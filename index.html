@@ -3,7 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Laboratório Lumyn</title>
+  <title>Lumyn — Prospecção com IA</title>
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="Plataforma de inteligência comercial para prospecção B2C/B2B local">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Lumyn">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/png" href="/icon-192.png">
   <style>
     /* ============================================================
        LUMYN DESIGN SYSTEM
@@ -4910,6 +4918,15 @@
       }
     });
 
+  </script>
+
+  <!-- Service Worker para PWA -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch((err) => {
+        console.log("[PWA] Service Worker não registrado:", err);
+      });
+    }
   </script>
 </body>
 </html>

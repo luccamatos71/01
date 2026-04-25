@@ -1,0 +1,31 @@
+<svg viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="192" height="192" fill="#07080f" rx="45"/>
+
+  <!-- Gradient -->
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e5e5e5;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Bulb light (simplified) -->
+  <circle cx="96" cy="70" r="28" fill="url(#grad)" filter="url(#glow)"/>
+
+  <!-- Bulb neck -->
+  <rect x="82" y="98" width="28" height="18" fill="url(#grad)"/>
+
+  <!-- Bulb socket -->
+  <circle cx="96" cy="122" r="14" fill="#ffffff"/>
+
+  <!-- "L" text for Lumyn -->
+  <text x="96" y="145" font-size="48" font-weight="bold" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif">L</text>
+</svg>
