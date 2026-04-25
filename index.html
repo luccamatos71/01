@@ -3823,11 +3823,15 @@
       input.focus();
     });
 
-    modeSelect.addEventListener("change", updateModeUI);
+    if (modeSelect) modeSelect.addEventListener("change", updateModeUI);
 
     updateModeUI();
 
+    // Wrap all element-dependent code in error boundary
+    try {
+
     // ===================== LEADS =====================
+    // Defensive element references - check if exist before using
     const leadsBtn         = document.getElementById("leadsBtn");
     const leadsOverlay     = document.getElementById("leadsOverlay");
     const leadsCloseBtn    = document.getElementById("leadsCloseBtn");
@@ -3836,6 +3840,9 @@
     const leadsHistorico   = document.getElementById("leadsHistorico");
     const cidadeChipsWrap  = document.getElementById("cidadeChipsWrap");
     const cidadeChips      = document.getElementById("cidadeChips");
+
+    // Guard function for elements that may not exist
+    const safeCall = (fn) => { try { if (typeof fn === "function") fn(); } catch (e) { /* silently ignore */ } };
 
     // Lead em hover na lista (para atalho W sem drawer)
     let leadHovered = null;
@@ -3858,6 +3865,7 @@
     }
 
     function renderizarHistoricoModal() {
+      if (!leadsHistorico) return; // Guard: element doesn't exist
       const hist = carregarHistorico();
       if (!hist.length) { leadsHistorico.style.display = "none"; return; }
       leadsHistorico.style.display = "block";
@@ -3865,23 +3873,25 @@
         hist.map(h => `<div class="leads-historico-item" data-query="${escapeHtml(h)}">${escapeHtml(h)}</div>`).join('');
       leadsHistorico.querySelectorAll(".leads-historico-item").forEach(el => {
         el.addEventListener("click", () => {
-          leadsQueryInput.value = el.dataset.query;
-          leadsQueryInput.focus();
+          if (leadsQueryInput) { leadsQueryInput.value = el.dataset.query; leadsQueryInput.focus(); }
         });
       });
     }
 
     function renderizarCidadeChips() {
+      if (!cidadeChipsWrap || !cidadeChips) return; // Guard: elements don't exist
       const cidades = carregarCidades();
       if (!cidades.length) { cidadeChipsWrap.style.display = "none"; return; }
       cidadeChipsWrap.style.display = "block";
       cidadeChips.innerHTML = cidades.map(c => `<button class="leads-chip cidade-chip" type="button" data-cidade="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('');
       cidadeChips.querySelectorAll(".cidade-chip").forEach(btn => {
         btn.addEventListener("click", () => {
-          const current = leadsQueryInput.value.trim();
-          const cat = current.replace(/ em .+$/i, "").trim();
-          leadsQueryInput.value = (cat || "") + " em " + btn.dataset.cidade;
-          leadsQueryInput.focus();
+          if (leadsQueryInput) {
+            const current = leadsQueryInput.value.trim();
+            const cat = current.replace(/ em .+$/i, "").trim();
+            leadsQueryInput.value = (cat || "") + " em " + btn.dataset.cidade;
+            leadsQueryInput.focus();
+          }
         });
       });
     }
@@ -3897,11 +3907,11 @@
       leadsOverlay.classList.remove("open");
     }
 
-    leadsBtn.addEventListener("click", openLeadsModal);
-    leadsCloseBtn.addEventListener("click", closeLeadsModal);
-    leadsOverlay.addEventListener("click", (e) => { if (e.target === leadsOverlay) closeLeadsModal(); });
+    if (leadsBtn) leadsBtn.addEventListener("click", openLeadsModal);
+    if (leadsCloseBtn) leadsCloseBtn.addEventListener("click", closeLeadsModal);
+    if (leadsOverlay) leadsOverlay.addEventListener("click", (e) => { if (e.target === leadsOverlay) closeLeadsModal(); });
 
-    leadsQueryInput.addEventListener("keydown", (e) => {
+    if (leadsQueryInput) leadsQueryInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") { e.preventDefault(); executarBuscaLeads(); }
     });
 
@@ -3921,7 +3931,7 @@
       });
     });
 
-    leadsSearchBtn.addEventListener("click", executarBuscaLeads);
+    if (leadsSearchBtn) leadsSearchBtn.addEventListener("click", executarBuscaLeads);
 
     async function executarBuscaLeads() {
       const query = leadsQueryInput.value.trim();
@@ -4100,11 +4110,13 @@
       });
     }
 
-    document.getElementById("analysisDrawerCloseBtn").addEventListener("click", closeAnalysisDrawer);
-    document.getElementById("analysisCloseBtn").addEventListener("click", closeAnalysisDrawer);
-    analysisNextBtn.addEventListener("click", navegarProximo);
+    const analysisDrawerCloseBtn2 = document.getElementById("analysisDrawerCloseBtn");
+    const analysisCloseBtn2 = document.getElementById("analysisCloseBtn");
+    if (analysisDrawerCloseBtn2) analysisDrawerCloseBtn2.addEventListener("click", closeAnalysisDrawer);
+    if (analysisCloseBtn2) analysisCloseBtn2.addEventListener("click", closeAnalysisDrawer);
+    if (analysisNextBtn) analysisNextBtn.addEventListener("click", navegarProximo);
 
-    analysisCopyBtn.addEventListener("click", () => {
+    if (analysisCopyBtn) analysisCopyBtn.addEventListener("click", () => {
       const msg = mensagemAtual();
       if (!msg) {
         analysisCopyBtn.textContent = "Não encontrada";
@@ -4117,7 +4129,7 @@
       });
     });
 
-    analysisWhatsappBtn.addEventListener("click", () => {
+    if (analysisWhatsappBtn) analysisWhatsappBtn.addEventListener("click", () => {
       if (!currentLead?.telefone) return;
       const msg = mensagemAtual();
       const link = montarLinkWhatsApp(currentLead.telefone, msg);
@@ -4439,7 +4451,7 @@
       fichaLeadAtivo = null;
     }
 
-    fichaCloseBtn.addEventListener("click", fecharFicha);
+    if (fichaCloseBtn) fichaCloseBtn.addEventListener("click", fecharFicha);
 
     function formatarData(iso) {
       if (!iso) return "—";
@@ -4475,6 +4487,7 @@
     }
 
     function abrirFicha(lead) {
+      if (!fichaBody || !fichaLeadNome || !fichaLeadMeta) return; // Guard: CRM elements don't exist
       fichaLeadAtivo = lead;
       fichaLeadNome.textContent = lead.nome || "Sem nome";
       fichaLeadMeta.textContent = [lead.categoria, lead.endereco].filter(Boolean).join(" · ");
@@ -4576,8 +4589,12 @@
         </div>
       `;
 
+      // Bind event listeners only if fichaBody exists
+      if (!fichaBody) return;
+
       // Copiar mensagem
-      fichaBody.querySelector("#btnCopiarMsg").addEventListener("click", () => {
+      const btnCopiarMsg = fichaBody.querySelector("#btnCopiarMsg");
+      if (btnCopiarMsg) btnCopiarMsg.addEventListener("click", () => {
         navigator.clipboard.writeText(lead.mensagemInicial || "").then(() => {
           fichaBody.querySelector("#btnCopiarMsg").textContent = "Copiado!";
           setTimeout(() => { if (fichaBody.querySelector("#btnCopiarMsg")) fichaBody.querySelector("#btnCopiarMsg").textContent = "Copiar mensagem"; }, 1400);
@@ -4585,7 +4602,8 @@
       });
 
       // Copiar follow-up
-      fichaBody.querySelector("#btnCopiarFollowUp").addEventListener("click", () => {
+      const btnCopiarFollowUp = fichaBody.querySelector("#btnCopiarFollowUp");
+      if (btnCopiarFollowUp) btnCopiarFollowUp.addEventListener("click", () => {
         navigator.clipboard.writeText(followUpTexto).then(() => {
           fichaBody.querySelector("#btnCopiarFollowUp").textContent = "Copiado!";
           setTimeout(() => { if (fichaBody.querySelector("#btnCopiarFollowUp")) fichaBody.querySelector("#btnCopiarFollowUp").textContent = "Copiar follow-up"; }, 1400);
@@ -4593,8 +4611,10 @@
       });
 
       // Salvar observações
-      fichaBody.querySelector("#btnSalvarNotas").addEventListener("click", async () => {
-        const notas = fichaBody.querySelector("#fichaNotas").value;
+      const btnSalvarNotas = fichaBody.querySelector("#btnSalvarNotas");
+      if (btnSalvarNotas) btnSalvarNotas.addEventListener("click", async () => {
+        const notasInput = fichaBody.querySelector("#fichaNotas");
+        const notas = notasInput ? notasInput.value : "";
         await crmFetch({ modo: "notas", id: lead.id, notas });
         fichaBody.querySelector("#btnSalvarNotas").textContent = "Salvo!";
         setTimeout(() => { if (fichaBody.querySelector("#btnSalvarNotas")) fichaBody.querySelector("#btnSalvarNotas").textContent = "Salvar observações"; }, 1400);
@@ -4659,32 +4679,39 @@
       const agora = new Date().toISOString();
 
       // Eu abordei → abordado, eu falei, aguardando cliente
-      fichaBody.querySelector("#btnAbordado").addEventListener("click", () =>
+      const btnAbordado = fichaBody.querySelector("#btnAbordado");
+      if (btnAbordado) btnAbordado.addEventListener("click", () =>
         atualizarLead(lead.id, { status: "abordado", ultimoMovimento: "eu", statusConversa: "aguardando_cliente", ultimaInteracaoEm: agora }));
 
       // Lead respondeu → conversando, lead falou, aguardando minha resposta
-      fichaBody.querySelector("#btnLeadRespondeu").addEventListener("click", () =>
+      const btnLeadRespondeu = fichaBody.querySelector("#btnLeadRespondeu");
+      if (btnLeadRespondeu) btnLeadRespondeu.addEventListener("click", () =>
         atualizarLead(lead.id, { status: "conversando", ultimoMovimento: "lead", statusConversa: "aguardando_resposta", ultimaInteracaoEm: agora }));
 
       // Eu respondi → conversando, eu falei, aguardando cliente
-      fichaBody.querySelector("#btnEuRespondi").addEventListener("click", () =>
+      const btnEuRespondi = fichaBody.querySelector("#btnEuRespondi");
+      if (btnEuRespondi) btnEuRespondi.addEventListener("click", () =>
         atualizarLead(lead.id, { status: "conversando", ultimoMovimento: "eu", statusConversa: "aguardando_cliente", ultimaInteracaoEm: agora }));
 
       // Follow-up enviado → follow_up, eu falei, aguardando resposta do lead
-      fichaBody.querySelector("#btnFollowUp").addEventListener("click", () =>
+      const btnFollowUp = fichaBody.querySelector("#btnFollowUp");
+      if (btnFollowUp) btnFollowUp.addEventListener("click", () =>
         atualizarLead(lead.id, { status: "follow_up", ultimoMovimento: "eu", statusConversa: "aguardando_cliente", ultimaInteracaoEm: agora }));
 
       // Mover etapas
-      fichaBody.querySelector("#btnReuniao").addEventListener("click", () =>
+      const btnReuniao = fichaBody.querySelector("#btnReuniao");
+      if (btnReuniao) btnReuniao.addEventListener("click", () =>
         atualizarLead(lead.id, { status: "reuniao", ultimoMovimento: "eu", statusConversa: "aguardando_cliente", ultimaInteracaoEm: agora }));
 
-      fichaBody.querySelector("#btnProposta").addEventListener("click", () =>
+      const btnProposta = fichaBody.querySelector("#btnProposta");
+      if (btnProposta) btnProposta.addEventListener("click", () =>
         atualizarLead(lead.id, { status: "proposta", ultimoMovimento: "eu", statusConversa: "aguardando_cliente", ultimaInteracaoEm: agora }));
 
-      fichaBody.querySelector("#btnFechado").addEventListener("click", () =>
+      const btnFechado = fichaBody.querySelector("#btnFechado");
+      if (btnFechado) btnFechado.addEventListener("click", () =>
         atualizarLead(lead.id, { status: "fechado", ultimoMovimento: null, statusConversa: null, ultimaInteracaoEm: agora }));
 
-      crmFicha.classList.add("open");
+      if (crmFicha) crmFicha.classList.add("open");
     }
 
     // ── Kanban ─────────────────────────────────────────
@@ -4756,12 +4783,12 @@
       crmOverlay.classList.remove("open");
     }
 
-    crmPanelBtn.addEventListener("click", abrirCRM);
-    crmCloseBtn.addEventListener("click", fecharCRM);
-    crmOverlay.addEventListener("click", e => { if (e.target === crmOverlay) fecharCRM(); });
+    if (crmPanelBtn) crmPanelBtn.addEventListener("click", abrirCRM);
+    if (crmCloseBtn) crmCloseBtn.addEventListener("click", fecharCRM);
+    if (crmOverlay) crmOverlay.addEventListener("click", e => { if (e.target === crmOverlay) fecharCRM(); });
 
     // Botão "+ CRM" no drawer
-    analysisCrmBtn.addEventListener("click", async () => {
+    if (analysisCrmBtn) analysisCrmBtn.addEventListener("click", async () => {
       if (!currentLead) return;
       const data = await crmFetch({ modo: "salvar", lead: currentLead });
       if (data.ok) {
@@ -4933,20 +4960,20 @@
       }
     }
 
-    estrategiaInput.addEventListener("input", () => {
+    if (estrategiaInput) estrategiaInput.addEventListener("input", () => {
       estrategiaInput.style.height = "auto";
       estrategiaInput.style.height = Math.min(estrategiaInput.scrollHeight, 120) + "px";
       atualizarBadgeModo(estrategiaInput.value);
     });
 
-    estrategiaInput.addEventListener("keydown", (e) => {
+    if (estrategiaInput) estrategiaInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviarEstrategia(); }
     });
 
-    estrategiaBtn.addEventListener("click", abrirEstrategia);
-    estrategiaSendBtn.addEventListener("click", enviarEstrategia);
-    estrategiaCloseBtn.addEventListener("click", fecharEstrategia);
-    estrategiaOverlay.addEventListener("click", e => { if (e.target === estrategiaOverlay) fecharEstrategia(); });
+    if (estrategiaBtn) estrategiaBtn.addEventListener("click", abrirEstrategia);
+    if (estrategiaSendBtn) estrategiaSendBtn.addEventListener("click", enviarEstrategia);
+    if (estrategiaCloseBtn) estrategiaCloseBtn.addEventListener("click", fecharEstrategia);
+    if (estrategiaOverlay) estrategiaOverlay.addEventListener("click", e => { if (e.target === estrategiaOverlay) fecharEstrategia(); });
 
     // ============================================================
     //  GESTOR DE TRÁFEGO — assistente conversacional
@@ -5138,19 +5165,19 @@
       }
     }
 
-    trafegoChatInput.addEventListener("input", () => {
+    if (trafegoChatInput) trafegoChatInput.addEventListener("input", () => {
       trafegoChatInput.style.height = "auto";
       trafegoChatInput.style.height = Math.min(trafegoChatInput.scrollHeight, 100) + "px";
     });
-    trafegoChatInput.addEventListener("keydown", (e) => {
+    if (trafegoChatInput) trafegoChatInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviarMsgTrafego(); }
     });
 
-    trafegoBtn.addEventListener("click", abrirTrafego);
-    trafegoRefreshBtn.addEventListener("click", carregarTrafego);
-    trafegoCloseBtn.addEventListener("click", fecharTrafego);
-    trafegoChatSendBtn.addEventListener("click", enviarMsgTrafego);
-    trafegoOverlay.addEventListener("click", e => { if (e.target === trafegoOverlay) fecharTrafego(); });
+    if (trafegoBtn) trafegoBtn.addEventListener("click", abrirTrafego);
+    if (trafegoRefreshBtn) trafegoRefreshBtn.addEventListener("click", carregarTrafego);
+    if (trafegoCloseBtn) trafegoCloseBtn.addEventListener("click", fecharTrafego);
+    if (trafegoChatSendBtn) trafegoChatSendBtn.addEventListener("click", enviarMsgTrafego);
+    if (trafegoOverlay) trafegoOverlay.addEventListener("click", e => { if (e.target === trafegoOverlay) fecharTrafego(); });
 
     // ESC fecha painéis — tráfego incluído
     document.addEventListener("keydown", (e) => {
@@ -5317,9 +5344,9 @@
     }
     function fecharCriativos() { criativosOverlay.classList.remove("open"); }
 
-    criativosBtn.addEventListener("click", abrirCriativos);
-    criativosCloseBtn.addEventListener("click", fecharCriativos);
-    criativosOverlay.addEventListener("click", e => { if (e.target === criativosOverlay) fecharCriativos(); });
+    if (criativosBtn) criativosBtn.addEventListener("click", abrirCriativos);
+    if (criativosCloseBtn) criativosCloseBtn.addEventListener("click", fecharCriativos);
+    if (criativosOverlay) criativosOverlay.addEventListener("click", e => { if (e.target === criativosOverlay) fecharCriativos(); });
 
     // Tabs de cliente
     document.querySelectorAll(".criativos-cliente-tab").forEach(tab => {
@@ -5450,12 +5477,14 @@
     });
 
     // Passo 3 — Gerar criativo com Gemini
-    criativosGerarBtn.addEventListener("click", async () => {
-      const instrucao = criativosInstrucao.value.trim();
+    if (criativosGerarBtn) criativosGerarBtn.addEventListener("click", async () => {
+      const criativosInstrucaoElem = document.getElementById("criativosInstrucao");
+      const instrucao = (criativosInstrucaoElem ? criativosInstrucaoElem.value : "").trim();
       if (!criativos.imagemSelecionada || !instrucao) return;
-      criativosGerarBtn.disabled = true;
-      criativosGerarBtn.textContent = "Gerando...";
-      criativosVariacoes.innerHTML = `
+      if (criativosGerarBtn) criativosGerarBtn.disabled = true;
+      if (criativosGerarBtn) criativosGerarBtn.textContent = "Gerando...";
+      const criativosVariacoesElem = document.getElementById("criativosVariacoes");
+      if (criativosVariacoesElem) criativosVariacoesElem.innerHTML = `
         <div style="font-size:12px; color:var(--text-3); padding:8px 0;">
           Enviando para o Gemini — pode levar 20–40s por variação...
         </div>`;
@@ -5482,7 +5511,7 @@
           return;
         }
 
-        criativosVariacoes.innerHTML = "";
+        if (criativosVariacoesElem) criativosVariacoesElem.innerHTML = "";
         (data.variacoes || []).forEach((v, i) => {
           const wrap = document.createElement("div");
           wrap.className = "criativo-variacao";
@@ -5523,15 +5552,18 @@
               }
             });
           }
-          criativosVariacoes.appendChild(wrap);
+          if (criativosVariacoesElem) criativosVariacoesElem.appendChild(wrap);
         });
       } catch (err) {
-        criativosVariacoes.innerHTML = `<div class="criativo-variacao-erro">Erro: ${escapeHtml(err.message)}</div>`;
+        if (criativosVariacoesElem) criativosVariacoesElem.innerHTML = `<div class="criativo-variacao-erro">Erro: ${escapeHtml(err.message)}</div>`;
       } finally {
-        criativosGerarBtn.disabled = false;
-        criativosGerarBtn.textContent = "Gerar criativo — 3 variações";
+        if (criativosGerarBtn) criativosGerarBtn.disabled = false;
+        if (criativosGerarBtn) criativosGerarBtn.textContent = "Gerar criativo — 3 variações";
       }
     });
+    } catch (e) {
+      console.warn("[Lumyn] Some overlay elements not found, continuing:", e.message);
+    }
 
   // ============================================================
   //  CENTRAL WINDOW — controle da janela central
