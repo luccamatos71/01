@@ -1270,8 +1270,10 @@ Retorne SOMENTE um JSON válido neste formato, sem texto adicional:
   ROTAS
 */
 async function handler(req, res) {
-  const urlObj = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-  const pathname = urlObj.pathname;
+  try {
+    const host = req.headers.host || "localhost:3000";
+    const urlObj = new URL(req.url, `http://${host}`);
+    const pathname = urlObj.pathname;
 
   if (req.method === "GET" && pathname === "/") {
     return enviarArquivo(res, path.join(__dirname, "index.html"), "text/html");
@@ -2027,8 +2029,13 @@ Regras:
     }
   }
 
-  res.writeHead(404);
-  res.end();
+    res.writeHead(404);
+    res.end();
+  } catch (err) {
+    console.error("[Handler] Erro não capturado:", err);
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ erro: err.message || "Erro interno" }));
+  }
 }
 
 async function inicializarSupabase() {
