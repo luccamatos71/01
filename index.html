@@ -2348,9 +2348,45 @@
     }
 
     @media (max-width: 720px) {
-      /* Layout: hide sidebar, full width main */
-      .app { grid-template-columns: 1fr; }
-      .sidebar { display: none; }
+      /* Layout: stack vertically, keep sidebar accessible */
+      .app {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+      }
+      .sidebar {
+        grid-column: 1;
+        grid-row: 1;
+        display: flex;
+        flex-direction: row;
+        overflow-x: auto;
+        overflow-y: hidden;
+        height: auto;
+        max-height: 200px;
+        border-right: none;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        padding: 12px;
+        gap: 12px;
+      }
+      .brand {
+        display: none;
+      }
+      .side-card {
+        flex-shrink: 0;
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 8px;
+        padding: 10px 12px;
+        background: rgba(255,255,255,0.03);
+        min-width: 140px;
+        border-bottom: none;
+      }
+      .side-card h3 {
+        font-size: 10px;
+        margin-bottom: 6px;
+      }
+      .main {
+        grid-column: 1;
+        grid-row: 2;
+      }
 
       /* Main spacing */
       .main-header {
@@ -2507,17 +2543,42 @@
         display: none !important;
       }
 
-      /* Expandir main para ocupar todo espaço */
+      /* Main: show header only */
       .main {
         display: flex;
         flex-direction: column;
+        overflow: hidden;
       }
 
-      /* Hide sidebar controls relacionados ao chat SDR */
+      .main-header {
+        display: flex !important;
+      }
+
+      /* Hide only SDR-related controls in horizontal sidebar */
       .side-card:nth-child(2),  /* Agente atual */
-      .side-card:nth-child(3)   /* Ferramenta ativa */
+      .side-card:nth-child(3),  /* Ferramenta ativa */
+      .side-card:nth-child(7)   /* Como usar (long text, not needed) */
       {
         display: none !important;
+      }
+
+      /* Style buttons in horizontal sidebar */
+      .side-card button {
+        width: 100%;
+        padding: 8px 10px;
+        font-size: 11px;
+        margin: 0;
+      }
+
+      /* Agir agora list: compact */
+      .alertas-list {
+        display: none;
+      }
+
+      /* CRM counters: compact */
+      .crm-counters {
+        font-size: 11px;
+        margin-bottom: 6px;
       }
 
       /* ========== KEEP VISIBLE (Overlays funcionam normalmente) ========== */
