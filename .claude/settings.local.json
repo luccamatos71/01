@@ -13,7 +13,27 @@
       "Bash(awk '{print $2}')",
       "Bash(xargs -r kill -9)",
       "Bash(timeout 3 node server.js)",
-      "Bash(PORT=3001 timeout 3 node server.js)"
+      "Bash(PORT=3001 timeout 3 node server.js)",
+      "Bash(vercel logs *)",
+      "Bash(node -c api/handler.js)",
+      "Bash(timeout 3 node -e \"require\\('./api/handler.js'\\)\")",
+      "Bash(PORT=3002 timeout 2 node server.js)",
+      "Bash(npm list *)",
+      "Bash(node generate-icons.js)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(grep -n \"\\\\.addEventListener\" \"C:\\\\\\\\Users\\\\\\\\lucca\\\\\\\\Downloads\\\\\\\\IA - APP - LUMYN\\\\\\\\index.html\")",
+      "Bash(grep -n \"document.getElementById\\(\\\\\"ficha\" \"C:\\\\\\\\Users\\\\\\\\lucca\\\\\\\\Downloads\\\\\\\\IA - APP - LUMYN\\\\\\\\index.html\")",
+      "Bash(grep -n \"fichaBody.querySelector\" \"C:\\\\\\\\Users\\\\\\\\lucca\\\\\\\\Downloads\\\\\\\\IA - APP - LUMYN\\\\\\\\index.html\")",
+      "Bash(grep -n \"const crmFicha\\\\|crmFicha\\\\.addEventListener\" \"C:\\\\\\\\Users\\\\\\\\lucca\\\\\\\\Downloads\\\\\\\\IA - APP - LUMYN\\\\\\\\index.html\")",
+      "Bash(grep -n \"fichaCloseBtn.addEventListener\" \"C:\\\\\\\\Users\\\\\\\\lucca\\\\\\\\Downloads\\\\\\\\IA - APP - LUMYN\\\\\\\\index.html\")",
+      "Bash(grep -n \"\\\\.addEventListener\\(\" \"C:\\\\\\\\Users\\\\\\\\lucca\\\\\\\\Downloads\\\\\\\\IA - APP - LUMYN\\\\\\\\index.html\")",
+      "Bash(grep -n \"const btnCopiarMensagemGerada\" \"C:\\\\\\\\Users\\\\\\\\lucca\\\\\\\\Downloads\\\\\\\\IA - APP - LUMYN\\\\\\\\index.html\")",
+      "Bash(grep -n \"const estrategiaInput\" \"C:\\\\\\\\Users\\\\\\\\lucca\\\\\\\\Downloads\\\\\\\\IA - APP - LUMYN\\\\\\\\index.html\")",
+      "Bash(grep -n \"const criativosGerarBtn\\\\|const trafegoChatSendBtn\\\\|const trafegoRefreshBtn\" \"C:\\\\\\\\Users\\\\\\\\lucca\\\\\\\\Downloads\\\\\\\\IA - APP - LUMYN\\\\\\\\index.html\")",
+      "Bash(grep -n \"trafegoChatSendBtn.addEventListener\\\\|criativosGerarBtn.addEventListener\" \"C:\\\\\\\\Users\\\\\\\\lucca\\\\\\\\Downloads\\\\\\\\IA - APP - LUMYN\\\\\\\\index.html\")",
+      "PowerShell($path = \"C:\\\\Users\\\\lucca\\\\Downloads\\\\IA - APP - LUMYN\\\\index.html\"; $lines = Get-Content -Path $path -Encoding UTF8; $totalLines = $lines.Count; Write-Output \"Total linhas: $totalLines\"; Write-Output \"Linha 2619: $\\($lines[2618]\\)\"; Write-Output \"Linha 2620: $\\($lines[2619]\\)\"; Write-Output \"Linha 2987: $\\($lines[2986]\\)\"; Write-Output \"Linha 2988: $\\($lines[2987]\\)\")",
+      "PowerShell($path = \"C:\\\\Users\\\\lucca\\\\Downloads\\\\IA - APP - LUMYN\\\\index.html\"; $newCssPath = \"C:\\\\Users\\\\lucca\\\\Downloads\\\\IA - APP - LUMYN\\\\_mobile_new.css\"; $lines = Get-Content -Path $path -Encoding UTF8; $newCss = Get-Content -Path $newCssPath -Encoding UTF8; $before = $lines[0..2618]; $after = $lines[2987..\\($lines.Count - 1\\)]; $combined = $before + $newCss + $after; $combined | Set-Content -Path $path -Encoding UTF8; Remove-Item -Path $newCssPath; $finalLines = \\(Get-Content -Path $path -Encoding UTF8\\).Count; Write-Output \"OK. Total linhas: $finalLines\")"
     ]
   }
 }
