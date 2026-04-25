@@ -2627,8 +2627,8 @@
       }
     }
 
-    /* ========== MOBILE LAYOUT (≤720px) ========== */
-    @media (max-width: 720px) {
+    /* ========== MOBILE LAYOUT (≤1024px) ========== */
+    @media (max-width: 1024px) {
       /* 1. Reset: remove fixed height, allow scroll */
       html, body { height: auto; overflow-y: auto; }
 
@@ -2643,19 +2643,19 @@
         overflow: visible;
         border-right: none;
         border-bottom: 1px solid rgba(255,255,255,0.06);
-        padding: 16px;
+        padding: 12px;
       }
 
       /* Brand: compact */
-      .brand { padding: 0 0 14px; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-      .brand h1 { font-size: 16px; margin: 0 0 2px; }
-      .brand p { font-size: 10px; margin: 0; }
+      .brand { padding: 0 0 10px; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+      .brand h1 { font-size: 14px; margin: 0 0 2px; }
+      .brand p { font-size: 9px; margin: 0; line-height: 1.3; }
 
       /* Side-cards: clean blocks */
       .side-card {
         display: block;
         width: 100%;
-        padding: 14px 0;
+        padding: 10px 0;
         margin: 0;
         border: none;
         border-bottom: 1px solid rgba(255,255,255,0.04);
@@ -2672,24 +2672,24 @@
 
       /* 5. KEEP: Prospecção, CRM, Estratégia, Tráfego — styled */
       .side-card h3 {
-        font-size: 10px;
+        font-size: 9px;
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.09em;
+        letter-spacing: 0.08em;
         color: var(--text-3);
-        margin: 0 0 10px;
+        margin: 0 0 8px;
       }
 
       .side-card button {
         display: block;
         width: 100%;
-        padding: 13px 16px;
+        padding: 10px 12px;
         margin: 0;
         border: 1px solid rgba(255,255,255,0.09);
         background: rgba(255,255,255,0.04);
         color: var(--text);
-        border-radius: 8px;
-        font-size: 14px;
+        border-radius: 6px;
+        font-size: 13px;
         font-weight: 500;
         text-align: left;
         cursor: pointer;
@@ -2698,13 +2698,22 @@
       .side-card button:active { background: rgba(255,255,255,0.08); }
 
       /* CRM counters inside side-card */
-      .crm-counters { margin-bottom: 8px; font-size: 12px; }
+      .crm-counters { margin-bottom: 6px; font-size: 11px; }
 
       /* 6. Main: hidden (SDR not needed on mobile) */
       .main { display: none; }
 
       /* 7. Inputs */
       input, select, textarea { font-size: 16px; } /* prevents iOS zoom */
+    }
+
+    /* Portrait-specific optimizations (≤600px width in portrait) */
+    @media (max-width: 600px) and (orientation: portrait) {
+      .sidebar { padding: 10px; }
+      .brand h1 { font-size: 13px; }
+      .brand p { font-size: 8px; }
+      .side-card button { padding: 9px 10px; font-size: 12px; }
+      .side-card h3 { font-size: 8px; margin: 0 0 6px; }
     }
   </style>
 </head>
