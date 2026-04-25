@@ -1276,7 +1276,7 @@ async function handler(req, res) {
     const pathname = urlObj.pathname;
 
   if (req.method === "GET" && pathname === "/") {
-    return enviarArquivo(res, path.join(__dirname, "index.html"), "text/html");
+    return enviarArquivo(res, path.join(__dirname, "..", "index.html"), "text/html");
   }
 
   // ================================
