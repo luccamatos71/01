@@ -3072,6 +3072,7 @@
   </div>
 
   <!-- LEADS MODAL -->
+  <!-- LEADS OVERLAY (comentado — central-window cuida disso)
   <div id="leadsOverlay" class="leads-overlay">
     <div class="leads-modal">
       <div class="leads-modal-top">
@@ -3112,8 +3113,9 @@
       </div>
     </div>
   </div>
+  -->
 
-  <!-- CRM OVERLAY -->
+  <!-- CRM OVERLAY (comentado — central-window cuida disso)
   <div id="crmOverlay" class="crm-overlay">
     <div class="crm-panel">
       <div class="crm-header">
@@ -3126,7 +3128,6 @@
       <div id="crmColumns" class="crm-columns"></div>
     </div>
 
-    <!-- FICHA DO LEAD -->
     <div id="crmFicha" class="crm-ficha">
       <div class="crm-ficha-header">
         <div class="crm-ficha-titulo">
@@ -3138,8 +3139,9 @@
       <div id="fichaBody" class="crm-ficha-body"></div>
     </div>
   </div>
+  -->
 
-  <!-- CRIATIVOS OVERLAY -->
+  <!-- CRIATIVOS OVERLAY (comentado — roadmap futuro)
   <div id="criativosOverlay" class="criativos-overlay">
     <div class="criativos-panel">
 
@@ -3153,10 +3155,8 @@
 
       <div class="criativos-body">
 
-        <!-- Coluna esquerda: seleção + galeria -->
         <div class="criativos-col criativos-col-esq">
 
-          <!-- Seletor de cliente -->
           <div class="criativos-section">
             <div class="criativos-section-titulo">Cliente</div>
             <div class="criativos-cliente-tabs">
@@ -3165,7 +3165,6 @@
             </div>
           </div>
 
-          <!-- Upload -->
           <div class="criativos-section">
             <div class="criativos-section-titulo">Upload de imagem</div>
             <label class="criativos-upload-label" for="criativosFileInput">
@@ -3175,7 +3174,6 @@
             <div id="criativosUploadStatus" class="criativos-upload-status"></div>
           </div>
 
-          <!-- Galeria -->
           <div class="criativos-section" style="flex:1; min-height:0;">
             <div class="criativos-section-titulo">Imagens <span id="criativosClienteLabel">(Rivano)</span></div>
             <div id="criativosGaleria" class="criativos-galeria"></div>
@@ -3183,10 +3181,8 @@
 
         </div>
 
-        <!-- Coluna direita: fluxo linear -->
         <div class="criativos-col criativos-col-dir">
 
-          <!-- PASSO 1 — Imagem selecionada -->
           <div class="criativos-section">
             <div class="criativos-section-titulo">
               <span class="criativos-step">1</span> Imagem
@@ -3196,7 +3192,6 @@
             </div>
           </div>
 
-          <!-- PASSO 2 — Briefing do gestor -->
           <div class="criativos-section" id="criativos-bloco-briefing" style="opacity:.4; pointer-events:none;">
             <div class="criativos-section-titulo">
               <span class="criativos-step">2</span> Briefing do gestor
@@ -3238,7 +3233,6 @@
             <button id="criativosDesignerBtn" class="criativos-btn primary" type="button" disabled>Enviar para o Designer →</button>
           </div>
 
-          <!-- PASSO 3 — Instrução do designer (editável) + Gerar -->
           <div class="criativos-section" id="criativos-bloco-instrucao" style="display:none">
             <div class="criativos-section-titulo">
               <span class="criativos-step">3</span> Instrução de edição
@@ -3253,8 +3247,9 @@
       </div>
     </div>
   </div>
+  -->
 
-  <!-- ESTRATÉGIA OVERLAY -->
+  <!-- ESTRATÉGIA OVERLAY (comentado — central-window cuida disso)
   <div id="estrategiaOverlay" class="estrategia-overlay">
     <div class="estrategia-panel">
       <div class="estrategia-header">
@@ -3282,8 +3277,9 @@
       </div>
     </div>
   </div>
+  -->
 
-  <!-- TRÁFEGO OVERLAY -->
+  <!-- TRÁFEGO OVERLAY (comentado — roadmap futuro)
   <div id="trafegoOverlay" class="trafego-overlay">
     <div class="trafego-panel">
       <div class="trafego-header">
@@ -3312,6 +3308,7 @@
       </div>
     </div>
   </div>
+  -->
 
   <!-- ANALYSIS DRAWER -->
   <div id="analysisDrawer" class="analysis-drawer">
@@ -5640,13 +5637,13 @@
           listEl.innerHTML = rows.length ? rows.join("") : `<div class="dashboard-item"><span style="color:var(--text-3);">Nenhum lead ainda</span></div>`;
         }
 
-        // Bind quick-access links
+        // Bind quick-access links — use central-window
         var goP = document.getElementById("cwGoProspeccao");
         var goC = document.getElementById("cwGoCrm");
         var goD = document.getElementById("cwGoDirector");
-        if (goP) goP.addEventListener("click", function() { fecharCW(); document.getElementById("leadsOverlay").classList.add("open"); });
-        if (goC) goC.addEventListener("click", function() { fecharCW(); document.getElementById("crmOverlay").classList.add("open"); });
-        if (goD) goD.addEventListener("click", function() { fecharCW(); document.getElementById("estrategiaOverlay").classList.add("open"); });
+        if (goP) goP.addEventListener("click", function() { abrirCW("prospeccao"); });
+        if (goC) goC.addEventListener("click", function() { abrirCW("crm"); });
+        if (goD) goD.addEventListener("click", function() { abrirCW("director"); });
       } catch(e) { /* silently fail */ }
     }
 
