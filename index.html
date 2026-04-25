@@ -1,0 +1,4915 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Laboratório Lumyn</title>
+  <style>
+    /* ============================================================
+       LUMYN DESIGN SYSTEM
+       Referência: Linear, Notion, Stripe Dashboard
+       Base: 8px grid · dark mode · minimalista
+    ============================================================ */
+
+    /* --- TOKENS ------------------------------------------------ */
+    :root {
+      /* Fundo */
+      --bg:          #07080f;
+      --surface:     #0c0e1a;
+      --surface-2:   #101226;
+      --surface-3:   #141729;
+
+      /* Bordas — uma única opacidade, usada em todo lugar */
+      --border:      rgba(255,255,255,0.07);
+      --border-soft: rgba(255,255,255,0.04);
+
+      /* Texto */
+      --text:    #e2e5f0;
+      --text-2:  #7e86a6;
+      --text-3:  #4a5070;
+
+      /* Alias legados (mantém compatibilidade com HTML inline) */
+      --muted:       var(--text-2);
+      --stroke:      var(--border);
+      --stroke-soft: var(--border-soft);
+
+      /* Marca */
+      --primary:        #6366f1;
+      --primary-2:      #4f46e5;
+      --primary-dim:    rgba(99,102,241,0.10);
+      --primary-border: rgba(99,102,241,0.20);
+
+      /* Semânticas */
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger:  #ef4444;
+
+      /* Escala tipográfica */
+      --text-xs:   10px;
+      --text-sm:   11px;
+      --text-base: 13px;
+      --text-md:   14px;
+      --text-lg:   16px;
+      --text-xl:   20px;
+
+      /* Border radius */
+      --r-sm: 6px;
+      --r-md: 8px;
+      --r-lg: 12px;
+      --r-xl: 16px;
+    }
+
+    /* --- RESET ------------------------------------------------- */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: var(--text-base);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* --- LAYOUT ------------------------------------------------ */
+    .app {
+      display: grid;
+      grid-template-columns: 232px 1fr;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    /* --- SIDEBAR ----------------------------------------------- */
+    .sidebar {
+      background:
+        radial-gradient(ellipse at 70% 0%, rgba(99,102,241,0.09) 0%, transparent 65%),
+        #07091a;
+      border-right: 1px solid rgba(255,255,255,0.06);
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    /* Brand — logo area da sidebar */
+    .brand {
+      padding: 22px 18px 18px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      flex-shrink: 0;
+    }
+
+    .brand h1 {
+      margin: 0 0 5px;
+      font-size: 18px;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .brand h1 span {
+      color: var(--primary);
+      /* leve brilho no nome da marca */
+      text-shadow: 0 0 20px rgba(99,102,241,0.4);
+    }
+
+    .brand p {
+      margin: 0;
+      color: var(--text-3);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    /* Seções da sidebar — sem card, só separador */
+    .side-card {
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .side-card h3 {
+      margin: 0;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--text-3);
+      font-weight: 600;
+    }
+
+    /* Info text (Como usar / Etapa atual) — mínimo visual */
+    .side-card > p {
+      margin: 0;
+      color: var(--text-3);
+      font-size: 11px;
+      line-height: 1.6;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .label {
+      font-size: 11px;
+      color: var(--text-3);
+      font-weight: 500;
+    }
+
+    /* --- INPUTS & SELECT -------------------------------------- */
+    select, textarea, input {
+      width: 100%;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      border-radius: var(--r-md);
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      font: inherit;
+      font-size: 12px;
+    }
+
+    select {
+      padding: 7px 10px;
+      appearance: none;
+      cursor: pointer;
+    }
+
+    textarea {
+      resize: none;
+      min-height: 48px;
+      padding: 10px 12px;
+      line-height: 1.5;
+      font-size: var(--text-base);
+    }
+
+    input { padding: 9px 12px; font-size: var(--text-base); }
+
+    select:focus, textarea:focus, input:focus {
+      border-color: rgba(99,102,241,0.45);
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.07);
+    }
+
+    /* --- BOTÕES ----------------------------------------------- */
+    .btn, button {
+      appearance: none;
+      border: none;
+      cursor: pointer;
+      font: inherit;
+      border-radius: var(--r-md);
+      transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.08s, opacity 0.12s;
+    }
+
+    button:active { transform: translateY(1px); }
+
+    /* Primário */
+    .btn-primary, .send-btn, .leads-search-btn {
+      background: var(--primary);
+      color: #fff;
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.01em;
+      border: 1px solid transparent;
+    }
+
+    .btn-primary:hover, .send-btn:hover, .leads-search-btn:hover {
+      background: var(--primary-2);
+    }
+
+    .btn-primary:disabled, .send-btn:disabled, .leads-search-btn:disabled {
+      opacity: 0.38;
+      cursor: not-allowed;
+    }
+
+    /* Secundário — "Limpar conversa" */
+    .btn.secondary, .btn-secondary {
+      background: transparent;
+      color: var(--text-3);
+      border: 1px solid rgba(255,255,255,0.07);
+      padding: 7px 12px;
+      font-weight: 500;
+      font-size: 11px;
+    }
+
+    .btn.secondary:hover, .btn-secondary:hover {
+      background: rgba(255,255,255,0.04);
+      color: var(--text-2);
+    }
+
+    /* CTA primário da sidebar — Buscar leads */
+    .leads-sidebar-btn {
+      width: 100%;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 10px 14px;
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.01em;
+      text-align: center;
+      border-radius: var(--r-md);
+      box-shadow: 0 2px 12px rgba(99,102,241,0.25);
+    }
+
+    .leads-sidebar-btn:hover {
+      background: var(--primary-2);
+      box-shadow: 0 2px 16px rgba(99,102,241,0.35);
+    }
+
+    /* --- MODE BADGE ------------------------------------------- */
+    .mode-badge {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      padding: 3px 9px;
+      background: rgba(255,255,255,0.05);
+      color: var(--text-2);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    /* --- MAIN -------------------------------------------------- */
+    .main {
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      /* leve gradiente no topo para dar profundidade */
+      background-image: radial-gradient(ellipse at 80% 0%, rgba(99,102,241,0.04) 0%, transparent 55%);
+    }
+
+    .main-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 13px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.01);
+    }
+
+    .main-title h2 {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+
+    .main-title p {
+      margin: 2px 0 0;
+      color: var(--text-3);
+      font-size: 11px;
+    }
+
+    /* Status pill */
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: rgba(34,197,94,0.07);
+      color: rgba(34,197,94,0.85);
+      border: 1px solid rgba(34,197,94,0.15);
+      border-radius: 20px;
+      font-weight: 500;
+      font-size: var(--text-sm);
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--success);
+    }
+
+    /* --- CHAT -------------------------------------------------- */
+    .chat {
+      flex: 1;
+      overflow: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .empty-state {
+      margin: auto;
+      max-width: 360px;
+      width: 100%;
+      text-align: center;
+      color: var(--text-2);
+      padding: 0;
+    }
+
+    .empty-state strong {
+      display: block;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .row.user { justify-content: flex-end; }
+
+    /* Bubbles */
+    .bubble {
+      max-width: min(760px, 88%);
+      border-radius: var(--r-lg);
+      padding: 10px 14px 8px;
+      border: 1px solid var(--border);
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+      line-height: 1.55;
+      font-size: var(--text-base);
+    }
+
+    .bubble.user {
+      background: var(--primary);
+      color: #fff;
+      border-color: transparent;
+      border-radius: var(--r-lg) var(--r-lg) 4px var(--r-lg);
+    }
+
+    .bubble.assistant {
+      background: var(--surface-2);
+      border-color: var(--border);
+      border-radius: var(--r-lg) var(--r-lg) var(--r-lg) 4px;
+    }
+
+    .bubble-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .bubble-role {
+      font-size: var(--text-xs);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-2);
+      font-weight: 700;
+    }
+
+    .bubble.user .bubble-role { color: rgba(255,255,255,0.55); }
+
+    .assistant-content {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    /* Seções accordion dentro do bubble */
+    .section {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--r-sm);
+      overflow: hidden;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      cursor: pointer;
+      user-select: none;
+      min-height: 28px;
+    }
+
+    .section-header:hover { background: rgba(255,255,255,0.02); }
+
+    .section-header strong {
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #818cf8;
+      font-weight: 700;
+    }
+
+    .section-chevron {
+      font-size: 9px;
+      color: var(--text-3);
+      transition: transform 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .section.open .section-chevron { transform: rotate(180deg); }
+
+    .section-body {
+      display: none;
+      padding: 6px 10px 8px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 12px;
+      line-height: 1.5;
+      color: rgba(226,229,240,0.80);
+      border-top: 1px solid var(--border-soft);
+    }
+
+    .section.open .section-body { display: block; }
+
+    .meta-box {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: var(--r-md);
+      background: var(--primary-dim);
+      border: 1px solid var(--primary-border);
+      color: #b4b8ff;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .error-box {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: var(--r-md);
+      background: rgba(239,68,68,0.06);
+      border: 1px solid rgba(239,68,68,0.15);
+      color: #fca5a5;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .copy-btn {
+      background: transparent;
+      color: var(--text-2);
+      border: 1px solid var(--border);
+      padding: 3px 9px;
+      font-size: var(--text-xs);
+      font-weight: 600;
+      width: fit-content;
+      margin-top: 6px;
+      border-radius: var(--r-sm);
+    }
+
+    .copy-btn:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+
+    /* --- COMPOSER --------------------------------------------- */
+    .composer {
+      padding: 12px 16px 14px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+
+    .composer-wrap {
+      display: grid;
+      grid-template-columns: 1fr 88px;
+      gap: 8px;
+      align-items: end;
+    }
+
+    .send-btn {
+      height: 100%;
+      min-height: 48px;
+      border-radius: var(--r-md);
+    }
+
+    .hint {
+      margin-top: 6px;
+      color: var(--text-3);
+      font-size: var(--text-xs);
+    }
+
+    /* --- LOADING ----------------------------------------------- */
+    .loading {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-2);
+      font-size: 12px;
+    }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 1.5px solid rgba(255,255,255,0.10);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ============================================================
+       LEADS MODAL — busca de leads
+    ============================================================ */
+    .leads-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.16s ease;
+    }
+
+    .leads-overlay.open { opacity: 1; pointer-events: all; }
+
+    .leads-modal {
+      width: min(480px, 94vw);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xl);
+      padding: 24px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04);
+      transform: translateY(8px);
+      transition: transform 0.16s ease;
+    }
+
+    .leads-overlay.open .leads-modal { transform: translateY(0); }
+
+    .leads-modal-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .leads-modal-top h3 {
+      margin: 0 0 3px;
+      font-size: var(--text-lg);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .leads-modal-top p { margin: 0; font-size: 12px; color: var(--text-2); }
+
+    /* Botão fechar — X */
+    .leads-close-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      width: 28px;
+      height: 28px;
+      border-radius: var(--r-sm);
+      font-size: 15px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      padding: 0;
+    }
+
+    .leads-close-btn:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+
+    .leads-query-input {
+      width: 100%;
+      padding: 11px 14px;
+      font-size: var(--text-base);
+      border-radius: var(--r-md);
+      margin-bottom: 16px;
+      border: 1px solid var(--border);
+      background: var(--surface-3);
+      color: var(--text);
+      outline: none;
+      font: inherit;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .leads-query-input:focus {
+      border-color: rgba(99,102,241,0.5);
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.08);
+    }
+
+    .leads-chips-label {
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-3);
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .leads-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 24px;
+    }
+
+    .leads-chip {
+      padding: 5px 12px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: var(--text-sm);
+      font-weight: 500;
+      color: var(--text-2);
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+    }
+
+    .leads-chip:hover {
+      background: var(--primary-dim);
+      border-color: var(--primary-border);
+      color: #a5b4fc;
+    }
+
+    /* Histórico de buscas */
+    .leads-historico { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
+    .leads-historico-label {
+      font-size: var(--text-xs); text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--text-3); font-weight: 700; margin-bottom: 6px;
+    }
+    .leads-historico-item {
+      font-size: 12px; color: var(--text-2);
+      padding: 6px 10px; border-radius: var(--r-sm);
+      border: 1px solid var(--border); cursor: pointer;
+      transition: background 120ms, color 120ms;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .leads-historico-item:hover { background: var(--primary-dim); border-color: var(--primary-border); color: #a5b4fc; }
+
+    .leads-modal-footer { display: flex; justify-content: flex-end; }
+
+    .leads-search-btn {
+      padding: 10px 22px;
+      border-radius: var(--r-md);
+    }
+
+    /* ============================================================
+       LEADS CARDS — lista de resultados no chat
+    ============================================================ */
+    .leads-summary {
+      font-size: 12px;
+      color: var(--text-2);
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border-soft);
+      margin-bottom: 4px;
+    }
+
+    .leads-summary strong { color: var(--text); }
+
+    /* Cartão de lead — estilo Linear */
+    .lead-card {
+      border-radius: var(--r-md);
+      border: 1px solid var(--border);
+      background: transparent;
+      overflow: hidden;
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s;
+    }
+
+    .lead-card:hover {
+      background: rgba(255,255,255,0.02);
+      border-color: rgba(255,255,255,0.12);
+    }
+
+    .lead-card.no-click { cursor: default; }
+    .lead-card.no-click:hover { background: transparent; border-color: var(--border); }
+
+    /* Lead ativo (drawer aberto) */
+    .lead-card.ativo { border-color: var(--primary-border); background: var(--primary-dim); }
+    .lead-card.ativo:hover { background: rgba(99,102,241,0.13); }
+
+    /* Quick actions no hover */
+    .lead-card-quick-actions {
+      display: none;
+      gap: 5px;
+      flex-shrink: 0;
+      align-items: center;
+    }
+    .lead-card:hover .lead-card-quick-actions { display: flex; }
+    .lead-card.ativo .lead-card-quick-actions { display: flex; }
+    .lead-card-qa-btn {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.02em;
+      padding: 4px 9px; border-radius: var(--r-sm); border: 1px solid var(--border);
+      background: var(--surface-2); color: var(--text-2);
+      cursor: pointer; transition: background 120ms, color 120ms, border-color 120ms;
+      white-space: nowrap;
+    }
+    .lead-card-qa-btn:hover { background: var(--surface-3); color: var(--text); border-color: rgba(255,255,255,0.12); }
+    .lead-card-qa-btn.wa { border-color: rgba(74,222,128,0.2); color: rgba(74,222,128,0.7); }
+    .lead-card-qa-btn.wa:hover { background: rgba(74,222,128,0.08); color: rgba(74,222,128,0.95); }
+    .lead-card-qa-btn.saved { color: rgba(34,197,94,0.6); border-color: rgba(34,197,94,0.2); cursor: default; }
+
+    .lead-card-body {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+    }
+
+    /* Badge ALTA / MÉDIA / BAIXA */
+    .lead-badge {
+      flex-shrink: 0;
+      font-size: var(--text-xs);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 20px;
+      min-width: 52px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .lead-badge.alta    { background: rgba(34,197,94,0.10);  color: #4ade80; }
+    .lead-badge.media   { background: rgba(245,158,11,0.10); color: #fbbf24; }
+    .lead-badge.baixa   { background: rgba(255,255,255,0.05); color: var(--text-3); }
+    .lead-badge.descarte { background: transparent; color: var(--text-3); opacity: 0.5; }
+
+    .lead-info { flex: 1; min-width: 0; }
+
+    .lead-name {
+      font-size: var(--text-base);
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .lead-meta {
+      font-size: var(--text-sm);
+      color: var(--text-2);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .lead-phone { font-size: var(--text-sm); margin-top: 2px; font-weight: 500; }
+    .lead-phone.has-phone { color: #a5b4fc; }
+    .lead-phone.no-phone  { color: var(--text-3); }
+
+    .lead-actions { flex-shrink: 0; }
+
+    .lead-toggle-btn, .lead-analyze-btn {
+      font-size: var(--text-sm);
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: var(--r-sm);
+      white-space: nowrap;
+    }
+
+    .lead-toggle-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-2);
+    }
+    .lead-toggle-btn:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+
+    .lead-analyze-btn {
+      background: var(--primary-dim);
+      border: 1px solid var(--primary-border);
+      color: #a5b4fc;
+    }
+    .lead-analyze-btn:hover { background: rgba(99,102,241,0.16); }
+
+    .lead-analysis {
+      display: none;
+      border-top: 1px solid var(--border-soft);
+      padding: 12px 14px;
+    }
+
+    .lead-analysis.open { display: block; }
+
+    .lead-analysis-text {
+      font-size: 12px;
+      line-height: 1.6;
+      color: rgba(226,229,240,0.82);
+      white-space: pre-wrap;
+      margin-bottom: 8px;
+    }
+
+    .lead-copy-msg-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      font-size: var(--text-xs);
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: var(--r-sm);
+    }
+    .lead-copy-msg-btn:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+
+    .leads-descartados-toggle {
+      font-size: var(--text-sm);
+      color: var(--text-3);
+      cursor: pointer;
+      padding: 8px 2px 2px;
+      user-select: none;
+      border-top: 1px solid var(--border-soft);
+      margin-top: 4px;
+    }
+
+    .leads-descartados-toggle:hover { color: var(--text-2); }
+
+    .leads-descartados-list { display: none; }
+    .leads-descartados-list.open { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
+
+    /* Lead contatado */
+    .lead-badge.contatado { background: rgba(34,197,94,0.07); color: rgba(34,197,94,0.45); }
+    .lead-card.contatado { opacity: 0.5; }
+    .lead-card.contatado:hover { opacity: 0.7; }
+
+    /* Mensagem de abordagem — seletor de estilo */
+    .mensagem-wrap {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .mensagem-titulo {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-2);
+      margin-bottom: 10px;
+    }
+    .estilo-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .estilo-tab {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: 7px 6px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      transition: all 0.15s;
+    }
+    .estilo-tab:hover { background: rgba(255,255,255,0.02); }
+    .estilo-tab.ativo {
+      background: var(--primary-dim);
+      border-color: var(--primary-border);
+    }
+    .estilo-tab .estilo-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .estilo-tab.ativo .estilo-label { color: #a5b4fc; }
+    .estilo-tab .estilo-desc {
+      font-size: 10px;
+      color: var(--text-2);
+      line-height: 1.2;
+      text-align: center;
+    }
+    .mensagem-box {
+      background: var(--surface-3);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: 12px 14px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text);
+      white-space: pre-wrap;
+      min-height: 60px;
+    }
+    .quando-usar {
+      margin-top: 10px;
+      font-size: 11px;
+      color: var(--text-2);
+      line-height: 1.5;
+    }
+    .quando-usar b { color: var(--text); }
+
+    /* Cor do card por status CRM */
+    .lead-card.st-abordado { border-left: 2px solid #60a5fa; }
+    .lead-card.st-respondeu { border-left: 2px solid #fbbf24; }
+    .lead-card.st-reuniao   { border-left: 2px solid #4ade80; background: rgba(74,222,128,0.04); }
+    .lead-card.st-fechado   { opacity: 0.45; border-left: 2px solid #4ade80; }
+    .lead-card.st-perdido   { opacity: 0.35; }
+
+    /* Badge de status (substitui o de prioridade quando lead tem status) */
+    .lead-badge.st-abordado  { background: rgba(96,165,250,0.10); color: #60a5fa; }
+    .lead-badge.st-respondeu { background: rgba(251,191,36,0.12); color: #fbbf24; }
+    .lead-badge.st-reuniao   { background: rgba(74,222,128,0.12); color: #4ade80; }
+    .lead-badge.st-fechado   { background: rgba(74,222,128,0.10); color: #4ade80; }
+    .lead-badge.st-perdido   { background: rgba(255,255,255,0.04); color: var(--text-2); }
+
+    /* Botões de status no drawer (C / R / M) */
+    .status-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 10px;
+      border-radius: var(--r-md);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .status-btn:hover { background: rgba(255,255,255,0.03); color: var(--text); }
+    .status-btn.ativo.st-abordado  { background: rgba(96,165,250,0.12); border-color: rgba(96,165,250,0.3); color: #60a5fa; }
+    .status-btn.ativo.st-respondeu { background: rgba(251,191,36,0.12); border-color: rgba(251,191,36,0.3); color: #fbbf24; }
+    .status-btn.ativo.st-reuniao   { background: rgba(74,222,128,0.12); border-color: rgba(74,222,128,0.3); color: #4ade80; }
+    .status-actions { display: flex; gap: 6px; }
+
+    /* Botão próximo lead */
+    .analysis-next-btn {
+      background: var(--primary-dim);
+      border: 1px solid var(--primary-border);
+      color: #a5b4fc;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 7px 13px;
+      border-radius: var(--r-md);
+      white-space: nowrap;
+    }
+    .analysis-next-btn:hover { background: rgba(99,102,241,0.18); }
+    .analysis-next-btn:disabled { opacity: 0.28; cursor: not-allowed; }
+
+    /* ============================================================
+       CRIATIVOS — overlay
+    ============================================================ */
+    .criativos-sidebar-btn {
+      width: 100%;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      font-size: var(--text-sm);
+      font-weight: 600;
+      padding: 8px 12px;
+      border-radius: var(--r-md);
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s;
+    }
+    .criativos-sidebar-btn:hover { background: rgba(255,255,255,0.03); color: var(--text); }
+
+    .criativos-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 250;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease;
+    }
+    .criativos-overlay.open { opacity: 1; pointer-events: all; }
+
+    .criativos-panel {
+      background: var(--surface);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transform: translateY(12px);
+      transition: transform 0.18s ease;
+    }
+    .criativos-overlay.open .criativos-panel { transform: translateY(0); }
+
+    .criativos-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .criativos-header h3 {
+      margin: 0 0 2px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .criativos-header p { margin: 0; font-size: 11px; color: var(--text-3); }
+
+    .criativos-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .criativos-col {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .criativos-col-esq {
+      width: 320px;
+      flex-shrink: 0;
+      border-right: 1px solid var(--border);
+    }
+    .criativos-col-dir { flex: 1; }
+
+    .criativos-section { display: flex; flex-direction: column; gap: 8px; }
+    .criativos-section-titulo {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-3);
+    }
+
+    /* Tabs de cliente */
+    .criativos-cliente-tabs { display: flex; gap: 6px; }
+    .criativos-cliente-tab {
+      flex: 1;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 7px 10px;
+      border-radius: var(--r-md);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .criativos-cliente-tab:hover { background: rgba(255,255,255,0.02); }
+    .criativos-cliente-tab.ativo {
+      background: var(--primary-dim);
+      border-color: var(--primary-border);
+      color: #a5b4fc;
+    }
+
+    /* Upload */
+    .criativos-upload-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px dashed rgba(255,255,255,0.12);
+      border-radius: var(--r-md);
+      padding: 12px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text-2);
+      transition: all 0.15s;
+    }
+    .criativos-upload-label:hover { border-color: var(--primary-border); color: #a5b4fc; background: var(--primary-dim); }
+    .criativos-upload-status { font-size: 11px; color: var(--text-3); min-height: 14px; }
+
+    /* Galeria */
+    .criativos-galeria {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      overflow-y: auto;
+    }
+    .criativos-thumb {
+      aspect-ratio: 1;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .criativos-thumb:hover { border-color: rgba(255,255,255,0.15); }
+    .criativos-thumb.ativo { border-color: #a5b4fc; }
+    .criativos-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .criativos-galeria-vazia { font-size: 12px; color: var(--text-3); padding: 8px 0; }
+
+    /* Preview */
+    .criativos-preview {
+      width: 100%;
+      max-height: 260px;
+      border-radius: var(--r-md);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: var(--surface-3);
+      min-height: 120px;
+    }
+    .criativos-preview img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .criativos-preview-empty { font-size: 12px; color: var(--text-3); }
+
+    /* Botões */
+    .criativos-btn {
+      padding: 8px 14px;
+      border-radius: var(--r-md);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-2);
+      transition: all 0.15s;
+      align-self: flex-start;
+    }
+    .criativos-btn:hover:not(:disabled) { background: rgba(255,255,255,0.03); color: var(--text); }
+    .criativos-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .criativos-btn.primary { background: var(--primary-dim); border-color: var(--primary-border); color: #a5b4fc; }
+    .criativos-btn.primary:hover:not(:disabled) { background: rgba(99,102,241,0.2); }
+    .criativos-btn.accent { border-color: rgba(74,222,128,0.3); color: #4ade80; }
+    .criativos-btn.accent:hover:not(:disabled) { background: rgba(74,222,128,0.07); }
+    .criativos-btn.ghost { border-color: transparent; color: var(--text-3); font-size: 11px; padding: 5px 8px; }
+    .criativos-btn.ghost:hover:not(:disabled) { color: var(--text-2); }
+    .criativos-btn.gemini {
+      background: linear-gradient(135deg, rgba(66,133,244,0.15), rgba(52,168,83,0.15));
+      border-color: rgba(66,133,244,0.35);
+      color: #7ab3f7;
+    }
+    .criativos-btn.gemini:hover:not(:disabled) {
+      background: linear-gradient(135deg, rgba(66,133,244,0.22), rgba(52,168,83,0.22));
+      color: #a8cbfa;
+    }
+
+    .criativos-badge-gemini {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      background: rgba(66,133,244,0.12);
+      border: 1px solid rgba(66,133,244,0.25);
+      color: #7ab3f7;
+      padding: 1px 6px;
+      border-radius: 10px;
+      margin-left: 6px;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    /* Grid de variações Gemini */
+    .criativos-variacoes {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 4px;
+    }
+    .criativo-variacao {
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      overflow: hidden;
+      background: var(--surface-3);
+    }
+    .criativo-variacao-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .criativo-variacao-label { font-size: 11px; font-weight: 600; color: var(--text-2); }
+    .criativo-variacao-img { width: 100%; display: block; }
+    .criativo-variacao-erro {
+      padding: 12px;
+      font-size: 11px;
+      color: rgba(239,68,68,0.7);
+    }
+    .criativos-salvar-btn {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 4px 9px;
+      border-radius: 6px;
+      border: 1px solid rgba(74,222,128,0.25);
+      background: transparent;
+      color: #4ade80;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .criativos-salvar-btn:hover { background: rgba(74,222,128,0.08); }
+    .criativos-salvar-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Steps */
+    .criativos-step {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--primary-dim);
+      border: 1px solid var(--primary-border);
+      color: #a5b4fc;
+      font-size: 9px;
+      font-weight: 700;
+      margin-right: 5px;
+      flex-shrink: 0;
+    }
+    .criativos-step-hint {
+      font-size: 10px;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+      opacity: .45;
+    }
+    .criativos-instrucao-area {
+      min-height: 140px;
+      font-size: 11px;
+      line-height: 1.6;
+      color: var(--text-2);
+    }
+    .criativos-diagnostico {
+      background: rgba(99,102,241,0.06);
+      border: 1px solid var(--primary-border);
+      border-radius: var(--r-md);
+      padding: 10px 12px;
+      font-size: 11px;
+      color: var(--text-2);
+      line-height: 1.5;
+    }
+    .criativos-diagnostico strong { color: #a5b4fc; font-weight: 600; }
+
+    /* Formulário do gestor */
+    .criativos-form { display: flex; flex-direction: column; gap: 10px; }
+    .criativos-field { display: flex; flex-direction: column; gap: 4px; }
+    .criativos-field-row { display: flex; gap: 8px; }
+    .criativos-label { font-size: 11px; color: var(--text-2); font-weight: 500; }
+    .criativos-input {
+      background: var(--surface-3);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      color: var(--text);
+      font-size: 12px;
+      padding: 8px 10px;
+      outline: none;
+      transition: border-color 0.15s;
+      font-family: inherit;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .criativos-input:focus { border-color: var(--primary-border); }
+    .criativos-input::placeholder { color: var(--text-3); }
+    .criativos-textarea { resize: vertical; min-height: 56px; }
+    .criativos-select {
+      background: var(--surface-3);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      color: var(--text);
+      font-size: 12px;
+      padding: 8px 10px;
+      outline: none;
+      cursor: pointer;
+      font-family: inherit;
+      width: 100%;
+    }
+    .criativos-select:focus { border-color: var(--primary-border); }
+
+    /* Resultado */
+    .criativos-result {
+      background: var(--surface-3);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: 12px 14px;
+      font-size: 12px;
+      line-height: 1.65;
+      color: var(--text);
+      white-space: pre-wrap;
+    }
+
+    /* ============================================================
+       CRM FICHA — painel lateral de detalhe do lead
+    ============================================================ */
+    .crm-ficha {
+      position: absolute;
+      top: 0; right: 0;
+      width: 380px;
+      height: 100%;
+      background: var(--surface-2);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.2s cubic-bezier(0.4,0,0.2,1);
+      z-index: 10;
+      box-shadow: -12px 0 32px rgba(0,0,0,0.35);
+    }
+    .crm-ficha.open { transform: translateX(0); }
+    .crm-overlay { position: relative; overflow: hidden; }
+
+    .crm-ficha-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .crm-ficha-nome {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.01em;
+      margin-bottom: 4px;
+    }
+    .crm-ficha-meta {
+      font-size: 11px;
+      color: var(--text-2);
+      line-height: 1.5;
+    }
+    .crm-ficha-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Bloco de informação */
+    .ficha-bloco { display: flex; flex-direction: column; gap: 6px; }
+    .ficha-bloco-titulo {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-3);
+    }
+    .ficha-bloco-val {
+      font-size: 12px;
+      color: var(--text);
+      line-height: 1.5;
+      background: var(--surface-3);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: 8px 10px;
+      min-height: 32px;
+    }
+    .ficha-bloco-val.textarea-like { white-space: pre-wrap; min-height: 60px; }
+    .ficha-bloco-val.highlight { color: #a5b4fc; background: var(--primary-dim); border-color: var(--primary-border); }
+    .ficha-bloco-val.urgente { color: #fbbf24; background: rgba(251,191,36,0.08); border-color: rgba(251,191,36,0.2); }
+    .ficha-bloco-val.ok { color: #4ade80; background: rgba(74,222,128,0.07); border-color: rgba(74,222,128,0.2); }
+
+    /* Notas editável */
+    .ficha-notas {
+      width: 100%;
+      box-sizing: border-box;
+      background: var(--surface-3);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: 8px 10px;
+      font-size: 12px;
+      color: var(--text);
+      resize: none;
+      min-height: 64px;
+      font-family: inherit;
+      line-height: 1.5;
+    }
+    .ficha-notas:focus { outline: none; border-color: var(--primary-border); }
+
+    /* Botões de ação da ficha */
+    .ficha-acoes {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .ficha-acoes-row { display: flex; gap: 6px; }
+    .ficha-estilo-tabs { display: flex; gap: 5px; margin-bottom: 4px; }
+    .ficha-estilo-tab {
+      flex: 1;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 8px;
+      border-radius: var(--r-md);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .ficha-estilo-tab:hover { background: rgba(255,255,255,0.02); }
+    .ficha-estilo-tab.ativo { background: var(--primary-dim); border-color: var(--primary-border); color: #a5b4fc; }
+    .ficha-btn {
+      flex: 1;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 7px 10px;
+      border-radius: var(--r-md);
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .ficha-btn:hover { background: rgba(255,255,255,0.03); color: var(--text); }
+    .ficha-btn.primary { background: #25d366; border-color: #25d366; color: #fff; text-decoration: none; display: inline-block; }
+    .ficha-btn.primary:hover { background: #1ebe5d; }
+    .ficha-btn.accent { background: var(--primary-dim); border-color: var(--primary-border); color: #a5b4fc; }
+    .ficha-btn.accent:hover { background: rgba(99,102,241,0.2); }
+    .ficha-btn.warn { border-color: rgba(251,191,36,0.3); color: #fbbf24; }
+    .ficha-btn.warn:hover { background: rgba(251,191,36,0.08); }
+    .ficha-btn.success { border-color: rgba(74,222,128,0.3); color: #4ade80; }
+    .ficha-btn.success:hover { background: rgba(74,222,128,0.07); }
+    .ficha-btn.danger { border-color: rgba(239,68,68,0.25); color: rgba(239,68,68,0.7); }
+    .ficha-btn.danger:hover { background: rgba(239,68,68,0.06); color: rgba(239,68,68,0.9); }
+    .ficha-btn.orange { border-color: rgba(249,115,22,0.3); color: #f97316; }
+    .ficha-btn.orange:hover { background: rgba(249,115,22,0.08); }
+
+    /* Status badge na ficha */
+    .ficha-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      color: var(--text-2);
+    }
+    .ficha-status-badge.novo      { color: var(--text-2); }
+    .ficha-status-badge.abordado  { color: #60a5fa; border-color: rgba(96,165,250,0.25); background: rgba(96,165,250,0.08); }
+    .ficha-status-badge.follow_up { color: #f97316; border-color: rgba(249,115,22,0.25); background: rgba(249,115,22,0.08); }
+    .ficha-status-badge.conversando { color: #a5b4fc; border-color: rgba(165,180,252,0.25); background: rgba(165,180,252,0.08); }
+    .ficha-status-badge.reuniao   { color: #4ade80; border-color: rgba(74,222,128,0.25); background: rgba(74,222,128,0.08); }
+    .ficha-status-badge.proposta  { color: #fbbf24; border-color: rgba(251,191,36,0.25); background: rgba(251,191,36,0.08); }
+    .ficha-status-badge.fechado   { color: #4ade80; border-color: rgba(74,222,128,0.25); background: rgba(74,222,128,0.08); }
+
+    /* Movimento badge */
+    .ficha-mov-eu   { color: #60a5fa; }
+    .ficha-mov-lead { color: #fbbf24; }
+
+    /* crm-card clicável */
+    .crm-card { cursor: pointer; }
+    .crm-card:hover { background: rgba(255,255,255,0.025); }
+
+    .crm-card-alerta {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-3);
+      white-space: nowrap;
+    }
+    .crm-card-alerta.urgente { color: #fbbf24; }
+
+    /* ============================================================
+       ANALYSIS DRAWER — painel lateral de análise
+    ============================================================ */
+    .analysis-drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 400px;
+      height: 100vh;
+      background: var(--surface-2);
+      border-left: 1px solid var(--border);
+      box-shadow: -16px 0 48px rgba(0,0,0,0.4);
+      display: flex;
+      flex-direction: column;
+      z-index: 150;
+      transform: translateX(100%);
+      transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .analysis-drawer.open { transform: translateX(0); }
+
+    @media (max-width: 600px) { .analysis-drawer { width: 100vw; } }
+
+    .analysis-drawer-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .analysis-drawer-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.01em;
+      margin-bottom: 5px;
+    }
+
+    .analysis-drawer-meta {
+      font-size: var(--text-sm);
+      color: var(--text-2);
+      line-height: 1.6;
+    }
+
+    .analysis-drawer-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .analysis-drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    .analysis-text {
+      font-size: var(--text-base);
+      line-height: 1.7;
+      color: rgba(226,229,240,0.88);
+      white-space: pre-wrap;
+    }
+
+    .analysis-drawer-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 14px 20px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .analysis-drawer-footer-actions { display: flex; gap: 6px; }
+
+    /* WhatsApp */
+    .analysis-whatsapp-btn {
+      background: #25d366;
+      border: none;
+      color: #fff;
+      font-size: var(--text-sm);
+      font-weight: 700;
+      padding: 8px 14px;
+      border-radius: var(--r-md);
+      white-space: nowrap;
+    }
+
+    .analysis-whatsapp-btn:hover { background: #1ebe5d; }
+    .analysis-whatsapp-btn:disabled {
+      background: rgba(37,211,102,0.18);
+      color: rgba(255,255,255,0.3);
+      cursor: not-allowed;
+    }
+
+    /* Copiar */
+    .analysis-copy-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      padding: 7px 13px;
+      border-radius: var(--r-md);
+    }
+
+    .analysis-copy-btn:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+
+    /* Fechar */
+    .analysis-close-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 7px 16px;
+      border-radius: var(--r-md);
+    }
+
+    .analysis-close-btn:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+
+    /* ============================================================
+       CRM PIPELINE
+    ============================================================ */
+    .crm-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 250;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease;
+    }
+
+    .crm-overlay.open { opacity: 1; pointer-events: all; }
+
+    .crm-panel {
+      background: var(--surface);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transform: translateY(12px);
+      transition: transform 0.18s ease;
+    }
+
+    .crm-overlay.open .crm-panel { transform: translateY(0); }
+
+    .crm-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.01);
+    }
+
+    .crm-header h2 {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+
+    .crm-header-right { display: flex; align-items: center; gap: 8px; }
+
+    .crm-total {
+      font-size: 11px;
+      color: var(--text-3);
+    }
+
+    .crm-columns {
+      display: flex;
+      gap: 0;
+      overflow-x: auto;
+      flex: 1;
+      padding: 0;
+    }
+
+    .crm-column {
+      flex: 0 0 200px;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border-soft);
+      min-height: 0;
+    }
+
+    .crm-column:last-child { border-right: none; }
+
+    .crm-column-header {
+      padding: 12px 14px 10px;
+      border-bottom: 1px solid var(--border-soft);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .crm-column-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .crm-column-count {
+      font-size: 10px;
+      color: var(--text-3);
+      background: rgba(255,255,255,0.05);
+      padding: 2px 6px;
+      border-radius: 10px;
+    }
+
+    .crm-column-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .crm-card {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: 10px 11px;
+      cursor: default;
+      transition: border-color 0.12s;
+    }
+
+    .crm-card:hover { border-color: rgba(255,255,255,0.14); }
+
+    .crm-card-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .crm-card-meta {
+      font-size: 10px;
+      color: var(--text-3);
+      margin-bottom: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .crm-card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .crm-status-select {
+      flex: 1;
+      font-size: 10px;
+      padding: 4px 6px;
+      border-radius: var(--r-sm);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      color: var(--text-2);
+      cursor: pointer;
+    }
+
+    .crm-remove-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-3);
+      font-size: 14px;
+      padding: 2px 5px;
+      border-radius: var(--r-sm);
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .crm-remove-btn:hover { background: rgba(239,68,68,0.10); color: #ef4444; }
+
+    .crm-empty-col {
+      font-size: 11px;
+      color: var(--text-3);
+      text-align: center;
+      padding: 16px 8px;
+    }
+
+    /* Cores por status */
+    .crm-col-novo    .crm-column-label { color: var(--text-2); }
+    .crm-col-abordado .crm-column-label { color: #818cf8; }
+    .crm-col-follow_up .crm-column-label { color: #f97316; }
+    .crm-col-respondeu .crm-column-label { color: var(--warning); }
+    .crm-col-reuniao .crm-column-label { color: #a78bfa; }
+    .crm-col-proposta .crm-column-label { color: #22d3ee; }
+    .crm-col-fechado .crm-column-label { color: var(--success); }
+    .crm-col-perdido .crm-column-label { color: var(--danger); }
+
+    /* Sidebar CRM counters */
+    .crm-counters {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .crm-counter-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+    }
+
+    .crm-counter-label { color: var(--text-3); }
+    .crm-counter-val { color: var(--text-2); font-weight: 600; }
+    .crm-counter-val.highlight { color: var(--success); }
+
+    /* Alertas "Agir agora" */
+    .side-card-agir { display: none; }
+    .side-card-agir.tem-alertas { display: block; }
+
+    .side-card-agir h3 { color: var(--warning) !important; }
+
+    .alertas-list { display: flex; flex-direction: column; gap: 5px; }
+
+    .alerta-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+      padding: 7px 9px;
+      border-radius: var(--r-sm);
+      background: rgba(245,158,11,0.06);
+      border: 1px solid rgba(245,158,11,0.14);
+      cursor: pointer;
+      transition: background 120ms;
+    }
+    .alerta-item:hover { background: rgba(245,158,11,0.11); }
+    .alerta-item.urgente {
+      background: rgba(239,68,68,0.06);
+      border-color: rgba(239,68,68,0.14);
+    }
+    .alerta-item.urgente:hover { background: rgba(239,68,68,0.11); }
+    .alerta-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--warning); flex-shrink: 0; margin-top: 4px;
+    }
+    .alerta-item.urgente .alerta-dot { background: var(--danger); }
+    .alerta-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+    .alerta-nome { font-size: 11px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .alerta-desc { font-size: 10px; color: var(--text-3); }
+
+    /* Botão salvar no CRM no drawer */
+    .analysis-crm-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      padding: 7px 11px;
+      border-radius: var(--r-md);
+      white-space: nowrap;
+    }
+
+    .analysis-crm-btn:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+    .analysis-crm-btn.saved { color: var(--success); border-color: rgba(34,197,94,0.25); }
+
+    /* ============================================================
+       ESTRATÉGIA
+    ============================================================ */
+    .estrategia-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms ease;
+    }
+    .estrategia-overlay.open { opacity: 1; pointer-events: all; }
+
+    .estrategia-panel {
+      width: min(680px, 96vw);
+      max-height: 82vh;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xl);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transform: translateY(12px);
+      transition: transform 200ms ease;
+    }
+    .estrategia-overlay.open .estrategia-panel { transform: translateY(0); }
+
+    .estrategia-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .estrategia-header h3 { margin: 0 0 2px; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+    .estrategia-header p  { margin: 0; font-size: 11px; color: var(--text-3); }
+
+    .estrategia-chat {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 100px;
+    }
+
+    .estrategia-empty {
+      color: var(--text-3);
+      font-size: 12px;
+      text-align: center;
+      margin: auto;
+      line-height: 1.6;
+    }
+    .estrategia-empty strong { color: var(--text-2); display: block; margin-bottom: 4px; font-size: 13px; }
+
+    .estrategia-msg {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .estrategia-msg-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-3);
+    }
+    .estrategia-msg.user .estrategia-msg-label { color: var(--primary); }
+    .estrategia-msg-body {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--surface-2);
+      border-radius: var(--r-md);
+      padding: 10px 14px;
+      white-space: pre-wrap;
+    }
+    .estrategia-msg.user .estrategia-msg-body {
+      background: var(--primary-dim);
+      border: 1px solid var(--primary-border);
+      color: #c7d2fe;
+      align-self: flex-end;
+      max-width: 85%;
+    }
+    .estrategia-msg.ia .estrategia-msg-body {
+      border: 1px solid var(--border);
+    }
+    .estrategia-msg-body.loading {
+      color: var(--text-3);
+      font-style: italic;
+    }
+
+    .estrategia-composer {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+      padding: 12px 16px 16px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .estrategia-input {
+      flex: 1;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      padding: 9px 12px;
+      resize: none;
+      min-height: 38px;
+      max-height: 120px;
+      line-height: 1.5;
+      outline: none;
+      transition: border-color 150ms;
+    }
+    .estrategia-input:focus { border-color: var(--primary-border); }
+    .estrategia-input::placeholder { color: var(--text-3); }
+    .estrategia-send-btn {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--r-md);
+      font-size: 16px;
+      width: 38px;
+      height: 38px;
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: opacity 150ms;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .estrategia-send-btn:hover { opacity: 0.85; }
+    .estrategia-send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* Badge de modo */
+    .director-modo-badge {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.07em;
+      text-transform: uppercase; padding: 3px 8px; border-radius: 20px;
+      border: 1px solid; transition: all 150ms;
+      flex-shrink: 0; align-self: flex-end; margin-bottom: 2px;
+    }
+    .director-modo-badge.estrategia { color: #a5b4fc; border-color: var(--primary-border); background: var(--primary-dim); }
+    .director-modo-badge.prospeccao  { color: #67e8f9; border-color: rgba(103,232,249,0.2); background: rgba(103,232,249,0.07); }
+    .director-modo-badge.conversa    { color: #86efac; border-color: rgba(134,239,172,0.2); background: rgba(134,239,172,0.07); }
+
+    /* Ações por modo abaixo da resposta */
+    .director-acoes {
+      display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap;
+    }
+    .director-acao-btn {
+      font-size: 11px; font-weight: 600; padding: 5px 12px;
+      border-radius: var(--r-sm); border: 1px solid var(--border);
+      background: var(--surface-2); color: var(--text-2);
+      cursor: pointer; transition: background 120ms, color 120ms;
+    }
+    .director-acao-btn:hover { background: var(--surface-3); color: var(--text); }
+    .director-acao-btn.primary { background: var(--primary-dim); border-color: var(--primary-border); color: #a5b4fc; }
+    .director-acao-btn.primary:hover { background: rgba(99,102,241,0.18); color: #c7d2fe; }
+    .director-acao-btn.copiado { color: rgba(34,197,94,0.7); border-color: rgba(34,197,94,0.2); cursor: default; }
+
+    /* Aviso de validação */
+    .director-aviso {
+      font-size: 10px; color: var(--warning); margin-top: 4px;
+      padding: 3px 8px; border-radius: var(--r-sm);
+      background: rgba(245,158,11,0.07); border: 1px solid rgba(245,158,11,0.15);
+      display: inline-block;
+    }
+
+    .estrategia-sidebar-btn {
+      width: 100%;
+      background: transparent;
+      color: var(--text-2);
+      border: 1px solid var(--border);
+      padding: 9px 12px;
+      font-weight: 500;
+      font-size: 12px;
+      letter-spacing: 0.01em;
+      text-align: center;
+      border-radius: var(--r-md);
+      cursor: pointer;
+      transition: background 150ms, color 150ms;
+    }
+    .estrategia-sidebar-btn:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+
+    /* ============================================================
+       GESTOR DE TRÁFEGO
+    ============================================================ */
+    .trafego-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.16s ease;
+    }
+    .trafego-overlay.open { opacity: 1; pointer-events: all; }
+
+    .trafego-panel {
+      width: min(980px, 96vw);
+      max-height: 88vh;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xl);
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transform: translateY(8px);
+      transition: transform 0.16s ease;
+    }
+    .trafego-overlay.open .trafego-panel { transform: translateY(0); }
+
+    .trafego-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .trafego-header h3 { margin: 0 0 2px; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+    .trafego-header p  { margin: 0; font-size: 11px; color: var(--text-3); }
+
+    .trafego-header-actions { display: flex; gap: 8px; align-items: center; }
+
+    .trafego-refresh-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 13px;
+      border-radius: var(--r-md);
+    }
+    .trafego-refresh-btn:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+    .trafego-refresh-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Split layout */
+    .trafego-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    .trafego-list-col {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px 20px;
+      transition: flex 220ms ease, min-width 220ms ease;
+      min-width: 0;
+    }
+    .trafego-list-col.comprimida { flex: 0 0 340px; border-right: 1px solid var(--border); }
+
+    .trafego-chat-col {
+      width: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: width 220ms ease;
+      flex-shrink: 0;
+    }
+    .trafego-chat-col.aberta { width: 400px; }
+
+    /* Tabela clicável */
+    .trafego-table tbody tr { cursor: pointer; transition: background 120ms; }
+    .trafego-table tbody tr:hover td { background: rgba(255,255,255,0.02); }
+    .trafego-table tbody tr.ativa td { background: var(--primary-dim); color: var(--text); border-bottom-color: var(--primary-border); }
+
+    /* Painel direito — cabeçalho da campanha */
+    .trafego-campanha-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .trafego-campanha-nome {
+      font-size: 12px; font-weight: 700; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-bottom: 8px;
+    }
+    .trafego-metrics { display: flex; gap: 14px; flex-wrap: wrap; }
+    .trafego-metric { display: flex; flex-direction: column; gap: 1px; }
+    .trafego-metric-val { font-size: 13px; font-weight: 700; color: var(--text); }
+    .trafego-metric-val.alert { color: #fbbf24; }
+    .trafego-metric-label { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
+
+    /* Chat */
+    .trafego-chat-msgs {
+      flex: 1; overflow-y: auto; padding: 12px 14px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .trafego-chat-msg { display: flex; flex-direction: column; gap: 2px; }
+    .trafego-chat-msg-label {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+      text-transform: uppercase; color: var(--text-3);
+    }
+    .trafego-chat-msg.user .trafego-chat-msg-label { color: var(--primary); }
+    .trafego-chat-msg-body {
+      font-size: 12px; line-height: 1.6; color: var(--text);
+      background: var(--surface-3); border: 1px solid var(--border);
+      border-radius: var(--r-md); padding: 8px 11px; white-space: pre-wrap;
+    }
+    .trafego-chat-msg.user .trafego-chat-msg-body {
+      background: var(--primary-dim); border-color: var(--primary-border);
+      color: #c7d2fe; align-self: flex-end; max-width: 90%;
+    }
+    .trafego-chat-msg-body.loading { color: var(--text-3); font-style: italic; }
+
+    .trafego-chat-composer {
+      display: flex; gap: 6px; align-items: flex-end;
+      padding: 10px 12px; border-top: 1px solid var(--border); flex-shrink: 0;
+    }
+    .trafego-chat-input {
+      flex: 1; background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--r-md); color: var(--text); font-family: inherit;
+      font-size: 12px; padding: 8px 10px; resize: none;
+      min-height: 34px; max-height: 100px; line-height: 1.5; outline: none;
+      transition: border-color 150ms;
+    }
+    .trafego-chat-input:focus { border-color: var(--primary-border); }
+    .trafego-chat-input::placeholder { color: var(--text-3); }
+    .trafego-chat-send-btn {
+      background: var(--primary); color: #fff; border: none;
+      border-radius: var(--r-md); font-size: 14px;
+      width: 34px; height: 34px; flex-shrink: 0; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: opacity 150ms;
+    }
+    .trafego-chat-send-btn:hover { opacity: 0.85; }
+    .trafego-chat-send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* Tabela de campanhas */
+    .trafego-table-wrap { overflow-x: auto; }
+
+    .trafego-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .trafego-table th {
+      text-align: left;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-3);
+      padding: 0 12px 8px 0;
+      white-space: nowrap;
+      border-bottom: 1px solid var(--border);
+    }
+    .trafego-table td {
+      padding: 10px 12px 10px 0;
+      border-bottom: 1px solid var(--border-soft);
+      color: var(--text);
+      white-space: nowrap;
+    }
+    .trafego-table td:first-child { color: var(--text); font-weight: 500; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+    .trafego-table tr:last-child td { border-bottom: none; }
+    .trafego-table tr.row-alert td { color: #fbbf24; }
+
+    /* Painel de análise */
+    .trafego-analise {
+      background: var(--surface-3);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .trafego-analise-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-3);
+    }
+
+    .trafego-resumo {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .trafego-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .trafego-list li {
+      font-size: 12px;
+      color: var(--text-2);
+      padding-left: 12px;
+      position: relative;
+    }
+    .trafego-list li::before {
+      content: '–';
+      position: absolute;
+      left: 0;
+      color: var(--text-3);
+    }
+    .trafego-list.acoes li::before { content: '→'; color: var(--primary); }
+    .trafego-list.acoes li { color: var(--text); }
+
+    .trafego-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    /* Botão sidebar tráfego */
+    .trafego-sidebar-btn {
+      width: 100%;
+      background: transparent;
+      color: var(--text-2);
+      border: 1px solid var(--border);
+      padding: 9px 12px;
+      font-weight: 500;
+      font-size: 12px;
+      letter-spacing: 0.01em;
+      text-align: center;
+      border-radius: var(--r-md);
+    }
+    .trafego-sidebar-btn:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+
+    /* ============================================================
+       RESPONSIVO
+    ============================================================ */
+    @media (max-width: 1080px) {
+      .app { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+      .sidebar {
+        order: 2;
+        flex-direction: row;
+        flex-wrap: wrap;
+        overflow-x: auto;
+        border-right: none;
+        border-top: 1px solid rgba(255,255,255,0.06);
+      }
+      .sidebar .brand { border-bottom: none; border-right: 1px solid rgba(255,255,255,0.05); }
+      .sidebar .side-card { border-bottom: none; border-right: 1px solid rgba(255,255,255,0.04); min-width: 160px; }
+      .main { order: 1; }
+    }
+
+    @media (max-width: 720px) {
+      .main-header { padding: 12px 16px; }
+      .chat { padding: 16px; }
+      .composer { padding: 10px 14px 12px; }
+      .composer-wrap { grid-template-columns: 1fr; }
+      .send-btn { min-height: 44px; }
+      .bubble { max-width: 96%; }
+      .brand h1 { font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <h1>IA <span>Lumyn</span></h1>
+        <p>Laboratório visual e funcional de IA aplicada à prospecção, análise de leads e estratégia comercial.</p>
+      </div>
+
+      <div class="side-card">
+        <h3>Agente atual</h3>
+
+        <div class="field">
+          <label class="label" for="agentSelect">Agente</label>
+          <select id="agentSelect">
+            <option value="sdr">SDR</option>
+          </select>
+        </div>
+
+        <button id="clearBtn" class="btn secondary" type="button">Limpar conversa</button>
+      </div>
+
+      <div class="side-card">
+        <h3>Ferramenta ativa</h3>
+
+        <div class="field">
+          <label class="label" for="modeSelect">Modo</label>
+          <select id="modeSelect">
+            <option value="manual">SDR + análise manual</option>
+            <option value="google">Google Meu Negócio + análise</option>
+          </select>
+        </div>
+
+        <div id="modeBadge" class="mode-badge">Análise manual</div>
+      </div>
+
+      <div class="side-card">
+        <h3>Prospecção</h3>
+        <button id="leadsBtn" class="leads-sidebar-btn" type="button">Buscar leads</button>
+      </div>
+
+      <div class="side-card side-card-agir" id="alertasSideCard">
+        <h3>Agir agora</h3>
+        <div id="alertasList" class="alertas-list"></div>
+      </div>
+
+      <div class="side-card">
+        <h3>Pipeline CRM</h3>
+        <div id="crmCounters" class="crm-counters">
+          <div class="crm-counter-row"><span class="crm-counter-label">Carregando...</span></div>
+        </div>
+        <button id="crmPanelBtn" class="btn secondary" type="button">Ver pipeline</button>
+      </div>
+
+      <div class="side-card">
+        <h3>Estratégia</h3>
+        <button id="estrategiaBtn" class="estrategia-sidebar-btn" type="button">Perguntar ao director</button>
+      </div>
+
+      <div class="side-card">
+        <h3>Tráfego</h3>
+        <button id="trafegoBtn" class="trafego-sidebar-btn" type="button">Ver campanhas</button>
+      </div>
+
+      <div class="side-card">
+        <h3>Criativos</h3>
+        <button id="criativosBtn" class="criativos-sidebar-btn" type="button">Abrir criativos</button>
+      </div>
+
+      <div class="side-card">
+        <h3>Como usar</h3>
+        <p>
+          <strong style="color:var(--text-2); font-weight:600;">Manual:</strong> descreva o cenário do lead.<br />
+          <strong style="color:var(--text-2); font-weight:600;">Google:</strong> busque empresas reais via Maps.
+        </p>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="main-header">
+        <div class="main-title">
+          <h2>Laboratório Lumyn</h2>
+          <p>Sistema de geração de oportunidades comerciais com IA</p>
+        </div>
+
+        <div class="status">
+          <span class="dot"></span>
+          <span>Sistema ativo</span>
+        </div>
+      </div>
+
+      <section id="chat" class="chat">
+        <div class="empty-state" id="emptyState">
+          <strong>Pronto para analisar.</strong>
+          Use o modo manual para pensar estratégia ou o modo Google para enriquecer um lead real com dados do Maps.
+        </div>
+      </section>
+
+      <section class="composer">
+        <div class="composer-wrap">
+          <div>
+            <textarea
+              id="input"
+              placeholder="Descreva o cenário... ex: pizzaria em Salvador com pouca avaliação e instagram parado"
+            ></textarea>
+            <div class="hint" id="hintText">
+              Shift + Enter quebra linha. Enter envia.
+            </div>
+          </div>
+
+          <button id="sendBtn" class="send-btn" type="button">Enviar</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- LEADS MODAL -->
+  <div id="leadsOverlay" class="leads-overlay">
+    <div class="leads-modal">
+      <div class="leads-modal-top">
+        <div>
+          <h3>Buscar leads</h3>
+          <p>Classifica empresas por potencial de prospecção via Google Maps</p>
+        </div>
+        <button class="leads-close-btn" id="leadsCloseBtn" type="button">&times;</button>
+      </div>
+
+      <input
+        type="text"
+        id="leadsQueryInput"
+        class="leads-query-input"
+        placeholder="Ex: barbearias em Curitiba"
+        autocomplete="off"
+      />
+
+      <div id="leadsHistorico" class="leads-historico" style="display:none"></div>
+
+      <div class="leads-chips-label">Categoria rápida</div>
+      <div class="leads-chips">
+        <button class="leads-chip" data-chip="Restaurantes" type="button">Restaurante</button>
+        <button class="leads-chip" data-chip="Salão de beleza" type="button">Salão</button>
+        <button class="leads-chip" data-chip="Barbearia" type="button">Barbearia</button>
+        <button class="leads-chip" data-chip="Clínica estética" type="button">Clínica</button>
+        <button class="leads-chip" data-chip="Academia" type="button">Academia</button>
+        <button class="leads-chip" data-chip="Loja de roupas" type="button">Loja</button>
+      </div>
+
+      <div id="cidadeChipsWrap" style="display:none">
+        <div class="leads-chips-label">Cidades recentes</div>
+        <div id="cidadeChips" class="leads-chips"></div>
+      </div>
+
+      <div class="leads-modal-footer">
+        <button id="leadsSearchBtn" class="leads-search-btn" type="button">Buscar leads</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CRM OVERLAY -->
+  <div id="crmOverlay" class="crm-overlay">
+    <div class="crm-panel">
+      <div class="crm-header">
+        <h2>Pipeline CRM</h2>
+        <div class="crm-header-right">
+          <span id="crmTotalLabel" class="crm-total"></span>
+          <button id="crmCloseBtn" class="leads-close-btn" type="button">&times;</button>
+        </div>
+      </div>
+      <div id="crmColumns" class="crm-columns"></div>
+    </div>
+
+    <!-- FICHA DO LEAD -->
+    <div id="crmFicha" class="crm-ficha">
+      <div class="crm-ficha-header">
+        <div class="crm-ficha-titulo">
+          <div id="fichaLeadNome" class="crm-ficha-nome"></div>
+          <div id="fichaLeadMeta" class="crm-ficha-meta"></div>
+        </div>
+        <button id="fichaCloseBtn" class="leads-close-btn" type="button">&times;</button>
+      </div>
+      <div id="fichaBody" class="crm-ficha-body"></div>
+    </div>
+  </div>
+
+  <!-- CRIATIVOS OVERLAY -->
+  <div id="criativosOverlay" class="criativos-overlay">
+    <div class="criativos-panel">
+
+      <div class="criativos-header">
+        <div>
+          <h3>Criativos</h3>
+          <p>Analytics-agent · Designer-agent</p>
+        </div>
+        <button id="criativosCloseBtn" class="leads-close-btn" type="button">&times;</button>
+      </div>
+
+      <div class="criativos-body">
+
+        <!-- Coluna esquerda: seleção + galeria -->
+        <div class="criativos-col criativos-col-esq">
+
+          <!-- Seletor de cliente -->
+          <div class="criativos-section">
+            <div class="criativos-section-titulo">Cliente</div>
+            <div class="criativos-cliente-tabs">
+              <button class="criativos-cliente-tab ativo" data-cliente="rivano" type="button">Rivano</button>
+              <button class="criativos-cliente-tab" data-cliente="com-tempero" type="button">Com Tempero</button>
+            </div>
+          </div>
+
+          <!-- Upload -->
+          <div class="criativos-section">
+            <div class="criativos-section-titulo">Upload de imagem</div>
+            <label class="criativos-upload-label" for="criativosFileInput">
+              <span id="criativosUploadLabel">Escolher imagem</span>
+              <input type="file" id="criativosFileInput" accept="image/*" style="display:none">
+            </label>
+            <div id="criativosUploadStatus" class="criativos-upload-status"></div>
+          </div>
+
+          <!-- Galeria -->
+          <div class="criativos-section" style="flex:1; min-height:0;">
+            <div class="criativos-section-titulo">Imagens <span id="criativosClienteLabel">(Rivano)</span></div>
+            <div id="criativosGaleria" class="criativos-galeria"></div>
+          </div>
+
+        </div>
+
+        <!-- Coluna direita: fluxo linear -->
+        <div class="criativos-col criativos-col-dir">
+
+          <!-- PASSO 1 — Imagem selecionada -->
+          <div class="criativos-section">
+            <div class="criativos-section-titulo">
+              <span class="criativos-step">1</span> Imagem
+            </div>
+            <div id="criativosPreview" class="criativos-preview">
+              <span class="criativos-preview-empty">Selecione uma imagem na galeria</span>
+            </div>
+          </div>
+
+          <!-- PASSO 2 — Briefing do gestor -->
+          <div class="criativos-section" id="criativos-bloco-briefing" style="opacity:.4; pointer-events:none;">
+            <div class="criativos-section-titulo">
+              <span class="criativos-step">2</span> Briefing do gestor
+            </div>
+            <button id="criativosAnalisarBtn" class="criativos-btn accent" type="button">⚡ Analisar campanha e gerar briefing</button>
+            <div id="criativosAnaliseStatus" class="criativos-upload-status"></div>
+            <div id="criativosDiagnostico" class="criativos-diagnostico" style="display:none"></div>
+            <div class="criativos-form">
+              <div class="criativos-field-row">
+                <div class="criativos-field" style="flex:1">
+                  <label class="criativos-label">Objetivo</label>
+                  <select id="criativosObjetivo" class="criativos-select">
+                    <option value="conversao">Conversão</option>
+                    <option value="brand">Brand awareness</option>
+                    <option value="engajamento">Engajamento</option>
+                  </select>
+                </div>
+                <div class="criativos-field" style="flex:1">
+                  <label class="criativos-label">Formato</label>
+                  <select id="criativosFormato" class="criativos-select">
+                    <option value="feed">Feed</option>
+                    <option value="story">Story</option>
+                  </select>
+                </div>
+              </div>
+              <div class="criativos-field">
+                <label class="criativos-label">Tagline <span style="opacity:.5">(texto exato)</span></label>
+                <input id="criativosLegenda" class="criativos-input" type="text" placeholder="Ex: Estilo que não passa">
+              </div>
+              <div class="criativos-field">
+                <label class="criativos-label">CTA <span style="opacity:.5">(texto exato)</span></label>
+                <input id="criativosCta" class="criativos-input" type="text" placeholder="Ex: Compre agora">
+              </div>
+              <div class="criativos-field">
+                <label class="criativos-label">Notas para o designer <span style="opacity:.5">(opcional)</span></label>
+                <textarea id="criativosContexto" class="criativos-input criativos-textarea" placeholder="Ex: foco nos óculos, tom mais frio, campanha de verão..."></textarea>
+              </div>
+            </div>
+            <button id="criativosDesignerBtn" class="criativos-btn primary" type="button" disabled>Enviar para o Designer →</button>
+          </div>
+
+          <!-- PASSO 3 — Instrução do designer (editável) + Gerar -->
+          <div class="criativos-section" id="criativos-bloco-instrucao" style="display:none">
+            <div class="criativos-section-titulo">
+              <span class="criativos-step">3</span> Instrução de edição
+              <span class="criativos-step-hint">— revise antes de gerar</span>
+            </div>
+            <textarea id="criativosInstrucao" class="criativos-input criativos-textarea criativos-instrucao-area"></textarea>
+            <button id="criativosGerarBtn" class="criativos-btn gemini" type="button">Gerar criativo — 3 variações</button>
+            <div id="criativosVariacoes" class="criativos-variacoes"></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ESTRATÉGIA OVERLAY -->
+  <div id="estrategiaOverlay" class="estrategia-overlay">
+    <div class="estrategia-panel">
+      <div class="estrategia-header">
+        <div>
+          <h3>Estratégia</h3>
+          <p>Director comercial — decisões baseadas nos dados do sistema</p>
+        </div>
+        <button id="estrategiaCloseBtn" class="leads-close-btn" type="button">&times;</button>
+      </div>
+      <div id="estrategiaChat" class="estrategia-chat">
+        <div class="estrategia-empty" id="estrategiaEmpty">
+          <strong>Director comercial online.</strong>
+          Pergunte sobre nicho, pipeline, próximo passo ou o que está travando.
+        </div>
+      </div>
+      <div class="estrategia-composer">
+        <span id="directorModoBadge" class="director-modo-badge estrategia">Estratégia</span>
+        <textarea
+          id="estrategiaInput"
+          class="estrategia-input"
+          placeholder="O que você quer resolver hoje?"
+          rows="1"
+        ></textarea>
+        <button id="estrategiaSendBtn" class="estrategia-send-btn" type="button">↵</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRÁFEGO OVERLAY -->
+  <div id="trafegoOverlay" class="trafego-overlay">
+    <div class="trafego-panel">
+      <div class="trafego-header">
+        <div>
+          <h3>Gestor de Tráfego</h3>
+          <p>Campanhas Meta Ads — últimos 30 dias</p>
+        </div>
+        <div class="trafego-header-actions">
+          <button id="trafegoRefreshBtn" class="trafego-refresh-btn" type="button">↻ Atualizar</button>
+          <button id="trafegoCloseBtn" class="leads-close-btn" type="button">&times;</button>
+        </div>
+      </div>
+      <div class="trafego-body">
+        <div id="trafegoListCol" class="trafego-list-col"></div>
+        <div id="trafegoChatCol" class="trafego-chat-col">
+          <div class="trafego-campanha-header">
+            <div id="trafegoCampanhaNome" class="trafego-campanha-nome"></div>
+            <div id="trafegoMetrics" class="trafego-metrics"></div>
+          </div>
+          <div id="trafegoChatMsgs" class="trafego-chat-msgs"></div>
+          <div class="trafego-chat-composer">
+            <textarea id="trafegoChatInput" class="trafego-chat-input" placeholder="Pauso? Troco criativo? Onde está o erro?" rows="1"></textarea>
+            <button id="trafegoChatSendBtn" class="trafego-chat-send-btn" type="button">↵</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ANALYSIS DRAWER -->
+  <div id="analysisDrawer" class="analysis-drawer">
+    <div class="analysis-drawer-header">
+      <div style="flex:1; min-width:0;">
+        <div id="analysisDrawerName" class="analysis-drawer-name"></div>
+        <div id="analysisDrawerMeta" class="analysis-drawer-meta"></div>
+      </div>
+      <div class="analysis-drawer-controls">
+        <div id="analysisDrawerBadge" class="lead-badge"></div>
+        <button id="analysisDrawerCloseBtn" class="leads-close-btn" type="button">&times;</button>
+      </div>
+    </div>
+    <div id="analysisDrawerBody" class="analysis-drawer-body"></div>
+    <div class="analysis-drawer-footer">
+      <div class="analysis-drawer-footer-actions">
+        <button id="analysisWhatsappBtn" class="analysis-whatsapp-btn" type="button" disabled>WhatsApp</button>
+        <button id="analysisCopyBtn" class="analysis-copy-btn" type="button">Copiar mensagem</button>
+        <button id="analysisCrmBtn" class="analysis-crm-btn" type="button">+ CRM</button>
+      </div>
+      <div style="display:flex; gap:6px; flex-shrink:0;">
+        <button id="analysisNextBtn" class="analysis-next-btn" type="button" disabled>Próximo →</button>
+        <button id="analysisCloseBtn" class="analysis-close-btn" type="button">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const chat = document.getElementById("chat");
+    const input = document.getElementById("input");
+    const sendBtn = document.getElementById("sendBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const emptyState = document.getElementById("emptyState");
+    const modeSelect = document.getElementById("modeSelect");
+    const modeBadge = document.getElementById("modeBadge");
+    const hintText = document.getElementById("hintText");
+    const agentSelect = document.getElementById("agentSelect");
+
+    const API_ROUTE = "/api/analisar";
+
+    let isSending = false;
+
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function formatTextToHtml(text) {
+      const safe = escapeHtml(text);
+      return safe.replace(/\n/g, "<br>");
+    }
+
+    function removeEmptyState() {
+      if (emptyState) emptyState.style.display = "none";
+    }
+
+    function scrollToBottom() {
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function createUserBubble(text, roleLabel = "SDR") {
+      removeEmptyState();
+
+      const row = document.createElement("div");
+      row.className = "row user";
+
+      row.innerHTML = `
+        <div class="bubble user">
+          <div class="bubble-head">
+            <span class="bubble-role">${escapeHtml(roleLabel)}</span>
+          </div>
+          <div>${formatTextToHtml(text)}</div>
+        </div>
+      `;
+
+      chat.appendChild(row);
+      scrollToBottom();
+    }
+
+    function splitStructuredResponse(text) {
+      const clean = String(text || "").trim();
+
+      const parts = clean.split(/\n(?=\d+\.\s)/g).filter(Boolean);
+
+      if (parts.length < 2) {
+        return null;
+      }
+
+      return parts.map(part => {
+        const lines = part.split("\n").filter(Boolean);
+        const title = lines.shift() || "";
+        const body = lines.join("\n").trim();
+        return { title, body };
+      });
+    }
+
+    function createAssistantBubble({
+      role = "SDR",
+      resposta = "",
+      origem = "",
+      erro = "",
+      detalhes = "",
+      extra = ""
+    }) {
+      removeEmptyState();
+
+      const row = document.createElement("div");
+      row.className = "row";
+
+      const sections = splitStructuredResponse(resposta);
+      let contentHtml = "";
+
+      if (sections) {
+        contentHtml = sections.map((item, idx) => {
+          const isAbertura = item.title.toLowerCase().includes("abertura") || item.title.toLowerCase().includes("mensagem");
+          return `
+            <div class="section${isAbertura ? " open" : ""}" data-acc="${idx}">
+              <div class="section-header">
+                <strong>${escapeHtml(item.title)}</strong>
+                <span class="section-chevron">▾</span>
+              </div>
+              <div class="section-body">${formatTextToHtml(item.body || "")}</div>
+            </div>
+          `;
+        }).join("");
+      } else if (resposta && resposta.trim()) {
+        contentHtml = `
+          <div class="section open" data-acc="0">
+            <div class="section-header">
+              <strong>Resposta</strong>
+              <span class="section-chevron">▾</span>
+            </div>
+            <div class="section-body">${formatTextToHtml(resposta)}</div>
+          </div>
+        `;
+      }
+
+      const extraHtml = extra
+        ? `<div class="meta-box">${formatTextToHtml(extra)}</div>`
+        : "";
+
+      const errorHtml = erro
+        ? `
+          <div class="error-box">
+            <strong style="display:block; margin-bottom:6px;">Erro</strong>
+            <div>${formatTextToHtml(erro)}</div>
+            ${detalhes ? `<div style="margin-top:8px; opacity:0.9;">${formatTextToHtml(detalhes)}</div>` : ""}
+          </div>
+        `
+        : "";
+
+      row.innerHTML = `
+        <div class="bubble assistant">
+          <div class="bubble-head">
+            <span class="bubble-role">${escapeHtml(role)}${origem ? " • " + escapeHtml(origem) : ""}</span>
+          </div>
+
+          <div class="assistant-content">
+            ${contentHtml}
+            ${extraHtml}
+            ${errorHtml}
+          </div>
+
+          <button class="copy-btn" type="button">Copiar resposta</button>
+        </div>
+      `;
+
+      row.querySelectorAll(".section[data-acc]").forEach(sec => {
+        sec.querySelector(".section-header").addEventListener("click", () => {
+          const isOpen = sec.classList.contains("open");
+          row.querySelectorAll(".section[data-acc]").forEach(s => s.classList.remove("open"));
+          if (!isOpen) sec.classList.add("open");
+        });
+      });
+
+      const copyBtn = row.querySelector(".copy-btn");
+      copyBtn.addEventListener("click", () => {
+        const textoParaCopiar = resposta || erro || "Sem conteúdo para copiar.";
+        navigator.clipboard.writeText(textoParaCopiar)
+          .then(() => {
+            copyBtn.textContent = "Copiado";
+            setTimeout(() => copyBtn.textContent = "Copiar resposta", 1200);
+          })
+          .catch(() => {
+            copyBtn.textContent = "Falhou ao copiar";
+            setTimeout(() => copyBtn.textContent = "Copiar resposta", 1200);
+          });
+      });
+
+      chat.appendChild(row);
+      scrollToBottom();
+    }
+
+    function createLoadingBubble() {
+      removeEmptyState();
+
+      const row = document.createElement("div");
+      row.className = "row";
+      row.dataset.loading = "true";
+
+      row.innerHTML = `
+        <div class="bubble assistant">
+          <div class="bubble-head">
+            <span class="bubble-role">LUMYN</span>
+          </div>
+          <div class="loading">
+            <span class="spinner"></span>
+            <span>Processando...</span>
+          </div>
+        </div>
+      `;
+
+      chat.appendChild(row);
+      scrollToBottom();
+      return row;
+    }
+
+    function removeLoadingBubble() {
+      const loading = chat.querySelector('[data-loading="true"]');
+      if (loading) loading.remove();
+    }
+
+    function formatDados(dados) {
+      const lines = [];
+      if (dados.nome) lines.push(`Empresa: ${dados.nome}`);
+      if (dados.categoria) lines.push(`Categoria: ${dados.categoria}`);
+      if (dados.nota) lines.push(`Nota: ${dados.nota} (${dados.avaliacoes} avaliações)`);
+      if (dados.telefone) lines.push(`Telefone: ${dados.telefone}`);
+      if (dados.site) lines.push(`Site: ${dados.site}`);
+      if (dados.endereco) lines.push(`Endereço: ${dados.endereco}`);
+      return lines.join("\n");
+    }
+
+    function createSelectionBubble(resultados) {
+      removeEmptyState();
+
+      const row = document.createElement("div");
+      row.className = "row";
+
+      const items = resultados.map((r, i) => `
+        <div
+          data-idx="${i}"
+          style="
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.07);
+            background: rgba(255,255,255,0.03);
+            transition: background 0.15s, border-color 0.15s;
+            overflow: hidden;
+          "
+        >
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              ${escapeHtml(r.nome || "Sem nome")}
+            </div>
+            <div style="font-size:11px; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              ${escapeHtml(r.endereco || "Endereço não disponível")}
+            </div>
+          </div>
+          <div style="flex-shrink:0; display:flex; align-items:center; gap:8px;">
+            ${r.nota ? `<span style="font-size:12px; font-weight:700; color:#ffd56a;">⭐ ${r.nota}</span>` : ""}
+            <span style="font-size:18px; color:rgba(255,255,255,0.2);">›</span>
+          </div>
+        </div>
+      `).join("");
+
+      row.innerHTML = `
+        <div class="bubble assistant">
+          <div class="bubble-head">
+            <span class="bubble-role">LUMYN • Google</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <div style="font-size:12px; color:var(--muted); padding: 0 2px 4px;">
+              ${resultados.length} resultado${resultados.length > 1 ? "s" : ""} encontrado${resultados.length > 1 ? "s" : ""}. Clique para analisar.
+            </div>
+            ${items}
+          </div>
+        </div>
+      `;
+
+      resultados.forEach((r, i) => {
+        const el = row.querySelector(`[data-idx="${i}"]`);
+        el.addEventListener("mouseenter", () => {
+          el.style.background = "rgba(124,108,255,0.10)";
+          el.style.borderColor = "rgba(124,108,255,0.35)";
+        });
+        el.addEventListener("mouseleave", () => {
+          el.style.background = "rgba(255,255,255,0.03)";
+          el.style.borderColor = "rgba(255,255,255,0.07)";
+        });
+        el.addEventListener("click", () => analisarPlace(r));
+      });
+
+      chat.appendChild(row);
+      scrollToBottom();
+    }
+
+    async function analisarPlace(lugar) {
+      if (isSending) return;
+
+      createUserBubble(`Analisar: ${lugar.nome}`, "SDR");
+      isSending = true;
+      sendBtn.disabled = true;
+      createLoadingBubble();
+
+      try {
+        const resp = await fetch(API_ROUTE, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ modo: "analisar", placeId: lugar.id })
+        });
+
+        const data = await resp.json();
+        removeLoadingBubble();
+
+        createAssistantBubble({
+          role: "LUMYN",
+          origem: "google",
+          resposta: data.resposta || "",
+          erro: data.erro || "",
+          extra: data.dados ? formatDados(data.dados) : ""
+        });
+      } catch (err) {
+        removeLoadingBubble();
+        createAssistantBubble({
+          role: "LUMYN",
+          origem: "google",
+          resposta: "",
+          erro: "Erro ao analisar o lugar.",
+          detalhes: err.message
+        });
+      } finally {
+        isSending = false;
+        sendBtn.disabled = false;
+        input.focus();
+      }
+    }
+
+    function updateModeUI() {
+      const mode = modeSelect.value;
+
+      if (mode === "manual") {
+        modeBadge.textContent = "Análise manual";
+        input.placeholder = "Descreva o cenário... ex: pizzaria em Salvador com pouca avaliação e instagram parado";
+        hintText.textContent = "Use este modo para estratégia, diagnóstico, abordagem, objeções e copy.";
+      } else {
+        modeBadge.textContent = "Google Meu Negócio";
+        input.placeholder = "Digite a busca ou cole um link... ex: cafeteria salvador";
+        hintText.textContent = "Use este modo para buscar empresas reais via Google Maps e gerar análise com dados reais.";
+      }
+    }
+
+    async function fetchWithFallback(routes, payload) {
+      let lastError = null;
+
+      for (const route of routes) {
+        try {
+          const response = await fetch(route, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+          });
+
+          const data = await response.json().catch(() => ({}));
+
+          if (!response.ok) {
+            lastError = {
+              erro: data?.erro || `Falha na rota ${route}`,
+              detalhes: data?.detalhes || `Status HTTP ${response.status}`
+            };
+            continue;
+          }
+
+          return data;
+        } catch (error) {
+          lastError = {
+            erro: "Erro ao conectar com servidor.",
+            detalhes: `${error.message} (${route})`
+          };
+        }
+      }
+
+      throw lastError || {
+        erro: "Erro ao conectar com servidor.",
+        detalhes: "Nenhuma rota respondeu com sucesso."
+      };
+    }
+
+    async function sendMessage() {
+      if (isSending) return;
+
+      const text = input.value.trim();
+      if (!text) return;
+
+      const mode = modeSelect.value;
+      const agente = agentSelect.value;
+
+      createUserBubble(text, mode === "manual" ? "SDR" : "LINK");
+
+      input.value = "";
+      isSending = true;
+      sendBtn.disabled = true;
+
+      createLoadingBubble();
+
+      try {
+        let data;
+
+        if (mode === "manual") {
+          data = await fetchWithFallback([API_ROUTE], {
+            modo: "manual",
+            input: text
+          });
+
+          removeLoadingBubble();
+
+          createAssistantBubble({
+            role: "LUMYN",
+            origem: "manual",
+            resposta: data?.resposta || "",
+            erro: data?.erro || "",
+            detalhes: data?.detalhes || ""
+          });
+        } else {
+          data = await fetchWithFallback([API_ROUTE], {
+            modo: "buscar",
+            input: text
+          });
+
+          removeLoadingBubble();
+
+          if (data?.modo === "selecao") {
+            createSelectionBubble(data.resultados || []);
+          } else {
+            createAssistantBubble({
+              role: "LUMYN",
+              origem: "google",
+              resposta: data?.resposta || "",
+              erro: data?.erro || "",
+              detalhes: data?.detalhes || ""
+            });
+          }
+        }
+      } catch (error) {
+        removeLoadingBubble();
+
+        createAssistantBubble({
+          role: mode === "manual" ? "SDR" : "LINK",
+          origem: mode,
+          resposta: "",
+          erro: error?.erro || "Erro ao conectar com servidor.",
+          detalhes: error?.detalhes || "Verifique se o server.js está rodando no localhost:3000."
+        });
+      } finally {
+        isSending = false;
+        sendBtn.disabled = false;
+        input.focus();
+      }
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+      }
+    });
+
+    clearBtn.addEventListener("click", () => {
+      chat.innerHTML = "";
+      if (emptyState) {
+        emptyState.style.display = "block";
+        chat.appendChild(emptyState);
+      }
+      fetch(API_ROUTE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modo: "limpar" })
+      }).catch(() => {});
+      input.focus();
+    });
+
+    modeSelect.addEventListener("change", updateModeUI);
+
+    updateModeUI();
+
+    // ===================== LEADS =====================
+    const leadsBtn         = document.getElementById("leadsBtn");
+    const leadsOverlay     = document.getElementById("leadsOverlay");
+    const leadsCloseBtn    = document.getElementById("leadsCloseBtn");
+    const leadsQueryInput  = document.getElementById("leadsQueryInput");
+    const leadsSearchBtn   = document.getElementById("leadsSearchBtn");
+    const leadsHistorico   = document.getElementById("leadsHistorico");
+    const cidadeChipsWrap  = document.getElementById("cidadeChipsWrap");
+    const cidadeChips      = document.getElementById("cidadeChips");
+
+    // Lead em hover na lista (para atalho W sem drawer)
+    let leadHovered = null;
+
+    // ---- Persistência de buscas ----
+    function carregarHistorico() { try { return JSON.parse(localStorage.getItem("lumyn_buscas") || "[]"); } catch { return []; } }
+    function salvarBusca(query) {
+      const hist = carregarHistorico().filter(h => h !== query);
+      hist.unshift(query);
+      localStorage.setItem("lumyn_buscas", JSON.stringify(hist.slice(0, 3)));
+    }
+    function carregarCidades() { try { return JSON.parse(localStorage.getItem("lumyn_cidades") || "[]"); } catch { return []; } }
+    function salvarCidade(query) {
+      const m = query.match(/ em (.+)$/i);
+      if (!m) return;
+      const cidade = m[1].trim();
+      const cidades = carregarCidades().filter(c => c.toLowerCase() !== cidade.toLowerCase());
+      cidades.unshift(cidade);
+      localStorage.setItem("lumyn_cidades", JSON.stringify(cidades.slice(0, 4)));
+    }
+
+    function renderizarHistoricoModal() {
+      const hist = carregarHistorico();
+      if (!hist.length) { leadsHistorico.style.display = "none"; return; }
+      leadsHistorico.style.display = "block";
+      leadsHistorico.innerHTML = `<div class="leads-historico-label">Buscas recentes</div>` +
+        hist.map(h => `<div class="leads-historico-item" data-query="${escapeHtml(h)}">${escapeHtml(h)}</div>`).join('');
+      leadsHistorico.querySelectorAll(".leads-historico-item").forEach(el => {
+        el.addEventListener("click", () => {
+          leadsQueryInput.value = el.dataset.query;
+          leadsQueryInput.focus();
+        });
+      });
+    }
+
+    function renderizarCidadeChips() {
+      const cidades = carregarCidades();
+      if (!cidades.length) { cidadeChipsWrap.style.display = "none"; return; }
+      cidadeChipsWrap.style.display = "block";
+      cidadeChips.innerHTML = cidades.map(c => `<button class="leads-chip cidade-chip" type="button" data-cidade="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('');
+      cidadeChips.querySelectorAll(".cidade-chip").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const current = leadsQueryInput.value.trim();
+          const cat = current.replace(/ em .+$/i, "").trim();
+          leadsQueryInput.value = (cat || "") + " em " + btn.dataset.cidade;
+          leadsQueryInput.focus();
+        });
+      });
+    }
+
+    function openLeadsModal() {
+      leadsOverlay.classList.add("open");
+      renderizarHistoricoModal();
+      renderizarCidadeChips();
+      setTimeout(() => leadsQueryInput.focus(), 80);
+    }
+
+    function closeLeadsModal() {
+      leadsOverlay.classList.remove("open");
+    }
+
+    leadsBtn.addEventListener("click", openLeadsModal);
+    leadsCloseBtn.addEventListener("click", closeLeadsModal);
+    leadsOverlay.addEventListener("click", (e) => { if (e.target === leadsOverlay) closeLeadsModal(); });
+
+    leadsQueryInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); executarBuscaLeads(); }
+    });
+
+    document.querySelectorAll(".leads-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        const current = leadsQueryInput.value.trim();
+        const cat = chip.dataset.chip;
+        const emMatch = current.match(/ em (.+)$/i);
+        if (emMatch) {
+          leadsQueryInput.value = cat + " em " + emMatch[1];
+        } else if (current) {
+          leadsQueryInput.value = cat + " em " + current;
+        } else {
+          leadsQueryInput.value = cat + " em ";
+        }
+        leadsQueryInput.focus();
+      });
+    });
+
+    leadsSearchBtn.addEventListener("click", executarBuscaLeads);
+
+    async function executarBuscaLeads() {
+      const query = leadsQueryInput.value.trim();
+      if (!query) return;
+
+      salvarBusca(query);
+      salvarCidade(query);
+      closeLeadsModal();
+      createUserBubble("Buscar leads: " + query, "LEADS");
+
+      isSending = true;
+      sendBtn.disabled = true;
+      createLoadingBubble();
+
+      try {
+        const data = await fetchWithFallback([API_ROUTE], { modo: "leads", input: query });
+        removeLoadingBubble();
+
+        if (data.erro) {
+          createAssistantBubble({ role: "LUMYN", origem: "leads", erro: data.erro });
+        } else {
+          createLeadsBubble(data);
+        }
+      } catch (err) {
+        removeLoadingBubble();
+        createAssistantBubble({
+          role: "LUMYN",
+          origem: "leads",
+          erro: err?.erro || "Erro ao buscar leads.",
+          detalhes: err?.detalhes || ""
+        });
+      } finally {
+        isSending = false;
+        sendBtn.disabled = false;
+      }
+    }
+
+    function extrairMensagemPronta(analise) {
+      // Retrocompat: retorna a primeira mensagem encontrada (Direta > Leve > Agressiva > legado)
+      const msgs = extrairMensagens(analise);
+      return msgs.direta || msgs.leve || msgs.agressiva || msgs.legado || "";
+    }
+
+    function extrairMensagens(analise) {
+      const out = { leve: "", direta: "", agressiva: "", quandoUsar: "", legado: "" };
+      if (!analise) return out;
+
+      const blocoMatch = analise.match(/Mensagem pronta:\s*\n([\s\S]+?)(?:\n---|\n\n\nRegras|$)/);
+      const bloco = blocoMatch ? blocoMatch[1] : analise;
+
+      const capt = (tag) => {
+        const re = new RegExp(`\\[${tag}\\]\\s*\\n([\\s\\S]+?)(?=\\n\\s*\\[(?:LEVE|DIRETA|AGRESSIVA)\\]|\\n\\s*Quando usar:|\\n---|$)`, "i");
+        const m = bloco.match(re);
+        return m ? m[1].trim() : "";
+      };
+
+      out.leve = capt("LEVE");
+      out.direta = capt("DIRETA");
+      out.agressiva = capt("AGRESSIVA");
+
+      const qu = bloco.match(/Quando usar:\s*([\s\S]+?)(?:\n---|\n\n\n|$)/i);
+      if (qu) out.quandoUsar = qu[1].trim();
+
+      // Fallback legado (mensagem única sem marcadores)
+      if (!out.leve && !out.direta && !out.agressiva) {
+        out.legado = bloco.trim();
+      }
+      return out;
+    }
+
+    // ===================== ANALYSIS DRAWER =====================
+    const analysisDrawer = document.getElementById("analysisDrawer");
+    const analysisDrawerName = document.getElementById("analysisDrawerName");
+    const analysisDrawerMeta = document.getElementById("analysisDrawerMeta");
+    const analysisDrawerBadge = document.getElementById("analysisDrawerBadge");
+    const analysisDrawerBody = document.getElementById("analysisDrawerBody");
+    const analysisCopyBtn = document.getElementById("analysisCopyBtn");
+    const analysisWhatsappBtn = document.getElementById("analysisWhatsappBtn");
+    const analysisNextBtn = document.getElementById("analysisNextBtn");
+
+    let currentAnalysisText = "";
+    let currentLead = null;
+    let currentEstilo = "direta"; // leve | direta | agressiva
+    let currentMensagens = { leve: "", direta: "", agressiva: "", quandoUsar: "", legado: "" };
+
+    function mensagemAtual() {
+      if (currentMensagens.legado) return currentMensagens.legado;
+      return currentMensagens[currentEstilo] || currentMensagens.direta || currentMensagens.leve || currentMensagens.agressiva || "";
+    }
+
+    // Fila de navegação entre leads
+    let leadsQueue = [];       // leads clicáveis na ordem da lista
+    let cardMap = new Map();   // lead.id → elemento DOM do card
+    let currentLeadIndex = -1;
+
+    function montarLinkWhatsApp(telefone, mensagem) {
+      const digits = (telefone || "").replace(/\D/g, "");
+      const number = digits.startsWith("55") ? digits : "55" + digits;
+      return "https://web.whatsapp.com/send?phone=" + number + (mensagem ? "&text=" + encodeURIComponent(mensagem) : "");
+    }
+
+    function marcarContatado(lead) {
+      if (!lead) return;
+      lead._contatado = true;
+      const card = cardMap.get(lead.id);
+      if (!card) return;
+      card.classList.add("contatado");
+      const badge = card.querySelector(".lead-badge");
+      if (badge) { badge.className = "lead-badge contatado"; badge.textContent = "✓ Contatado"; }
+    }
+
+    function atualizarBotaoProximo() {
+      analysisNextBtn.disabled = currentLeadIndex >= leadsQueue.length - 1;
+    }
+
+    function navegarProximo() {
+      if (currentLeadIndex >= leadsQueue.length - 1) return;
+      currentLeadIndex++;
+      openAnalysisDrawer(leadsQueue[currentLeadIndex]);
+    }
+
+    function closeAnalysisDrawer() {
+      analysisDrawer.classList.remove("open");
+      cardMap.forEach(c => c.classList.remove("ativo"));
+      currentAnalysisText = "";
+      currentLead = null;
+      currentMensagens = { leve: "", direta: "", agressiva: "", quandoUsar: "", legado: "" };
+    }
+
+    function renderAnaliseNoDrawer(texto) {
+      currentAnalysisText = texto || "";
+      currentMensagens = extrairMensagens(currentAnalysisText);
+
+      // Se legado (mensagem única), renderiza análise crua
+      if (currentMensagens.legado && !currentMensagens.leve && !currentMensagens.direta && !currentMensagens.agressiva) {
+        analysisDrawerBody.innerHTML = `<div class="analysis-text">${formatTextToHtml(currentAnalysisText)}</div>`;
+        return;
+      }
+
+      // Remove o bloco "Mensagem pronta: ..." da análise para mostrar em separado
+      const analiseSemMsg = currentAnalysisText.replace(/Mensagem pronta:[\s\S]*$/i, "").trim();
+
+      const estilos = [
+        { key: "leve",      label: "Leve",      desc: "abre porta sem pressão" },
+        { key: "direta",    label: "Direta",    desc: "objetiva, padrão" },
+        { key: "agressiva", label: "Agressiva", desc: "aponta dor do nicho" },
+      ];
+
+      const tabsHtml = estilos.map(e => `
+        <button class="estilo-tab ${e.key === currentEstilo ? 'ativo' : ''}" data-estilo="${e.key}" type="button">
+          <span class="estilo-label">${e.label}</span>
+          <span class="estilo-desc">${e.desc}</span>
+        </button>`).join("");
+
+      const quandoUsar = currentMensagens.quandoUsar
+        ? `<div class="quando-usar"><b>Quando usar:</b> ${escapeHtml(currentMensagens.quandoUsar)}</div>`
+        : "";
+
+      analysisDrawerBody.innerHTML = `
+        <div class="analysis-text">${formatTextToHtml(analiseSemMsg)}</div>
+        <div class="mensagem-wrap">
+          <div class="mensagem-titulo">Mensagem de abordagem</div>
+          <div class="estilo-tabs">${tabsHtml}</div>
+          <div class="mensagem-box" id="mensagemBox">${escapeHtml(mensagemAtual())}</div>
+          ${quandoUsar}
+        </div>
+      `;
+
+      analysisDrawerBody.querySelectorAll(".estilo-tab").forEach(btn => {
+        btn.addEventListener("click", () => {
+          currentEstilo = btn.dataset.estilo;
+          analysisDrawerBody.querySelectorAll(".estilo-tab").forEach(b => b.classList.toggle("ativo", b === btn));
+          const box = document.getElementById("mensagemBox");
+          if (box) box.textContent = mensagemAtual();
+        });
+      });
+    }
+
+    document.getElementById("analysisDrawerCloseBtn").addEventListener("click", closeAnalysisDrawer);
+    document.getElementById("analysisCloseBtn").addEventListener("click", closeAnalysisDrawer);
+    analysisNextBtn.addEventListener("click", navegarProximo);
+
+    analysisCopyBtn.addEventListener("click", () => {
+      const msg = mensagemAtual();
+      if (!msg) {
+        analysisCopyBtn.textContent = "Não encontrada";
+        setTimeout(() => analysisCopyBtn.textContent = "Copiar mensagem", 1500);
+        return;
+      }
+      navigator.clipboard.writeText(msg).then(() => {
+        analysisCopyBtn.textContent = "Copiado!";
+        setTimeout(() => analysisCopyBtn.textContent = "Copiar mensagem", 1200);
+      });
+    });
+
+    analysisWhatsappBtn.addEventListener("click", () => {
+      if (!currentLead?.telefone) return;
+      const msg = mensagemAtual();
+      const link = montarLinkWhatsApp(currentLead.telefone, msg);
+      window.open(link, "_blank");
+      marcarContatado(currentLead);
+    });
+
+    async function openAnalysisDrawer(lead) {
+      const p = lead.prioridade;
+      const badgeClass = p === "MEDIA" ? "media" : p === "ALTA" ? "alta" : p === "DESCARTE" ? "descarte" : "baixa";
+      const badgeLabel = p === "MEDIA" ? "MÉDIA" : p;
+
+      currentLead = lead;
+      const idx = leadsQueue.findIndex(l => l.id === lead.id);
+      if (idx !== -1) currentLeadIndex = idx;
+      atualizarBotaoProximo();
+
+      analysisDrawerName.textContent = lead.nome || "Sem nome";
+      analysisDrawerBadge.className = "lead-badge " + (lead._contatado ? "contatado" : badgeClass);
+      analysisDrawerBadge.textContent = lead._contatado ? "✓ Contatado" : badgeLabel;
+
+      const metaParts = [];
+      if (lead.nota) metaParts.push(`⭐ ${lead.nota} · ${lead.avaliacoes} avaliações`);
+      if (lead.telefone) metaParts.push(lead.telefone);
+      if (lead.endereco) metaParts.push(lead.endereco);
+      analysisDrawerMeta.textContent = metaParts.join(" · ");
+
+      currentAnalysisText = "";
+      analysisCopyBtn.textContent = "Copiar mensagem";
+      analysisWhatsappBtn.disabled = !lead.telefone;
+      analysisDrawer.classList.add("open");
+
+      // Marcar card ativo na lista
+      cardMap.forEach(c => c.classList.remove("ativo"));
+      const cardAtivo = cardMap.get(lead.id);
+      if (cardAtivo) cardAtivo.classList.add("ativo");
+
+      if (lead.analise) {
+        renderAnaliseNoDrawer(lead.analise);
+      } else {
+        analysisDrawerBody.innerHTML = `<div class="loading"><span class="spinner"></span><span>Analisando...</span></div>`;
+        try {
+          const resp = await fetch(API_ROUTE, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ modo: "analisar", placeId: lead.id })
+          });
+          const data = await resp.json();
+          if (data.resposta) {
+            lead.analise = data.resposta;
+            renderAnaliseNoDrawer(data.resposta);
+          } else {
+            analysisDrawerBody.innerHTML = `<div class="error-box">${escapeHtml(data.erro || "Sem resposta.")}</div>`;
+          }
+        } catch {
+          analysisDrawerBody.innerHTML = `<div class="error-box">Erro ao carregar análise.</div>`;
+        }
+      }
+    }
+
+    function criarLeadCard(lead) {
+      const p = lead.prioridade;
+      const badgeClass = p === "MEDIA" ? "media" : p === "ALTA" ? "alta" : p === "DESCARTE" ? "descarte" : "baixa";
+      const badgeLabel = p === "MEDIA" ? "MÉDIA" : p;
+
+      const ratingHtml = lead.nota
+        ? `&#11088; ${lead.nota} &nbsp;&middot;&nbsp; ${lead.avaliacoes} aval.`
+        : `${lead.avaliacoes || 0} aval.`;
+
+      const phoneHtml = lead.telefone
+        ? `&nbsp;&middot;&nbsp; <span style="color:#a5b4fc;">${escapeHtml(lead.telefone)}</span>`
+        : `&nbsp;&middot;&nbsp; <span style="color:rgba(136,146,176,0.4);">sem telefone</span>`;
+
+      const card = document.createElement("div");
+      card.className = "lead-card" + (p === "DESCARTE" ? " no-click" : "");
+
+      const quickActions = p !== "DESCARTE" ? `
+        <div class="lead-card-quick-actions">
+          ${lead.telefone ? `<button class="lead-card-qa-btn wa" data-wa="1" type="button">WhatsApp</button>` : ""}
+          <button class="lead-card-qa-btn crm-quick" type="button">+CRM</button>
+        </div>` : "";
+
+      card.innerHTML = `
+        <div class="lead-card-body">
+          <div class="lead-badge ${badgeClass}">${escapeHtml(badgeLabel)}</div>
+          <div class="lead-info">
+            <div class="lead-name">${escapeHtml(lead.nome || "Sem nome")}</div>
+            <div class="lead-meta">${ratingHtml}${phoneHtml}</div>
+          </div>
+          ${quickActions}
+          ${p !== "DESCARTE" ? `<div style="color:var(--muted); font-size:16px; flex-shrink:0; margin-left:2px;">&#8250;</div>` : ""}
+        </div>
+      `;
+
+      if (p !== "DESCARTE") {
+        cardMap.set(lead.id, card);
+
+        // Hover tracking para atalho W
+        card.addEventListener("mouseenter", () => { leadHovered = lead; });
+        card.addEventListener("mouseleave", () => { if (leadHovered === lead) leadHovered = null; });
+
+        // Botão WhatsApp direto
+        const waBtn = card.querySelector("[data-wa]");
+        if (waBtn) {
+          waBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const msg = lead.analise ? extrairMensagemPronta(lead.analise) : "";
+            window.open(montarLinkWhatsApp(lead.telefone, msg), "_blank");
+            marcarContatado(lead);
+          });
+        }
+
+        // Botão +CRM direto
+        const crmBtn = card.querySelector(".crm-quick");
+        if (crmBtn) {
+          crmBtn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            if (crmBtn.classList.contains("saved")) return;
+            crmBtn.textContent = "...";
+            const data = await crmFetch({ modo: "salvar", lead });
+            if (data.ok) {
+              crmBtn.textContent = data.jaExiste ? "No CRM" : "Salvo!";
+              crmBtn.classList.add("saved");
+              await carregarCRM();
+            } else {
+              crmBtn.textContent = "+CRM";
+            }
+          });
+        }
+
+        // Click no card (abre drawer)
+        card.addEventListener("click", () => openAnalysisDrawer(lead));
+      }
+
+      return card;
+    }
+
+    function createLeadsBubble(data) {
+      removeEmptyState();
+
+      // Resetar fila de navegação
+      leadsQueue = (data.leads || []).filter(l => l.prioridade !== "DESCARTE");
+      cardMap = new Map();
+      currentLeadIndex = -1;
+
+      const { resumo, leads, descartados } = data;
+      const row = document.createElement("div");
+      row.className = "row";
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble assistant";
+      bubble.innerHTML = `
+        <div class="bubble-head">
+          <span class="bubble-role">LUMYN &middot; Leads</span>
+        </div>
+        <div class="leads-summary">
+          <strong>${resumo.total} resultados</strong> &nbsp;&middot;&nbsp;
+          <span style="color:#4ade80">${resumo.alta} ALTA</span> &nbsp;&middot;&nbsp;
+          <span style="color:#fbbf24">${resumo.media} M&Eacute;DIA</span> &nbsp;&middot;&nbsp;
+          <span style="color:var(--muted)">${resumo.baixa} BAIXA</span>
+          ${resumo.descartados > 0 ? `&nbsp;&middot;&nbsp; ${resumo.descartados} descartados` : ""}
+        </div>
+      `;
+
+      const list = document.createElement("div");
+      list.style.cssText = "display:flex; flex-direction:column; gap:5px;";
+
+      leads.forEach((lead) => list.appendChild(criarLeadCard(lead)));
+
+      if (descartados && descartados.length > 0) {
+        const toggle = document.createElement("div");
+        toggle.className = "leads-descartados-toggle";
+        toggle.textContent = `&#9658; Ver ${descartados.length} descartado${descartados.length > 1 ? "s" : ""}`;
+
+        const descList = document.createElement("div");
+        descList.className = "leads-descartados-list";
+        descartados.forEach((lead) => descList.appendChild(criarLeadCard(lead)));
+
+        toggle.addEventListener("click", () => {
+          const isOpen = descList.classList.contains("open");
+          descList.classList.toggle("open", !isOpen);
+          toggle.textContent = isOpen
+            ? `&#9658; Ver ${descartados.length} descartado${descartados.length > 1 ? "s" : ""}`
+            : "&#9660; Ocultar descartados";
+        });
+
+        list.appendChild(toggle);
+        list.appendChild(descList);
+      }
+
+      bubble.appendChild(list);
+      row.appendChild(bubble);
+      chat.appendChild(row);
+      scrollToBottom();
+    }
+    // ===================== CRM =====================
+    const CRM_ROUTE = "/api/crm";
+    const CRM_STATUSES = [
+      { key: "novo",        label: "Novo" },
+      { key: "abordado",    label: "Abordado" },
+      { key: "follow_up",   label: "1 Follow-up" },
+      { key: "conversando", label: "Conversando" },
+      { key: "reuniao",     label: "Reunião" },
+      { key: "proposta",    label: "Proposta" },
+      { key: "fechado",     label: "Fechado" },
+    ];
+
+    const crmOverlay   = document.getElementById("crmOverlay");
+    const crmColumns   = document.getElementById("crmColumns");
+    const crmCloseBtn  = document.getElementById("crmCloseBtn");
+    const crmPanelBtn  = document.getElementById("crmPanelBtn");
+    const crmTotalLabel = document.getElementById("crmTotalLabel");
+    const crmCounters      = document.getElementById("crmCounters");
+    const alertasSideCard  = document.getElementById("alertasSideCard");
+    const alertasList      = document.getElementById("alertasList");
+    const analysisCrmBtn = document.getElementById("analysisCrmBtn");
+
+    let crmData = { leads: [] };
+
+    async function crmFetch(payload) {
+      const r = await fetch(CRM_ROUTE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      return r.json();
+    }
+
+    async function carregarCRM() {
+      try {
+        const data = await crmFetch({ modo: "listar" });
+        crmData = data;
+        atualizarContadoresSidebar();
+      } catch { /* silencioso */ }
+    }
+
+    function atualizarContadoresSidebar() {
+      const leads = crmData.leads || [];
+      const ativos = leads.filter(l => l.status !== "fechado" && l.status !== "perdido");
+      const reunioes = leads.filter(l => l.status === "reuniao").length;
+      const fechados = leads.filter(l => l.status === "fechado").length;
+
+      if (!leads.length) {
+        crmCounters.innerHTML = `<div class="crm-counter-row"><span class="crm-counter-label">Nenhum lead salvo</span></div>`;
+        alertasSideCard.classList.remove("tem-alertas");
+        return;
+      }
+
+      crmCounters.innerHTML = `
+        <div class="crm-counter-row">
+          <span class="crm-counter-label">Ativos</span>
+          <span class="crm-counter-val">${ativos.length}</span>
+        </div>
+        ${reunioes ? `<div class="crm-counter-row">
+          <span class="crm-counter-label">Reuniões</span>
+          <span class="crm-counter-val highlight">${reunioes}</span>
+        </div>` : ""}
+        ${fechados ? `<div class="crm-counter-row">
+          <span class="crm-counter-label">Fechados</span>
+          <span class="crm-counter-val highlight">${fechados}</span>
+        </div>` : ""}
+      `;
+
+      // Alertas: baseados em statusConversa (nova lógica)
+      const agora = Date.now();
+      const alertas = [];
+
+      leads.forEach(l => {
+        if (l.status === "fechado") return;
+        const ref = l.ultimaInteracaoEm || l.atualizadoEm;
+        const atualizado = ref ? new Date(ref).getTime() : 0;
+        const diffH = (agora - atualizado) / 3600000;
+
+        // Lead aguardando minha resposta (urgente — ele falou por último)
+        if (l.statusConversa === "aguardando_resposta" && diffH >= 2) {
+          alertas.push({ lead: l, urgente: true, desc: `lead esperando — ${Math.floor(diffH)}h aguardando sua resposta` });
+        }
+        // Eu falei por último, lead não respondeu (follow-up)
+        else if (l.statusConversa === "aguardando_cliente" && diffH >= 24) {
+          alertas.push({ lead: l, urgente: false, desc: `follow-up — ${Math.floor(diffH)}h sem resposta do lead` });
+        }
+        // Fallback legado: abordado sem statusConversa definido
+        else if (!l.statusConversa && l.status === "abordado" && diffH >= 24) {
+          alertas.push({ lead: l, urgente: false, desc: `follow-up — ${Math.floor(diffH)}h sem resposta` });
+        }
+      });
+
+      if (!alertas.length) {
+        alertasSideCard.classList.remove("tem-alertas");
+        return;
+      }
+
+      alertasSideCard.classList.add("tem-alertas");
+      alertasList.innerHTML = alertas.map((a, i) => `
+        <div class="alerta-item${a.urgente ? ' urgente' : ''}" data-alerta="${i}">
+          <span class="alerta-dot"></span>
+          <div class="alerta-info">
+            <span class="alerta-nome">${escapeHtml(a.lead.nome || "Lead")}</span>
+            <span class="alerta-desc">${escapeHtml(a.desc)}</span>
+          </div>
+        </div>`).join('');
+
+      alertasList.querySelectorAll(".alerta-item").forEach(el => {
+        el.addEventListener("click", () => abrirCRM());
+      });
+    }
+
+    // ── Ficha ──────────────────────────────────────────
+    const crmFicha      = document.getElementById("crmFicha");
+    const fichaLeadNome = document.getElementById("fichaLeadNome");
+    const fichaLeadMeta = document.getElementById("fichaLeadMeta");
+    const fichaBody     = document.getElementById("fichaBody");
+    const fichaCloseBtn = document.getElementById("fichaCloseBtn");
+
+    let fichaLeadAtivo = null;
+
+    function fecharFicha() {
+      crmFicha.classList.remove("open");
+      fichaLeadAtivo = null;
+    }
+
+    fichaCloseBtn.addEventListener("click", fecharFicha);
+
+    function formatarData(iso) {
+      if (!iso) return "—";
+      const d = new Date(iso);
+      return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    }
+
+    function proximaAcao(lead) {
+      if (lead.statusConversa === "aguardando_resposta") return "⚡ Responder o lead agora";
+      const ref = lead.ultimaInteracaoEm || lead.atualizadoEm;
+      const diffH = ref ? (Date.now() - new Date(ref).getTime()) / 3600000 : 999;
+      if (lead.statusConversa === "aguardando_cliente" && diffH >= 24) return "📩 Enviar follow-up — mais de 24h sem resposta";
+      if (lead.statusConversa === "aguardando_cliente") return "⏳ Aguardar resposta do lead";
+      if (lead.status === "follow_up") return "📩 Aguardar resposta do follow-up";
+      if (lead.status === "reuniao") return "📅 Confirmar reunião e preparar proposta";
+      if (lead.status === "proposta") return "📋 Follow-up da proposta";
+      if (lead.status === "novo") return "📤 Iniciar contato";
+      return "—";
+    }
+
+    function labelStatus(key) {
+      return (CRM_STATUSES.find(s => s.key === key) || {}).label || key;
+    }
+
+    async function atualizarLead(id, campos) {
+      await crmFetch({ modo: "atualizar", id, ...campos });
+      await carregarCRM();
+      // atualiza ficha com dados frescos
+      const lead = (crmData.leads || []).find(l => l.id === id);
+      if (lead) abrirFicha(lead);
+      else fecharFicha();
+      renderizarCRM();
+    }
+
+    function abrirFicha(lead) {
+      fichaLeadAtivo = lead;
+      fichaLeadNome.textContent = lead.nome || "Sem nome";
+      fichaLeadMeta.textContent = [lead.categoria, lead.endereco].filter(Boolean).join(" · ");
+
+      const movLabel = lead.ultimoMovimento === "eu" ? "Eu" : lead.ultimoMovimento === "lead" ? "Lead" : "—";
+      const movClass = lead.ultimoMovimento === "lead" ? "ficha-mov-lead" : "ficha-mov-eu";
+      const scLabel  = lead.statusConversa === "aguardando_resposta"
+        ? '<span style="color:#fbbf24">⚡ Aguardando sua resposta</span>'
+        : lead.statusConversa === "aguardando_cliente"
+        ? '<span style="color:var(--text-3)">⏳ Aguardando cliente</span>'
+        : "—";
+
+      const followUpTexto = lead.followUp ||
+        "Oi! Passei para ver se chegou minha mensagem. Teria 15 min essa semana?";
+
+      fichaBody.innerHTML = `
+        <div class="ficha-bloco">
+          <div class="ficha-bloco-titulo">Status</div>
+          <div class="ficha-bloco-val">
+            <span class="ficha-status-badge ${lead.status || 'novo'}">${labelStatus(lead.status || "novo")}</span>
+            &nbsp; ${scLabel}
+          </div>
+        </div>
+
+        <div class="ficha-bloco">
+          <div class="ficha-bloco-titulo">Última interação</div>
+          <div class="ficha-bloco-val">
+            ${formatarData(lead.ultimaInteracaoEm || lead.atualizadoEm)}
+            &nbsp;·&nbsp; falou por último: <span class="${movClass}"><b>${movLabel}</b></span>
+          </div>
+        </div>
+
+        <div class="ficha-bloco">
+          <div class="ficha-bloco-titulo">Próxima ação</div>
+          <div class="ficha-bloco-val highlight">${proximaAcao(lead)}</div>
+        </div>
+
+        <div class="ficha-bloco">
+          <div class="ficha-bloco-titulo">Mensagem inicial</div>
+          <div class="ficha-bloco-val textarea-like">${escapeHtml(lead.mensagemInicial || "Nenhuma mensagem registrada.")}</div>
+          <button class="ficha-btn" id="btnCopiarMsg">Copiar mensagem</button>
+        </div>
+
+        <div class="ficha-bloco">
+          <div class="ficha-bloco-titulo">Follow-up sugerido</div>
+          <div class="ficha-bloco-val textarea-like">${escapeHtml(followUpTexto)}</div>
+          <button class="ficha-btn" id="btnCopiarFollowUp">Copiar follow-up</button>
+        </div>
+
+        <div class="ficha-bloco">
+          <div class="ficha-bloco-titulo">Observações</div>
+          <textarea class="ficha-notas" id="fichaNotas" placeholder="Anotações sobre o lead...">${escapeHtml(lead.notas || "")}</textarea>
+          <button class="ficha-btn" id="btnSalvarNotas">Salvar observações</button>
+        </div>
+
+        ${lead.telefone ? `
+        <div class="ficha-bloco">
+          <div class="ficha-bloco-titulo">Contato</div>
+          <a class="ficha-btn primary" id="btnWhatsApp"
+             href="https://wa.me/${(lead.telefone || "").replace(/\D/g, "")}"
+             target="_blank" rel="noopener">
+            WhatsApp — ${escapeHtml(lead.telefone)}
+          </a>
+        </div>` : ""}
+
+        <div class="ficha-bloco" id="fichaSecaoMensagens">
+          <div class="ficha-bloco-titulo">Mensagens</div>
+          <div class="ficha-estilo-tabs">
+            <button class="ficha-estilo-tab" data-estilo="leve">Leve</button>
+            <button class="ficha-estilo-tab ativo" data-estilo="direto">Direto</button>
+            <button class="ficha-estilo-tab" data-estilo="provocativo">Provocativo</button>
+          </div>
+          <div class="ficha-acoes-row" style="flex-wrap:wrap; gap:6px;">
+            <button class="ficha-btn" data-tipo="abordagem">1ª abordagem</button>
+            <button class="ficha-btn" data-tipo="followup">Follow-up</button>
+            <button class="ficha-btn" data-tipo="reuniao">Convite reunião</button>
+          </div>
+          <div id="fichaMensagemBox" style="display:none">
+            <div class="ficha-bloco-val textarea-like" id="fichaMensagemTexto"></div>
+            <button class="ficha-btn" id="btnCopiarMensagemGerada">Copiar mensagem</button>
+          </div>
+        </div>
+
+        <div class="ficha-bloco">
+          <div class="ficha-bloco-titulo">Ações</div>
+          <div class="ficha-acoes">
+            <div class="ficha-acoes-row">
+              <button class="ficha-btn accent" id="btnAbordado">Eu abordei</button>
+              <button class="ficha-btn warn"   id="btnLeadRespondeu">Lead respondeu</button>
+              <button class="ficha-btn"        id="btnEuRespondi">Eu respondi</button>
+              <button class="ficha-btn orange"  id="btnFollowUp">Follow-up enviado</button>
+            </div>
+            <div class="ficha-acoes-row">
+              <button class="ficha-btn success" id="btnReuniao">Reunião</button>
+              <button class="ficha-btn success" id="btnProposta">Proposta</button>
+              <button class="ficha-btn success" id="btnFechado">Fechado</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Copiar mensagem
+      fichaBody.querySelector("#btnCopiarMsg").addEventListener("click", () => {
+        navigator.clipboard.writeText(lead.mensagemInicial || "").then(() => {
+          fichaBody.querySelector("#btnCopiarMsg").textContent = "Copiado!";
+          setTimeout(() => { if (fichaBody.querySelector("#btnCopiarMsg")) fichaBody.querySelector("#btnCopiarMsg").textContent = "Copiar mensagem"; }, 1400);
+        });
+      });
+
+      // Copiar follow-up
+      fichaBody.querySelector("#btnCopiarFollowUp").addEventListener("click", () => {
+        navigator.clipboard.writeText(followUpTexto).then(() => {
+          fichaBody.querySelector("#btnCopiarFollowUp").textContent = "Copiado!";
+          setTimeout(() => { if (fichaBody.querySelector("#btnCopiarFollowUp")) fichaBody.querySelector("#btnCopiarFollowUp").textContent = "Copiar follow-up"; }, 1400);
+        });
+      });
+
+      // Salvar observações
+      fichaBody.querySelector("#btnSalvarNotas").addEventListener("click", async () => {
+        const notas = fichaBody.querySelector("#fichaNotas").value;
+        await crmFetch({ modo: "notas", id: lead.id, notas });
+        fichaBody.querySelector("#btnSalvarNotas").textContent = "Salvo!";
+        setTimeout(() => { if (fichaBody.querySelector("#btnSalvarNotas")) fichaBody.querySelector("#btnSalvarNotas").textContent = "Salvar observações"; }, 1400);
+        await carregarCRM();
+      });
+
+      // Geração de mensagens
+      const fichaMensagemBox   = fichaBody.querySelector("#fichaMensagemBox");
+      const fichaMensagemTexto = fichaBody.querySelector("#fichaMensagemTexto");
+      const btnCopiarMensagemGerada = fichaBody.querySelector("#btnCopiarMensagemGerada");
+
+      let estiloAtivo = "direto";
+      fichaBody.querySelectorAll(".ficha-estilo-tab").forEach(tab => {
+        tab.addEventListener("click", () => {
+          fichaBody.querySelectorAll(".ficha-estilo-tab").forEach(t => t.classList.remove("ativo"));
+          tab.classList.add("ativo");
+          estiloAtivo = tab.dataset.estilo;
+        });
+      });
+
+      fichaBody.querySelectorAll("[data-tipo]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const tipo = btn.dataset.tipo;
+          const labelOriginal = btn.textContent;
+          btn.disabled = true;
+          btn.textContent = "Gerando...";
+          fichaMensagemBox.style.display = "none";
+
+          try {
+            const r = await fetch("/api/crm/mensagem", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ lead, tipo, estilo: estiloAtivo }),
+            });
+            const data = await r.json();
+            if (data.mensagem) {
+              fichaMensagemTexto.textContent = data.mensagem;
+              fichaMensagemBox.style.display = "flex";
+              fichaMensagemBox.style.flexDirection = "column";
+              fichaMensagemBox.style.gap = "8px";
+            } else {
+              fichaMensagemTexto.textContent = data.erro || "Erro ao gerar.";
+              fichaMensagemBox.style.display = "block";
+            }
+          } catch {
+            fichaMensagemTexto.textContent = "Erro de conexão.";
+            fichaMensagemBox.style.display = "block";
+          } finally {
+            btn.disabled = false;
+            btn.textContent = labelOriginal;
+          }
+        });
+      });
+
+      btnCopiarMensagemGerada.addEventListener("click", () => {
+        navigator.clipboard.writeText(fichaMensagemTexto.textContent).then(() => {
+          btnCopiarMensagemGerada.textContent = "Copiado!";
+          setTimeout(() => { btnCopiarMensagemGerada.textContent = "Copiar mensagem"; }, 1400);
+        });
+      });
+
+      const agora = new Date().toISOString();
+
+      // Eu abordei → abordado, eu falei, aguardando cliente
+      fichaBody.querySelector("#btnAbordado").addEventListener("click", () =>
+        atualizarLead(lead.id, { status: "abordado", ultimoMovimento: "eu", statusConversa: "aguardando_cliente", ultimaInteracaoEm: agora }));
+
+      // Lead respondeu → conversando, lead falou, aguardando minha resposta
+      fichaBody.querySelector("#btnLeadRespondeu").addEventListener("click", () =>
+        atualizarLead(lead.id, { status: "conversando", ultimoMovimento: "lead", statusConversa: "aguardando_resposta", ultimaInteracaoEm: agora }));
+
+      // Eu respondi → conversando, eu falei, aguardando cliente
+      fichaBody.querySelector("#btnEuRespondi").addEventListener("click", () =>
+        atualizarLead(lead.id, { status: "conversando", ultimoMovimento: "eu", statusConversa: "aguardando_cliente", ultimaInteracaoEm: agora }));
+
+      // Follow-up enviado → follow_up, eu falei, aguardando resposta do lead
+      fichaBody.querySelector("#btnFollowUp").addEventListener("click", () =>
+        atualizarLead(lead.id, { status: "follow_up", ultimoMovimento: "eu", statusConversa: "aguardando_cliente", ultimaInteracaoEm: agora }));
+
+      // Mover etapas
+      fichaBody.querySelector("#btnReuniao").addEventListener("click", () =>
+        atualizarLead(lead.id, { status: "reuniao", ultimoMovimento: "eu", statusConversa: "aguardando_cliente", ultimaInteracaoEm: agora }));
+
+      fichaBody.querySelector("#btnProposta").addEventListener("click", () =>
+        atualizarLead(lead.id, { status: "proposta", ultimoMovimento: "eu", statusConversa: "aguardando_cliente", ultimaInteracaoEm: agora }));
+
+      fichaBody.querySelector("#btnFechado").addEventListener("click", () =>
+        atualizarLead(lead.id, { status: "fechado", ultimoMovimento: null, statusConversa: null, ultimaInteracaoEm: agora }));
+
+      crmFicha.classList.add("open");
+    }
+
+    // ── Kanban ─────────────────────────────────────────
+    function renderizarCRM() {
+      const leads = crmData.leads || [];
+      crmTotalLabel.textContent = leads.length ? `${leads.length} lead${leads.length > 1 ? "s" : ""}` : "";
+      crmColumns.innerHTML = "";
+
+      CRM_STATUSES.forEach(({ key, label }) => {
+        const grupo = leads.filter(l => l.status === key);
+        const col = document.createElement("div");
+        col.className = `crm-column crm-col-${key}`;
+        col.innerHTML = `
+          <div class="crm-column-header">
+            <span class="crm-column-label">${label}</span>
+            <span class="crm-column-count">${grupo.length}</span>
+          </div>
+          <div class="crm-column-body" id="crm-col-${key}"></div>`;
+
+        const body = col.querySelector(`#crm-col-${key}`);
+        if (!grupo.length) {
+          body.innerHTML = `<div class="crm-empty-col">—</div>`;
+        } else {
+          grupo.forEach(lead => {
+            const card = document.createElement("div");
+            card.className = "crm-card";
+
+            // Indicador de urgência no card
+            const urgente = lead.statusConversa === "aguardando_resposta";
+            const followupPendente = lead.statusConversa === "aguardando_cliente" &&
+              lead.ultimaInteracaoEm && (Date.now() - new Date(lead.ultimaInteracaoEm).getTime()) / 3600000 >= 24;
+
+            card.innerHTML = `
+              <div class="crm-card-name" title="${escapeHtml(lead.nome)}">${escapeHtml(lead.nome)}</div>
+              <div class="crm-card-meta">${escapeHtml(lead.categoria || lead.endereco || "")}</div>
+              <div class="crm-card-footer">
+                ${urgente ? '<span class="crm-card-alerta urgente">⚡ Responder</span>' : ""}
+                ${followupPendente ? '<span class="crm-card-alerta">📩 Follow-up</span>' : ""}
+                <button class="crm-remove-btn" title="Remover">&times;</button>
+              </div>`;
+
+            card.addEventListener("click", (e) => {
+              if (e.target.classList.contains("crm-remove-btn")) return;
+              abrirFicha(lead);
+            });
+
+            card.querySelector(".crm-remove-btn").addEventListener("click", async (e) => {
+              e.stopPropagation();
+              await crmFetch({ modo: "remover", id: lead.id });
+              fecharFicha();
+              await carregarCRM();
+              renderizarCRM();
+            });
+
+            body.appendChild(card);
+          });
+        }
+        crmColumns.appendChild(col);
+      });
+    }
+
+    function abrirCRM() {
+      renderizarCRM();
+      crmOverlay.classList.add("open");
+    }
+
+    function fecharCRM() {
+      fecharFicha();
+      crmOverlay.classList.remove("open");
+    }
+
+    crmPanelBtn.addEventListener("click", abrirCRM);
+    crmCloseBtn.addEventListener("click", fecharCRM);
+    crmOverlay.addEventListener("click", e => { if (e.target === crmOverlay) fecharCRM(); });
+
+    // Botão "+ CRM" no drawer
+    analysisCrmBtn.addEventListener("click", async () => {
+      if (!currentLead) return;
+      const data = await crmFetch({ modo: "salvar", lead: currentLead });
+      if (data.ok) {
+        analysisCrmBtn.textContent = data.jaExiste ? "No CRM" : "Salvo!";
+        analysisCrmBtn.classList.add("saved");
+        await carregarCRM();
+      }
+    });
+
+    // Ao abrir o drawer, verificar se o lead já está no CRM
+    const _openOriginal = openAnalysisDrawer;
+    openAnalysisDrawer = async function(lead) {
+      analysisCrmBtn.textContent = "+ CRM";
+      analysisCrmBtn.classList.remove("saved");
+      await _openOriginal(lead);
+      const jaExiste = crmData.leads.some(l => l.id === lead.id);
+      if (jaExiste) {
+        analysisCrmBtn.textContent = "No CRM";
+        analysisCrmBtn.classList.add("saved");
+      }
+    };
+
+    // ============================================================
+    //  DIRECTOR COMERCIAL
+    // ============================================================
+    const estrategiaBtn      = document.getElementById("estrategiaBtn");
+    const estrategiaOverlay  = document.getElementById("estrategiaOverlay");
+    const estrategiaChat     = document.getElementById("estrategiaChat");
+    const estrategiaEmpty    = document.getElementById("estrategiaEmpty");
+    const estrategiaInput    = document.getElementById("estrategiaInput");
+    const estrategiaSendBtn  = document.getElementById("estrategiaSendBtn");
+    const estrategiaCloseBtn = document.getElementById("estrategiaCloseBtn");
+    const directorModoBadge  = document.getElementById("directorModoBadge");
+
+    let estrategiaEnviando = false;
+    let historicoDiretor = []; // máx 5 trocas (10 itens)
+
+    // Detecção de modo no cliente (espelha o servidor)
+    function detectarModoCliente(texto) {
+      const t = texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const conversa   = ["respondeu","disse","falou","voltou","me mandou","me escreveu","reply","respondendo","me ligou","me perguntou"];
+      const prospeccao = ["mensagem","escreve","manda ","fala com","texto para","texto pra","aborda","prospeta","entra em contato","cria mensagem","gera mensagem","como abordar","como falar"];
+      if (conversa.some(k => t.includes(k)))   return "conversa";
+      if (prospeccao.some(k => t.includes(k))) return "prospeccao";
+      return "estrategia";
+    }
+
+    const MODO_LABELS = { estrategia: "Estratégia", prospeccao: "Prospecção", conversa: "Conversa" };
+
+    function atualizarBadgeModo(texto) {
+      const modo = detectarModoCliente(texto || "");
+      directorModoBadge.className = `director-modo-badge ${modo}`;
+      directorModoBadge.textContent = MODO_LABELS[modo];
+    }
+
+    function abrirEstrategia() {
+      estrategiaOverlay.classList.add("open");
+      estrategiaInput.focus();
+    }
+
+    function fecharEstrategia() {
+      estrategiaOverlay.classList.remove("open");
+      historicoDiretor = []; // reset ao fechar
+    }
+
+    function adicionarMsgEstrategia(tipo, texto, loading = false) {
+      if (estrategiaEmpty) estrategiaEmpty.style.display = "none";
+      const wrap = document.createElement("div");
+      wrap.className = `estrategia-msg ${tipo}`;
+      const label = document.createElement("div");
+      label.className = "estrategia-msg-label";
+      label.textContent = tipo === "user" ? "Você" : "Director";
+      const body = document.createElement("div");
+      body.className = "estrategia-msg-body" + (loading ? " loading" : "");
+      body.textContent = texto;
+      wrap.appendChild(label);
+      wrap.appendChild(body);
+      estrategiaChat.appendChild(wrap);
+      estrategiaChat.scrollTop = estrategiaChat.scrollHeight;
+      return { wrap, body };
+    }
+
+    function adicionarAcoesDiretor(wrap, resposta, modo, aviso) {
+      const acoes = document.createElement("div");
+      acoes.className = "director-acoes";
+
+      // Botão copiar
+      const btnCopiar = document.createElement("button");
+      btnCopiar.className = "director-acao-btn primary";
+      btnCopiar.textContent = modo === "estrategia" ? "Copiar decisão" : "Copiar mensagem";
+      btnCopiar.addEventListener("click", () => {
+        navigator.clipboard.writeText(resposta).then(() => {
+          btnCopiar.textContent = "Copiado!";
+          btnCopiar.classList.add("copiado");
+          btnCopiar.classList.remove("primary");
+          setTimeout(() => {
+            btnCopiar.textContent = modo === "estrategia" ? "Copiar decisão" : "Copiar mensagem";
+            btnCopiar.classList.remove("copiado");
+            btnCopiar.classList.add("primary");
+          }, 1800);
+        });
+      });
+      acoes.appendChild(btnCopiar);
+
+      // Botão WhatsApp (conversa e prospecção)
+      if (modo === "conversa" || modo === "prospeccao") {
+        const btnWa = document.createElement("button");
+        btnWa.className = "director-acao-btn";
+        btnWa.textContent = "Abrir WhatsApp";
+        btnWa.addEventListener("click", () => {
+          const link = "https://web.whatsapp.com/send?text=" + encodeURIComponent(resposta);
+          window.open(link, "_blank");
+        });
+        acoes.appendChild(btnWa);
+      }
+
+      // Aviso de validação
+      if (aviso) {
+        const badge = document.createElement("span");
+        badge.className = "director-aviso";
+        badge.textContent = "revisar antes de enviar";
+        acoes.appendChild(badge);
+      }
+
+      wrap.appendChild(acoes);
+    }
+
+    async function enviarEstrategia() {
+      const pergunta = estrategiaInput.value.trim();
+      if (!pergunta || estrategiaEnviando) return;
+      estrategiaEnviando = true;
+      estrategiaSendBtn.disabled = true;
+      estrategiaInput.value = "";
+      estrategiaInput.style.height = "auto";
+      atualizarBadgeModo("");
+
+      adicionarMsgEstrategia("user", pergunta);
+      const { body: respostaEl } = adicionarMsgEstrategia("ia", "...", true);
+
+      try {
+        const resp = await fetch("/api/estrategia", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pergunta, historico: historicoDiretor.slice(-10) }),
+        });
+        const data = await resp.json();
+        if (data.erro) throw new Error(data.erro);
+
+        respostaEl.textContent = data.resposta;
+        respostaEl.classList.remove("loading");
+
+        // Adicionar botões de ação
+        adicionarAcoesDiretor(respostaEl.parentElement.parentElement, data.resposta, data.modo, data.aviso);
+
+        // Salvar histórico (máx 5 trocas = 10 itens)
+        historicoDiretor.push({ tipo: "user", texto: pergunta });
+        historicoDiretor.push({ tipo: "ia", texto: data.resposta });
+        if (historicoDiretor.length > 10) historicoDiretor = historicoDiretor.slice(-10);
+
+      } catch (err) {
+        respostaEl.textContent = "Erro: " + err.message;
+        respostaEl.classList.remove("loading");
+        respostaEl.style.color = "var(--danger)";
+      } finally {
+        estrategiaEnviando = false;
+        estrategiaSendBtn.disabled = false;
+        estrategiaInput.focus();
+        estrategiaChat.scrollTop = estrategiaChat.scrollHeight;
+      }
+    }
+
+    estrategiaInput.addEventListener("input", () => {
+      estrategiaInput.style.height = "auto";
+      estrategiaInput.style.height = Math.min(estrategiaInput.scrollHeight, 120) + "px";
+      atualizarBadgeModo(estrategiaInput.value);
+    });
+
+    estrategiaInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviarEstrategia(); }
+    });
+
+    estrategiaBtn.addEventListener("click", abrirEstrategia);
+    estrategiaSendBtn.addEventListener("click", enviarEstrategia);
+    estrategiaCloseBtn.addEventListener("click", fecharEstrategia);
+    estrategiaOverlay.addEventListener("click", e => { if (e.target === estrategiaOverlay) fecharEstrategia(); });
+
+    // ============================================================
+    //  GESTOR DE TRÁFEGO — assistente conversacional
+    // ============================================================
+    const trafegoBtn         = document.getElementById("trafegoBtn");
+    const trafegoOverlay     = document.getElementById("trafegoOverlay");
+    const trafegoListCol     = document.getElementById("trafegoListCol");
+    const trafegoChatCol     = document.getElementById("trafegoChatCol");
+    const trafegoCampanhaNome = document.getElementById("trafegoCampanhaNome");
+    const trafegoMetrics     = document.getElementById("trafegoMetrics");
+    const trafegoChatMsgs    = document.getElementById("trafegoChatMsgs");
+    const trafegoChatInput   = document.getElementById("trafegoChatInput");
+    const trafegoChatSendBtn = document.getElementById("trafegoChatSendBtn");
+    const trafegoRefreshBtn  = document.getElementById("trafegoRefreshBtn");
+    const trafegoCloseBtn    = document.getElementById("trafegoCloseBtn");
+
+    let campanhaAtiva = null;
+    let historicoChatTrafego = [];
+    let trafegoChatEnviando = false;
+    let campanhasCache = [];
+
+    function abrirTrafego() {
+      trafegoOverlay.classList.add("open");
+      carregarTrafego();
+    }
+
+    function fecharTrafego() {
+      trafegoOverlay.classList.remove("open");
+      campanhaAtiva = null;
+      historicoChatTrafego = [];
+      trafegoChatCol.classList.remove("aberta");
+      trafegoListCol.classList.remove("comprimida");
+    }
+
+    async function carregarTrafego() {
+      trafegoListCol.innerHTML = '<div style="padding:40px; text-align:center; color:var(--text-3); font-size:12px;">Carregando campanhas...</div>';
+      trafegoRefreshBtn.disabled = true;
+      campanhaAtiva = null;
+      historicoChatTrafego = [];
+      trafegoChatCol.classList.remove("aberta");
+      trafegoListCol.classList.remove("comprimida");
+      try {
+        const resp = await fetch("/ads/insights");
+        const data = await resp.json();
+        if (data.erro) throw new Error(data.erro);
+        campanhasCache = data.campanhas || [];
+        renderizarTabela(campanhasCache);
+      } catch (err) {
+        trafegoListCol.innerHTML = `<div style="padding:40px; text-align:center; color:var(--danger); font-size:12px;">${escapeHtml(err.message)}</div>`;
+      } finally {
+        trafegoRefreshBtn.disabled = false;
+      }
+    }
+
+    function renderizarTabela(campanhas) {
+      if (!campanhas.length) {
+        trafegoListCol.innerHTML = '<div style="padding:40px; text-align:center; color:var(--text-3); font-size:12px;">Nenhuma campanha encontrada nos últimos 30 dias.</div>';
+        return;
+      }
+      const linhas = campanhas.map((c, i) => {
+        const alerta = c.ctr < 1 || (c.gasto > 100 && c.cliques === 0);
+        return `<tr class="${alerta ? 'row-alert' : ''}" data-idx="${i}">
+          <td title="${escapeHtml(c.campanha)}">${escapeHtml(c.campanha)}</td>
+          <td>R$ ${c.gasto.toFixed(2)}</td>
+          <td>${c.impressoes.toLocaleString('pt-BR')}</td>
+          <td>${c.cliques.toLocaleString('pt-BR')}</td>
+          <td>${c.ctr.toFixed(2)}%</td>
+          <td>R$ ${c.cpc.toFixed(2)}</td>
+        </tr>`;
+      }).join('');
+
+      trafegoListCol.innerHTML = `
+        <p style="font-size:11px; color:var(--text-3); margin:0 0 14px;">Clique em uma campanha para analisar.</p>
+        <div class="trafego-table-wrap">
+          <table class="trafego-table">
+            <thead><tr>
+              <th>Campanha</th><th>Gasto</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>CPC</th>
+            </tr></thead>
+            <tbody>${linhas}</tbody>
+          </table>
+        </div>`;
+
+      trafegoListCol.querySelectorAll("tbody tr").forEach(tr => {
+        tr.addEventListener("click", () => {
+          const c = campanhasCache[parseInt(tr.dataset.idx)];
+          selecionarCampanha(c, tr);
+        });
+      });
+    }
+
+    async function selecionarCampanha(campanha, trEl) {
+      trafegoListCol.querySelectorAll("tbody tr").forEach(r => r.classList.remove("ativa"));
+      if (trEl) trEl.classList.add("ativa");
+
+      trafegoListCol.classList.add("comprimida");
+      trafegoChatCol.classList.add("aberta");
+
+      campanhaAtiva = campanha;
+      historicoChatTrafego = [];
+
+      // Header de métricas
+      trafegoCampanhaNome.textContent = campanha.campanha;
+      trafegoMetrics.innerHTML = [
+        { label: "Gasto",   val: `R$ ${campanha.gasto.toFixed(2)}`,   alert: false },
+        { label: "CTR",     val: `${campanha.ctr.toFixed(2)}%`,        alert: campanha.ctr < 1 },
+        { label: "CPC",     val: `R$ ${campanha.cpc.toFixed(2)}`,      alert: campanha.cpc > 5 },
+        { label: "Cliques", val: campanha.cliques.toLocaleString('pt-BR'), alert: false },
+      ].map(m => `<div class="trafego-metric">
+        <span class="trafego-metric-val${m.alert ? ' alert' : ''}">${escapeHtml(String(m.val))}</span>
+        <span class="trafego-metric-label">${m.label}</span>
+      </div>`).join('');
+
+      // Diagnóstico inicial
+      trafegoChatMsgs.innerHTML = '';
+      trafegoChatInput.value = '';
+      const loadEl = adicionarMsgTrafego("gestor", "Analisando a campanha...", true);
+
+      try {
+        const resp = await fetch("/ads/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ campanha, mensagem: "Diagnóstico inicial desta campanha.", historico: [] }),
+        });
+        const data = await resp.json();
+        if (data.erro) throw new Error(data.erro);
+        loadEl.textContent = data.resposta;
+        loadEl.classList.remove("loading");
+        historicoChatTrafego.push({ tipo: "gestor", texto: data.resposta });
+      } catch (err) {
+        loadEl.textContent = "Erro: " + err.message;
+        loadEl.classList.remove("loading");
+        loadEl.style.color = "var(--danger)";
+      }
+    }
+
+    function adicionarMsgTrafego(tipo, texto, loading = false) {
+      const wrap = document.createElement("div");
+      wrap.className = `trafego-chat-msg ${tipo}`;
+      const label = document.createElement("div");
+      label.className = "trafego-chat-msg-label";
+      label.textContent = tipo === "user" ? "Você" : "Gestor";
+      const body = document.createElement("div");
+      body.className = "trafego-chat-msg-body" + (loading ? " loading" : "");
+      body.textContent = texto;
+      wrap.appendChild(label);
+      wrap.appendChild(body);
+      trafegoChatMsgs.appendChild(wrap);
+      trafegoChatMsgs.scrollTop = trafegoChatMsgs.scrollHeight;
+      return body;
+    }
+
+    async function enviarMsgTrafego() {
+      const texto = trafegoChatInput.value.trim();
+      if (!texto || trafegoChatEnviando || !campanhaAtiva) return;
+      trafegoChatEnviando = true;
+      trafegoChatSendBtn.disabled = true;
+      trafegoChatInput.value = "";
+      trafegoChatInput.style.height = "auto";
+
+      adicionarMsgTrafego("user", texto);
+      historicoChatTrafego.push({ tipo: "user", texto });
+      const loadEl = adicionarMsgTrafego("gestor", "Pensando...", true);
+
+      try {
+        const resp = await fetch("/ads/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            campanha: campanhaAtiva,
+            mensagem: texto,
+            historico: historicoChatTrafego.slice(-6),
+          }),
+        });
+        const data = await resp.json();
+        if (data.erro) throw new Error(data.erro);
+        loadEl.textContent = data.resposta;
+        loadEl.classList.remove("loading");
+        historicoChatTrafego.push({ tipo: "gestor", texto: data.resposta });
+        if (historicoChatTrafego.length > 12) historicoChatTrafego = historicoChatTrafego.slice(-12);
+      } catch (err) {
+        loadEl.textContent = "Erro: " + err.message;
+        loadEl.classList.remove("loading");
+        loadEl.style.color = "var(--danger)";
+      } finally {
+        trafegoChatEnviando = false;
+        trafegoChatSendBtn.disabled = false;
+        trafegoChatInput.focus();
+        trafegoChatMsgs.scrollTop = trafegoChatMsgs.scrollHeight;
+      }
+    }
+
+    trafegoChatInput.addEventListener("input", () => {
+      trafegoChatInput.style.height = "auto";
+      trafegoChatInput.style.height = Math.min(trafegoChatInput.scrollHeight, 100) + "px";
+    });
+    trafegoChatInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviarMsgTrafego(); }
+    });
+
+    trafegoBtn.addEventListener("click", abrirTrafego);
+    trafegoRefreshBtn.addEventListener("click", carregarTrafego);
+    trafegoCloseBtn.addEventListener("click", fecharTrafego);
+    trafegoChatSendBtn.addEventListener("click", enviarMsgTrafego);
+    trafegoOverlay.addEventListener("click", e => { if (e.target === trafegoOverlay) fecharTrafego(); });
+
+    // ESC fecha painéis — tráfego incluído
+    document.addEventListener("keydown", (e) => {
+      const qualquerInputFocado = ["INPUT","TEXTAREA","SELECT"].includes(document.activeElement?.tagName);
+      const drawerAberto = analysisDrawer.classList.contains("open");
+
+      // ESC — fecha o painel mais recente
+      if (e.key === "Escape") {
+        if (estrategiaOverlay.classList.contains("open")) { fecharEstrategia(); return; }
+        if (trafegoOverlay.classList.contains("open")) { fecharTrafego(); return; }
+        if (criativosOverlay.classList.contains("open")) { fecharCriativos(); return; }
+        if (crmOverlay.classList.contains("open")) { fecharCRM(); return; }
+        if (drawerAberto) { closeAnalysisDrawer(); return; }
+        if (leadsOverlay.classList.contains("open")) { closeLeadsModal(); return; }
+      }
+
+      // Atalhos globais (fora de inputs)
+      if (!qualquerInputFocado && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // B — abre modal de busca
+        if ((e.key === "b" || e.key === "B") && !drawerAberto && !leadsOverlay.classList.contains("open")) {
+          e.preventDefault();
+          openLeadsModal();
+          return;
+        }
+
+        // W — WhatsApp: drawer aberto usa lead atual, senão usa lead em hover na lista
+        if (e.key === "w" || e.key === "W") {
+          if (drawerAberto && currentLead?.telefone) {
+            e.preventDefault();
+            analysisWhatsappBtn.click();
+            return;
+          }
+          if (!drawerAberto && leadHovered?.telefone) {
+            e.preventDefault();
+            const msg = leadHovered.analise ? extrairMensagemPronta(leadHovered.analise) : "";
+            window.open(montarLinkWhatsApp(leadHovered.telefone, msg), "_blank");
+            marcarContatado(leadHovered);
+            return;
+          }
+        }
+
+        // → ou N — próximo lead no drawer
+        if (drawerAberto && (e.key === "ArrowRight" || e.key === "n")) {
+          e.preventDefault();
+          navegarProximo();
+        }
+      }
+    });
+
+    // Carregar CRM na inicialização
+    carregarCRM();
+
+    // ============================================================
+    //  CRIATIVOS — fluxo linear: gestor → designer → gemini
+    // ============================================================
+    const criativosOverlay    = document.getElementById("criativosOverlay");
+    const criativosCloseBtn   = document.getElementById("criativosCloseBtn");
+    const criativosBtn        = document.getElementById("criativosBtn");
+    const criativosGaleria    = document.getElementById("criativosGaleria");
+    const criativosPreview    = document.getElementById("criativosPreview");
+    const criativosFileInput  = document.getElementById("criativosFileInput");
+    const criativosUploadStatus = document.getElementById("criativosUploadStatus");
+    const criativosClienteLabel = document.getElementById("criativosClienteLabel");
+
+    // Passo 2
+    const criativos_bloco_briefing = document.getElementById("criativos-bloco-briefing");
+    const criativosLegenda    = document.getElementById("criativosLegenda");
+    const criativosCta        = document.getElementById("criativosCta");
+    const criativosObjetivo   = document.getElementById("criativosObjetivo");
+    const criativosFormato    = document.getElementById("criativosFormato");
+    const criativosContexto   = document.getElementById("criativosContexto");
+    const criativosDesignerBtn  = document.getElementById("criativosDesignerBtn");
+    const criativosAnalisarBtn  = document.getElementById("criativosAnalisarBtn");
+    const criativosAnaliseStatus = document.getElementById("criativosAnaliseStatus");
+    const criativosDiagnostico  = document.getElementById("criativosDiagnostico");
+
+    // Passo 3
+    const criativos_bloco_instrucao = document.getElementById("criativos-bloco-instrucao");
+    const criativosInstrucao = document.getElementById("criativosInstrucao");
+    const criativosGerarBtn  = document.getElementById("criativosGerarBtn");
+    const criativosVariacoes = document.getElementById("criativosVariacoes");
+
+    // Estado encapsulado
+    const criativos = {
+      clienteAtivo: "rivano",
+      imagemSelecionada: null, // { nome, url, base64, mimeType }
+    };
+
+    function resetarFluxo() {
+      criativos_bloco_briefing.style.opacity = "0.4";
+      criativos_bloco_briefing.style.pointerEvents = "none";
+      criativos_bloco_instrucao.style.display = "none";
+      criativosInstrucao.value = "";
+      criativosVariacoes.innerHTML = "";
+      criativosDesignerBtn.disabled = true;
+      criativosAnaliseStatus.textContent = "";
+      criativosDiagnostico.style.display = "none";
+    }
+
+    function habilitarBriefing() {
+      criativos_bloco_briefing.style.opacity = "1";
+      criativos_bloco_briefing.style.pointerEvents = "auto";
+    }
+
+    function formularioPreenchido() {
+      return !!(criativosCta.value.trim() || criativosLegenda.value.trim());
+    }
+
+    [criativosCta, criativosLegenda].forEach(el =>
+      el.addEventListener("input", () => {
+        criativosDesignerBtn.disabled = !formularioPreenchido();
+      })
+    );
+
+    // Analisar campanha e gerar briefing automaticamente
+    criativosAnalisarBtn.addEventListener("click", async () => {
+      if (!criativos.imagemSelecionada) return;
+      criativosAnalisarBtn.disabled = true;
+      criativosAnalisarBtn.textContent = "Analisando campanha...";
+      criativosAnaliseStatus.textContent = "Buscando dados Meta Ads e analisando performance...";
+      criativosDiagnostico.style.display = "none";
+
+      try {
+        const r = await fetch("/api/criativos/analisar-e-briefar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cliente: criativos.clienteAtivo,
+            imagemBase64: criativos.imagemSelecionada.base64,
+            mimeType: criativos.imagemSelecionada.mimeType,
+          }),
+        });
+        const data = await r.json();
+        if (data.briefing) {
+          const b = data.briefing;
+          if (b.cta)      criativosCta.value      = b.cta;
+          if (b.legenda)  criativosLegenda.value  = b.legenda;
+          if (b.objetivo) criativosObjetivo.value = b.objetivo;
+          if (b.formato)  criativosFormato.value  = b.formato;
+          if (b.contexto) criativosContexto.value = b.contexto;
+
+          // Mostrar diagnóstico da campanha
+          if (b.diagnostico) {
+            criativosDiagnostico.innerHTML = `<strong>Diagnóstico:</strong> ${escapeHtml(b.diagnostico)}`;
+            criativosDiagnostico.style.display = "block";
+          }
+
+          criativosAnaliseStatus.textContent = "✓ Briefing gerado — revise e ajuste se necessário";
+          criativosDesignerBtn.disabled = !formularioPreenchido();
+        } else {
+          criativosAnaliseStatus.textContent = data.erro || "Erro ao gerar briefing.";
+        }
+      } catch {
+        criativosAnaliseStatus.textContent = "Erro ao conectar.";
+      } finally {
+        criativosAnalisarBtn.disabled = false;
+        criativosAnalisarBtn.textContent = "⚡ Analisar campanha e gerar briefing";
+      }
+    });
+
+    function abrirCriativos() {
+      criativosOverlay.classList.add("open");
+      carregarGaleria();
+    }
+    function fecharCriativos() { criativosOverlay.classList.remove("open"); }
+
+    criativosBtn.addEventListener("click", abrirCriativos);
+    criativosCloseBtn.addEventListener("click", fecharCriativos);
+    criativosOverlay.addEventListener("click", e => { if (e.target === criativosOverlay) fecharCriativos(); });
+
+    // Tabs de cliente
+    document.querySelectorAll(".criativos-cliente-tab").forEach(tab => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".criativos-cliente-tab").forEach(t => t.classList.remove("ativo"));
+        tab.classList.add("ativo");
+        criativos.clienteAtivo = tab.dataset.cliente;
+        criativosClienteLabel.textContent = `(${tab.textContent})`;
+        criativos.imagemSelecionada = null;
+        criativosPreview.innerHTML = `<span class="criativos-preview-empty">Selecione uma imagem na galeria</span>`;
+        resetarFluxo();
+        carregarGaleria();
+      });
+    });
+
+    // Galeria
+    async function carregarGaleria() {
+      criativosGaleria.innerHTML = `<span class="criativos-galeria-vazia">Carregando...</span>`;
+      try {
+        const r = await fetch(`/api/criativos/listar?cliente=${criativos.clienteAtivo}`);
+        const data = await r.json();
+        const imgs = data.imagens || [];
+        if (!imgs.length) {
+          criativosGaleria.innerHTML = `<span class="criativos-galeria-vazia">Nenhuma imagem ainda.</span>`;
+          return;
+        }
+        criativosGaleria.innerHTML = "";
+        imgs.forEach(img => {
+          const thumb = document.createElement("div");
+          thumb.className = "criativos-thumb";
+          thumb.innerHTML = `<img src="${img.url}" alt="${escapeHtml(img.nome)}" loading="lazy">`;
+          thumb.addEventListener("click", () => selecionarImagem(img, thumb));
+          criativosGaleria.appendChild(thumb);
+        });
+      } catch {
+        criativosGaleria.innerHTML = `<span class="criativos-galeria-vazia">Erro ao carregar.</span>`;
+      }
+    }
+
+    // Passo 1 — Selecionar imagem
+    async function selecionarImagem(img, thumbEl) {
+      document.querySelectorAll(".criativos-thumb").forEach(t => t.classList.remove("ativo"));
+      thumbEl.classList.add("ativo");
+      criativosPreview.innerHTML = `<img src="${img.url}" alt="${escapeHtml(img.nome)}">`;
+      resetarFluxo();
+      try {
+        const r = await fetch(img.url);
+        const blob = await r.blob();
+        const base64 = await new Promise(res => {
+          const reader = new FileReader();
+          reader.onload = () => res(reader.result.split(",")[1]);
+          reader.readAsDataURL(blob);
+        });
+        criativos.imagemSelecionada = { nome: img.nome, url: img.url, base64, mimeType: blob.type };
+        habilitarBriefing();
+      } catch {
+        criativos.imagemSelecionada = null;
+      }
+    }
+
+    // Upload de imagem
+    criativosFileInput.addEventListener("change", async () => {
+      const file = criativosFileInput.files[0];
+      if (!file) return;
+      criativosUploadStatus.textContent = "Enviando...";
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result.split(",")[1];
+        try {
+          const r = await fetch("/api/criativos/upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cliente: criativos.clienteAtivo, nome: file.name, base64, mimeType: file.type }),
+          });
+          const data = await r.json();
+          if (data.ok) {
+            criativosUploadStatus.textContent = "✓ Enviado";
+            criativosFileInput.value = "";
+            setTimeout(() => { criativosUploadStatus.textContent = ""; }, 2000);
+            await carregarGaleria();
+          } else {
+            criativosUploadStatus.textContent = data.erro || "Erro ao enviar.";
+          }
+        } catch {
+          criativosUploadStatus.textContent = "Erro ao enviar.";
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Passo 2 — Enviar para o Designer
+    criativosDesignerBtn.addEventListener("click", async () => {
+      if (!criativos.imagemSelecionada || !formularioPreenchido()) return;
+      criativosDesignerBtn.disabled = true;
+      criativosDesignerBtn.textContent = "Enviando para o designer...";
+      criativos_bloco_instrucao.style.display = "none";
+      criativosVariacoes.innerHTML = "";
+      try {
+        const r = await fetch("/api/criativos/designer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cliente: criativos.clienteAtivo,
+            cta: criativosCta.value.trim(),
+            legenda: criativosLegenda.value.trim(),
+            objetivo: criativosObjetivo.value,
+            formato: criativosFormato.value,
+            contexto: criativosContexto.value.trim(),
+            imagemBase64: criativos.imagemSelecionada.base64,
+            mimeType: criativos.imagemSelecionada.mimeType,
+          }),
+        });
+        const data = await r.json();
+        if (data.edit_prompt) {
+          criativosInstrucao.value = data.edit_prompt;
+          criativos_bloco_instrucao.style.display = "flex";
+          criativosInstrucao.focus();
+          criativosInstrucao.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        } else {
+          alert(data.erro || "Designer-agent não retornou instrução.");
+        }
+      } catch {
+        alert("Erro ao conectar com o designer-agent.");
+      } finally {
+        criativosDesignerBtn.disabled = false;
+        criativosDesignerBtn.textContent = "Enviar para o Designer →";
+      }
+    });
+
+    // Passo 3 — Gerar criativo com Gemini
+    criativosGerarBtn.addEventListener("click", async () => {
+      const instrucao = criativosInstrucao.value.trim();
+      if (!criativos.imagemSelecionada || !instrucao) return;
+      criativosGerarBtn.disabled = true;
+      criativosGerarBtn.textContent = "Gerando...";
+      criativosVariacoes.innerHTML = `
+        <div style="font-size:12px; color:var(--text-3); padding:8px 0;">
+          Enviando para o Gemini — pode levar 20–40s por variação...
+        </div>`;
+      try {
+        const r = await fetch("/api/criativos/editar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imagemBase64: criativos.imagemSelecionada.base64,
+            mimeType: criativos.imagemSelecionada.mimeType,
+            promptEdicao: instrucao,
+          }),
+        });
+        const data = await r.json();
+
+        if (data.erro) {
+          criativosVariacoes.innerHTML = `
+            <div class="criativo-variacao" style="border-color:rgba(239,68,68,0.25);">
+              <div class="criativo-variacao-header">
+                <span class="criativo-variacao-label" style="color:rgba(239,68,68,0.8);">Erro</span>
+              </div>
+              <div class="criativo-variacao-erro">${escapeHtml(data.erro)}</div>
+            </div>`;
+          return;
+        }
+
+        criativosVariacoes.innerHTML = "";
+        (data.variacoes || []).forEach((v, i) => {
+          const wrap = document.createElement("div");
+          wrap.className = "criativo-variacao";
+          if (!v.ok) {
+            wrap.innerHTML = `
+              <div class="criativo-variacao-header"><span class="criativo-variacao-label">Variação ${i + 1}</span></div>
+              <div class="criativo-variacao-erro">Falhou: ${escapeHtml(v.erro || "erro desconhecido")}</div>`;
+          } else {
+            const dataUri = `data:${v.mimeType};base64,${v.base64}`;
+            wrap.innerHTML = `
+              <div class="criativo-variacao-header">
+                <span class="criativo-variacao-label">Variação ${i + 1}</span>
+                <button class="criativos-salvar-btn" data-idx="${i}" type="button">Salvar na galeria</button>
+              </div>
+              <img class="criativo-variacao-img" src="${dataUri}" alt="Variação ${i + 1}">`;
+            wrap.querySelector(".criativos-salvar-btn").addEventListener("click", async (e) => {
+              const btn = e.currentTarget;
+              btn.disabled = true;
+              btn.textContent = "Salvando...";
+              try {
+                const resp = await fetch("/api/criativos/upload", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    cliente: criativos.clienteAtivo,
+                    nome: `criativo_v${i + 1}_${Date.now()}`,
+                    base64: v.base64,
+                    mimeType: v.mimeType,
+                  }),
+                });
+                const d = await resp.json();
+                btn.textContent = d.ok ? "Salvo!" : "Erro";
+                if (d.ok) await carregarGaleria();
+                else btn.disabled = false;
+              } catch {
+                btn.textContent = "Erro";
+                btn.disabled = false;
+              }
+            });
+          }
+          criativosVariacoes.appendChild(wrap);
+        });
+      } catch (err) {
+        criativosVariacoes.innerHTML = `<div class="criativo-variacao-erro">Erro: ${escapeHtml(err.message)}</div>`;
+      } finally {
+        criativosGerarBtn.disabled = false;
+        criativosGerarBtn.textContent = "Gerar criativo — 3 variações";
+      }
+    });
+
+  </script>
+</body>
+</html>

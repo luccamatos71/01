@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:ai.google.dev)",
+      "WebFetch(domain:docs.cloud.google.com)",
+      "WebFetch(domain:blog.laozhang.ai)",
+      "WebFetch(domain:developers.googleblog.com)",
+      "Bash(curl -s \"https://ai.google.dev/gemini-api/docs/image-generation\")",
+      "WebFetch(domain:discuss.ai.google.dev)",
+      "Bash(npm install *)",
+      "Bash(timeout 5 node server.js)",
+      "Bash(awk '{print $2}')",
+      "Bash(xargs -r kill -9)",
+      "Bash(timeout 3 node server.js)",
+      "Bash(PORT=3001 timeout 3 node server.js)"
+    ]
+  }
+}
