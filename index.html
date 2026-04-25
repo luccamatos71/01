@@ -2348,13 +2348,153 @@
     }
 
     @media (max-width: 720px) {
-      .main-header { padding: 12px 16px; }
-      .chat { padding: 16px; }
-      .composer { padding: 10px 14px 12px; }
-      .composer-wrap { grid-template-columns: 1fr; }
-      .send-btn { min-height: 44px; }
-      .bubble { max-width: 96%; }
-      .brand h1 { font-size: 18px; }
+      /* Layout: hide sidebar, full width main */
+      .app { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+
+      /* Main spacing */
+      .main-header {
+        padding: 12px 16px;
+        flex-wrap: wrap;
+      }
+      .main-title h2 { font-size: 14px; }
+      .main-title p { display: none; }
+
+      /* Chat area */
+      .chat {
+        padding: 12px 16px;
+        gap: 10px;
+      }
+      .bubble {
+        max-width: 96%;
+        padding: 9px 12px 7px;
+        font-size: 12px;
+      }
+      .empty-state { padding: 20px 16px; }
+      .empty-state strong { font-size: 13px; }
+
+      /* Composer (input area) */
+      .composer {
+        padding: 8px 12px 10px;
+        gap: 8px;
+      }
+      .composer-wrap {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+      .send-btn {
+        min-height: 40px;
+        width: 100%;
+      }
+
+      /* All buttons: 100% width on mobile */
+      button {
+        width: 100%;
+        margin: 0 !important;
+      }
+
+      /* Criativos sections: stack vertically */
+      .criativos-container {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+      }
+      .criativos-section {
+        padding: 12px !important;
+        margin: 0 !important;
+      }
+      .criativos-section-titulo {
+        font-size: 12px !important;
+        margin-bottom: 8px !important;
+      }
+
+      /* Ficha (right drawer) */
+      .ficha {
+        padding: 12px !important;
+        gap: 10px !important;
+      }
+      .ficha-bloco {
+        gap: 4px !important;
+      }
+      .ficha-bloco-titulo {
+        font-size: 11px !important;
+      }
+      .ficha-bloco-val {
+        font-size: 12px !important;
+        padding: 8px 10px !important;
+      }
+
+      /* Cards: more compact */
+      .card {
+        padding: 10px 12px !important;
+        margin: 0 !important;
+      }
+      .card-title {
+        font-size: 12px !important;
+      }
+      .card-desc {
+        font-size: 11px !important;
+        line-height: 1.4;
+      }
+
+      /* Lead cards in list */
+      .lead-card {
+        padding: 10px 12px !important;
+      }
+
+      /* List with scroll: limit height */
+      #searcher-results,
+      [class*="leads-list"],
+      [class*="agir-agora"],
+      .chat {
+        max-height: 60vh;
+        overflow-y: auto;
+      }
+
+      /* Hide long secondary text */
+      .card-desc.secondary,
+      .text-secondary,
+      .text-muted,
+      [class*="nota"],
+      [class*="descricao"] {
+        display: none;
+      }
+
+      /* Sections: compact */
+      .section {
+        margin: 4px 0 !important;
+      }
+      .section-header {
+        padding: 5px 8px !important;
+        min-height: 24px;
+      }
+      .section-body {
+        padding: 5px 8px 6px !important;
+        font-size: 11px;
+      }
+
+      /* Inputs: full width */
+      input, select, textarea {
+        width: 100% !important;
+        font-size: 14px; /* Prevent zoom on iOS */
+      }
+
+      /* Status pill: smaller */
+      .status {
+        padding: 3px 8px;
+        font-size: 10px;
+      }
+
+      /* Typography: compact */
+      h1, h2, h3 { margin: 0 0 4px !important; }
+      p { margin: 0 0 6px !important; }
+
+      /* Remove excessive margins */
+      .field { gap: 4px !important; }
+      .bubble-head { margin-bottom: 4px !important; }
+
+      /* Brand */
+      .brand h1 { font-size: 16px; }
+      .brand p { font-size: 10px; }
     }
   </style>
 </head>
