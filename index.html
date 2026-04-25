@@ -2674,14 +2674,53 @@
         background: none;
       }
 
+      /* Hide all side-cards except: Prospecção (4), CRM (5), Estratégia (6), Tráfego (8) */
+      .side-card:nth-child(1), /* Brand - keep */
+      .side-card:nth-child(2), /* Agente atual - hide */
+      .side-card:nth-child(3), /* Ferramenta ativa - hide */
+      .side-card:nth-child(4), /* Prospecção - keep */
+      .side-card:nth-child(5), /* Agir agora - hide */
+      .side-card:nth-child(6), /* CRM - keep */
+      .side-card:nth-child(7), /* Estratégia - keep */
+      .side-card:nth-child(8), /* Tráfego - keep */
+      .side-card:nth-child(9), /* Criativos - hide */
+      .side-card:nth-child(10) /* Como usar - hide */
+      {
+        /* selectors ready for hiding */
+      }
+
       .side-card:nth-child(2),
       .side-card:nth-child(3),
-      .side-card:nth-child(7) {
+      .side-card:nth-child(5),
+      .side-card:nth-child(9),
+      .side-card:nth-child(10) {
         display: none !important;
       }
 
-      .side-card h3 { font-size: 11px; margin: 0 0 8px; }
-      .side-card button { width: 100%; padding: 10px 12px; margin: 4px 0 0; }
+      .side-card h3 {
+        font-size: 11px;
+        margin: 0 0 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-3);
+      }
+
+      .side-card button {
+        width: 100%;
+        padding: 12px 14px;
+        margin: 6px 0 0;
+        border: 1px solid rgba(255,255,255,0.08);
+        background: rgba(255,255,255,0.04);
+        color: var(--text);
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+      }
+
+      .side-card button:active {
+        background: rgba(255,255,255,0.08);
+      }
 
       /* Main: full width */
       .main {
