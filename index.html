@@ -2348,10 +2348,9 @@
     }
 
     @media (max-width: 720px) {
-      /* Layout: stack vertically, keep sidebar accessible */
+      /* PLACEHOLDER - replaced by second block below */
       .app {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto 1fr;
+        display: block;
       }
       .sidebar {
         grid-column: 1;
@@ -2628,147 +2627,84 @@
       }
     }
 
-    /* ========== CLEAN MOBILE LAYOUT (≤720px) ========== */
+    /* ========== MOBILE LAYOUT (≤720px) ========== */
     @media (max-width: 720px) {
-      /* Remove fixed heights and constraints */
-      html, body {
-        height: auto;
-        overflow: auto;
-      }
+      /* 1. Reset: remove fixed height, allow scroll */
+      html, body { height: auto; overflow-y: auto; }
 
-      /* Layout: single column, block flow */
-      .app {
-        display: block;
-        height: auto;
-        overflow: visible;
-      }
+      /* 2. Layout: single column */
+      .app { display: block; height: auto; overflow: visible; }
 
-      /* Sidebar: vertical blocks at top */
+      /* 3. Sidebar: vertical stack */
       .sidebar {
         display: block;
         width: 100%;
         height: auto;
         overflow: visible;
         border-right: none;
-        border-bottom: 1px solid rgba(255,255,255,0.05);
-        padding: 12px;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+        padding: 16px;
       }
 
-      .brand {
-        display: block;
-        padding: 0 0 12px;
-        margin-bottom: 12px;
-        border-bottom: 1px solid rgba(255,255,255,0.05);
-      }
-
-      .brand h1 { font-size: 16px; margin: 0 0 4px; }
+      /* Brand: compact */
+      .brand { padding: 0 0 14px; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+      .brand h1 { font-size: 16px; margin: 0 0 2px; }
       .brand p { font-size: 10px; margin: 0; }
 
+      /* Side-cards: clean blocks */
       .side-card {
         display: block;
         width: 100%;
-        padding: 12px 0;
+        padding: 14px 0;
         margin: 0;
         border: none;
         border-bottom: 1px solid rgba(255,255,255,0.04);
         background: none;
       }
+      .side-card:last-child { border-bottom: none; }
 
-      /* Hide all side-cards except: Prospecção (4), CRM (5), Estratégia (6), Tráfego (8) */
-      .side-card:nth-child(1), /* Brand - keep */
-      .side-card:nth-child(2), /* Agente atual - hide */
-      .side-card:nth-child(3), /* Ferramenta ativa - hide */
-      .side-card:nth-child(4), /* Prospecção - keep */
-      .side-card:nth-child(5), /* Agir agora - hide */
-      .side-card:nth-child(6), /* CRM - keep */
-      .side-card:nth-child(7), /* Estratégia - keep */
-      .side-card:nth-child(8), /* Tráfego - keep */
-      .side-card:nth-child(9), /* Criativos - hide */
-      .side-card:nth-child(10) /* Como usar - hide */
-      {
-        /* selectors ready for hiding */
-      }
+      /* 4. HIDE: Agente, Ferramenta, Agir agora, Criativos, Como usar */
+      #sc-agente,
+      #sc-modo,
+      #alertasSideCard,
+      #sc-criativos,
+      #sc-usar { display: none !important; }
 
-      .side-card:nth-child(2),
-      .side-card:nth-child(3),
-      .side-card:nth-child(5),
-      .side-card:nth-child(9),
-      .side-card:nth-child(10) {
-        display: none !important;
-      }
-
+      /* 5. KEEP: Prospecção, CRM, Estratégia, Tráfego — styled */
       .side-card h3 {
-        font-size: 11px;
-        margin: 0 0 8px;
+        font-size: 10px;
+        font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.09em;
         color: var(--text-3);
+        margin: 0 0 10px;
       }
 
       .side-card button {
-        width: 100%;
-        padding: 12px 14px;
-        margin: 6px 0 0;
-        border: 1px solid rgba(255,255,255,0.08);
-        background: rgba(255,255,255,0.04);
-        color: var(--text);
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 13px;
-        font-weight: 500;
-      }
-
-      .side-card button:active {
-        background: rgba(255,255,255,0.08);
-      }
-
-      /* Main: full width */
-      .main {
         display: block;
         width: 100%;
-        height: auto;
-        overflow: visible;
-        padding: 0;
+        padding: 13px 16px;
+        margin: 0;
+        border: 1px solid rgba(255,255,255,0.09);
+        background: rgba(255,255,255,0.04);
+        color: var(--text);
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        text-align: left;
+        cursor: pointer;
       }
 
-      .main-header {
-        padding: 12px 16px;
-        border-bottom: 1px solid rgba(255,255,255,0.05);
-      }
+      .side-card button:active { background: rgba(255,255,255,0.08); }
 
-      .main-title h2 { font-size: 16px; margin: 0; }
-      .main-title p { display: none; }
+      /* CRM counters inside side-card */
+      .crm-counters { margin-bottom: 8px; font-size: 12px; }
 
-      /* Hide SDR interface */
-      #chat,
-      .composer {
-        display: none !important;
-      }
+      /* 6. Main: hidden (SDR not needed on mobile) */
+      .main { display: none; }
 
-      /* Remove all position: absolute from mobile */
-      * { position: static !important; }
-
-      /* Overlays: allow positioning */
-      .leads-overlay,
-      .crm-overlay,
-      .criativos-overlay,
-      .director-overlay,
-      .trafego-overlay {
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        width: 100% !important;
-        height: 100% !important;
-        z-index: 1000 !important;
-      }
-
-      /* Responsive buttons and inputs */
-      button { font-size: 12px; padding: 8px 12px; }
-      input, select, textarea { font-size: 14px; padding: 8px 10px; }
-
-      /* Compact spacing */
-      h1, h2, h3, h4, h5, h6 { margin: 0 0 6px; }
-      p { margin: 0 0 6px; }
+      /* 7. Inputs */
+      input, select, textarea { font-size: 16px; } /* prevents iOS zoom */
     }
   </style>
 </head>
@@ -2780,7 +2716,7 @@
         <p>Laboratório visual e funcional de IA aplicada à prospecção, análise de leads e estratégia comercial.</p>
       </div>
 
-      <div class="side-card">
+      <div class="side-card" id="sc-agente">
         <h3>Agente atual</h3>
 
         <div class="field">
@@ -2793,7 +2729,7 @@
         <button id="clearBtn" class="btn secondary" type="button">Limpar conversa</button>
       </div>
 
-      <div class="side-card">
+      <div class="side-card" id="sc-modo">
         <h3>Ferramenta ativa</h3>
 
         <div class="field">
@@ -2835,12 +2771,12 @@
         <button id="trafegoBtn" class="trafego-sidebar-btn" type="button">Ver campanhas</button>
       </div>
 
-      <div class="side-card">
+      <div class="side-card" id="sc-criativos">
         <h3>Criativos</h3>
         <button id="criativosBtn" class="criativos-sidebar-btn" type="button">Abrir criativos</button>
       </div>
 
-      <div class="side-card">
+      <div class="side-card" id="sc-usar">
         <h3>Como usar</h3>
         <p>
           <strong style="color:var(--text-2); font-weight:600;">Manual:</strong> descreva o cenário do lead.<br />
