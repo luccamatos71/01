@@ -143,6 +143,48 @@
       line-height: 1.5;
     }
 
+    /* ========== SIDEBAR NAV ========== */
+    .sidebar-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 8px;
+      flex: 1;
+    }
+
+    .nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-2);
+      border-radius: var(--r-md);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 80ms, color 80ms, border-color 80ms;
+    }
+
+    .nav-btn:hover {
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+    }
+
+    .nav-btn.nav-btn-active {
+      background: rgba(99,102,241,0.10);
+      border-color: rgba(99,102,241,0.20);
+      color: var(--primary);
+    }
+
+    .nav-icon {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+
     /* Seções da sidebar — sem card, só separador */
     .side-card {
       padding: 14px 18px;
@@ -2337,6 +2379,263 @@
     }
     .trafego-sidebar-btn:hover { background: rgba(255,255,255,0.04); color: var(--text); }
 
+    /* ========== CENTRAL WINDOW MODAL ========== */
+
+    .cw-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 299;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 200ms ease;
+    }
+
+    .cw-backdrop.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .central-window {
+      position: fixed;
+      inset: 0;
+      margin: auto;
+      width: clamp(500px, 80vw, 900px);
+      height: clamp(400px, 90vh, 90vh);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xl);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+      z-index: 300;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(0.95);
+      transition: opacity 200ms ease, transform 200ms ease;
+    }
+
+    .central-window.open {
+      opacity: 1;
+      pointer-events: all;
+      transform: scale(1);
+    }
+
+    .cw-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 48px;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--border-soft);
+      flex-shrink: 0;
+    }
+
+    .cw-header-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0;
+      color: var(--text);
+    }
+
+    .cw-header-icon {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+      color: var(--text-2);
+    }
+
+    .cw-header-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .cw-header-btn {
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: rgba(255,255,255,0.04);
+      color: var(--text-2);
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 80ms;
+    }
+
+    .cw-header-btn:hover {
+      background: rgba(255,255,255,0.08);
+    }
+
+    .cw-body {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      padding: 20px;
+    }
+
+    .cw-footer {
+      display: flex;
+      gap: 8px;
+      padding: 16px 20px;
+      border-top: 1px solid var(--border-soft);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    .cw-footer button {
+      flex: 1;
+      min-width: 120px;
+      height: 40px;
+      padding: 0 16px;
+      border: none;
+      border-radius: var(--r-md);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 80ms;
+    }
+
+    .cw-footer .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .cw-footer .btn-primary:hover {
+      background: var(--primary-2);
+    }
+
+    .cw-footer .btn-secondary {
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      border: 1px solid var(--border) !important;
+    }
+
+    .cw-footer .btn-secondary:hover {
+      background: rgba(255,255,255,0.08);
+    }
+
+    .cw-footer .btn-close {
+      flex: 0 0 40px;
+      min-width: 40px;
+      padding: 0;
+      background: transparent;
+      color: var(--text-2);
+      border: none;
+    }
+
+    /* Dashboard */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    .dashboard-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 16px;
+    }
+
+    .dashboard-card h3 {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-3);
+      margin: 0 0 12px;
+    }
+
+    .dashboard-value {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 4px;
+      line-height: 1;
+    }
+
+    .dashboard-meta {
+      font-size: 11px;
+      color: var(--text-2);
+      margin: 0;
+    }
+
+    .dashboard-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .dashboard-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    .dashboard-item span {
+      color: var(--text-2);
+    }
+
+    .dashboard-item strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* Placeholder view — CRM / Tráfego / Director */
+    .cw-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 12px;
+      color: var(--text-3);
+      text-align: center;
+    }
+
+    .cw-placeholder svg {
+      opacity: 0.25;
+    }
+
+    .cw-placeholder strong {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-2);
+      margin-bottom: 4px;
+    }
+
+    .cw-placeholder p {
+      font-size: 12px;
+      margin: 0;
+      line-height: 1.6;
+      max-width: 300px;
+    }
+
+    /* Mobile: janela central em overlay */
+    @media (max-width: 1024px) {
+      .central-window {
+        width: min(92vw, 480px);
+        max-height: 90dvh;
+        border-radius: var(--r-xl) var(--r-xl) 0 0;
+        bottom: 0;
+        top: auto;
+        inset: auto 0 0;
+        margin: 0 auto;
+      }
+
+      .cw-body {
+        overflow-y: auto;
+      }
+    }
+
     /* ============================================================
        RESPONSIVO
     ============================================================ */
@@ -2573,6 +2872,48 @@
       /* 13. Ocultar main */
       .main { display: none !important; }
 
+      /* Sidebar nav mobile: grid de 2 col para os botões */
+      .sidebar-nav {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        padding: 0;
+        flex: none;
+      }
+
+      .nav-btn {
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 14px 8px;
+        font-size: 11px;
+        border-radius: var(--r-lg);
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border);
+        text-align: center;
+      }
+
+      .nav-btn.nav-btn-active {
+        background: var(--primary-dim);
+        border-color: var(--primary-border);
+        color: var(--primary);
+      }
+
+      .nav-icon {
+        width: 20px;
+        height: 20px;
+      }
+
+      /* Home button spans full width on mobile */
+      .nav-btn[data-view="home"] {
+        grid-column: 1 / -1;
+        flex-direction: row;
+        justify-content: center;
+        padding: 14px 16px;
+        gap: 10px;
+      }
+
       /* 14. Inputs: >= 16px evita zoom iOS */
       input, select, textarea { font-size: 16px; }
 
@@ -2616,75 +2957,67 @@
     <aside class="sidebar">
       <div class="brand">
         <h1>IA <span>Lumyn</span></h1>
-        <p>Laboratório visual e funcional de IA aplicada à prospecção, análise de leads e estratégia comercial.</p>
       </div>
 
-      <div class="side-card" id="sc-agente">
-        <h3>Agente atual</h3>
+      <nav class="sidebar-nav">
+        <button class="nav-btn nav-btn-active" data-view="home" type="button" title="Home">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+          <span>Home</span>
+        </button>
 
-        <div class="field">
-          <label class="label" for="agentSelect">Agente</label>
-          <select id="agentSelect">
-            <option value="sdr">SDR</option>
-          </select>
-        </div>
+        <button class="nav-btn" data-view="prospeccao" type="button" title="Prospecção">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.35-4.35"/>
+          </svg>
+          <span>Prospecção</span>
+        </button>
 
-        <button id="clearBtn" class="btn secondary" type="button">Limpar conversa</button>
-      </div>
+        <button class="nav-btn" data-view="crm" type="button" title="CRM">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2"/>
+            <path d="M8 21h8M12 17v4"/>
+          </svg>
+          <span>CRM</span>
+        </button>
 
-      <div class="side-card" id="sc-modo">
-        <h3>Ferramenta ativa</h3>
+        <button class="nav-btn" data-view="trafego" type="button" title="Tráfego">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+            <polyline points="17 6 23 6 23 12"/>
+          </svg>
+          <span>Tráfego</span>
+        </button>
 
-        <div class="field">
-          <label class="label" for="modeSelect">Modo</label>
-          <select id="modeSelect">
-            <option value="manual">SDR + análise manual</option>
-            <option value="google">Google Meu Negócio + análise</option>
-          </select>
-        </div>
+        <button class="nav-btn" data-view="director" type="button" title="Director Comercial">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          <span>Director</span>
+        </button>
+      </nav>
 
+      <!-- Hidden elements kept for JS compatibility -->
+      <div style="display:none">
+        <select id="agentSelect"><option value="sdr">SDR</option></select>
+        <select id="modeSelect">
+          <option value="manual">SDR + análise manual</option>
+          <option value="google">Google Meu Negócio + análise</option>
+        </select>
         <div id="modeBadge" class="mode-badge">Análise manual</div>
-      </div>
-
-      <div class="side-card">
-        <h3>Prospecção</h3>
-        <button id="leadsBtn" class="leads-sidebar-btn" type="button">Buscar leads</button>
-      </div>
-
-      <div class="side-card side-card-agir" id="alertasSideCard">
-        <h3>Agir agora</h3>
-        <div id="alertasList" class="alertas-list"></div>
-      </div>
-
-      <div class="side-card">
-        <h3>Pipeline CRM</h3>
-        <div id="crmCounters" class="crm-counters">
-          <div class="crm-counter-row"><span class="crm-counter-label">Carregando...</span></div>
+        <button id="clearBtn" type="button"></button>
+        <button id="leadsBtn" type="button"></button>
+        <div id="alertasSideCard" class="side-card-agir">
+          <div id="alertasList" class="alertas-list"></div>
         </div>
-        <button id="crmPanelBtn" class="btn secondary" type="button">Ver pipeline</button>
-      </div>
-
-      <div class="side-card">
-        <h3>Estratégia</h3>
-        <button id="estrategiaBtn" class="estrategia-sidebar-btn" type="button">Perguntar ao director</button>
-      </div>
-
-      <div class="side-card">
-        <h3>Tráfego</h3>
-        <button id="trafegoBtn" class="trafego-sidebar-btn" type="button">Ver campanhas</button>
-      </div>
-
-      <div class="side-card" id="sc-criativos">
-        <h3>Criativos</h3>
-        <button id="criativosBtn" class="criativos-sidebar-btn" type="button">Abrir criativos</button>
-      </div>
-
-      <div class="side-card" id="sc-usar">
-        <h3>Como usar</h3>
-        <p>
-          <strong style="color:var(--text-2); font-weight:600;">Manual:</strong> descreva o cenário do lead.<br />
-          <strong style="color:var(--text-2); font-weight:600;">Google:</strong> busque empresas reais via Maps.
-        </p>
+        <div id="crmCounters" class="crm-counters"></div>
+        <button id="crmPanelBtn" type="button"></button>
+        <button id="estrategiaBtn" type="button"></button>
+        <button id="trafegoBtn" type="button"></button>
+        <button id="criativosBtn" type="button"></button>
       </div>
     </aside>
 
@@ -2992,6 +3325,26 @@
         <button id="analysisCloseBtn" class="analysis-close-btn" type="button">Fechar</button>
       </div>
     </div>
+  </div>
+
+  <!-- CENTRAL WINDOW -->
+  <div class="cw-backdrop" id="cwBackdrop"></div>
+  <div class="central-window" id="centralWindow" data-view="">
+    <div class="cw-header" id="cwHeader">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <svg id="cwHeaderIcon" class="cw-header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
+        <h2 class="cw-header-title" id="cwHeaderTitle">Dashboard</h2>
+      </div>
+      <div class="cw-header-actions">
+        <button class="cw-header-btn" id="cwCloseBtn" type="button" title="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="cw-body" id="cwBody"></div>
+    <div class="cw-footer" id="cwFooter" style="display:none"></div>
   </div>
 
   <script>
@@ -5170,6 +5523,179 @@
         criativosGerarBtn.textContent = "Gerar criativo — 3 variações";
       }
     });
+
+  // ============================================================
+  //  CENTRAL WINDOW — controle da janela central
+  // ============================================================
+
+  (function() {
+    const cwBackdrop = document.getElementById("cwBackdrop");
+    const cwWin      = document.getElementById("centralWindow");
+    const cwBody     = document.getElementById("cwBody");
+    const cwFooter   = document.getElementById("cwFooter");
+    const cwTitle    = document.getElementById("cwHeaderTitle");
+    const cwIcon     = document.getElementById("cwHeaderIcon");
+    const cwCloseBtn = document.getElementById("cwCloseBtn");
+
+    const CW_ICONS = {
+      home:       `<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>`,
+      prospeccao: `<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>`,
+      crm:        `<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>`,
+      trafego:    `<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>`,
+      director:   `<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>`,
+    };
+
+    const CW_TITLES = {
+      home:       "Dashboard",
+      prospeccao: "Prospecção",
+      crm:        "CRM",
+      trafego:    "Tráfego",
+      director:   "Director",
+    };
+
+    function getDashboardHTML() {
+      return `<div class="dashboard-grid">
+        <div class="dashboard-card">
+          <h3>Pipeline CRM</h3>
+          <div class="dashboard-value" id="cwDashTotal">—</div>
+          <p class="dashboard-meta" id="cwDashMeta">calculando...</p>
+        </div>
+        <div class="dashboard-card">
+          <h3>Status dos leads</h3>
+          <div class="dashboard-list" id="cwDashCrmList">
+            <div class="dashboard-item"><span style="color:var(--text-3);">Carregando...</span></div>
+          </div>
+        </div>
+        <div class="dashboard-card">
+          <h3>Acesso rápido</h3>
+          <div class="dashboard-list">
+            <div class="dashboard-item" style="cursor:pointer;" id="cwGoProspeccao">
+              <span>Buscar leads</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+            <div class="dashboard-item" style="cursor:pointer;" id="cwGoCrm">
+              <span>Ver pipeline</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+            <div class="dashboard-item" style="cursor:pointer;" id="cwGoDirector">
+              <span>Director comercial</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function getPlaceholderHTML(view) {
+      const info = {
+        prospeccao: { title: "Prospecção de leads", desc: "Encontre e classifique empresas locais via Google Maps.", action: "Buscar leads", overlayId: "leadsOverlay" },
+        crm:        { title: "Pipeline CRM", desc: "Acompanhe seus leads do primeiro contato ao fechamento.", action: "Abrir pipeline", overlayId: "crmOverlay" },
+        trafego:    { title: "Gestor de Tráfego", desc: "Análise de campanhas e segmentação baseada nos nichos prospectados.", action: "Ver campanhas", overlayId: "trafegoOverlay" },
+        director:   { title: "Director Comercial", desc: "Estratégia, priorização de nichos e refinamento de abordagem com IA.", action: "Abrir Director", overlayId: "estrategiaOverlay" },
+      };
+      const d = info[view];
+      if (!d) return "";
+      return `<div class="cw-placeholder">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">${CW_ICONS[view] || ""}</svg>
+        <div>
+          <strong>${d.title}</strong>
+          <p>${d.desc}</p>
+        </div>
+        <button class="cw-open-overlay-btn" data-overlay="${d.overlayId}"
+          style="padding:10px 20px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:var(--primary);color:#fff;margin-top:4px;"
+        >${d.action}</button>
+      </div>`;
+    }
+
+    function preencherDashboard() {
+      try {
+        const crm = JSON.parse(localStorage.getItem("lumyn_crm") || "[]");
+        const total = crm.length;
+        const contagem = {};
+        crm.forEach(function(l) { contagem[l.status] = (contagem[l.status] || 0) + 1; });
+
+        var totalEl = document.getElementById("cwDashTotal");
+        var metaEl  = document.getElementById("cwDashMeta");
+        if (totalEl) totalEl.textContent = total;
+        if (metaEl)  metaEl.textContent  = total === 1 ? "1 lead no CRM" : total + " leads no CRM";
+
+        var listEl = document.getElementById("cwDashCrmList");
+        if (listEl) {
+          var statusLabels = { novo:"Novos", abordado:"Abordados", follow_up:"Follow-up", respondeu:"Responderam", reuniao:"Reunião", proposta:"Proposta", fechado:"Fechados" };
+          var rows = Object.entries(statusLabels)
+            .filter(function(pair) { return contagem[pair[0]] > 0; })
+            .map(function(pair) { return `<div class="dashboard-item"><span>${pair[1]}</span><strong>${contagem[pair[0]]}</strong></div>`; });
+          listEl.innerHTML = rows.length ? rows.join("") : `<div class="dashboard-item"><span style="color:var(--text-3);">Nenhum lead ainda</span></div>`;
+        }
+
+        // Bind quick-access links
+        var goP = document.getElementById("cwGoProspeccao");
+        var goC = document.getElementById("cwGoCrm");
+        var goD = document.getElementById("cwGoDirector");
+        if (goP) goP.addEventListener("click", function() { fecharCW(); document.getElementById("leadsOverlay").classList.add("open"); });
+        if (goC) goC.addEventListener("click", function() { fecharCW(); document.getElementById("crmOverlay").classList.add("open"); });
+        if (goD) goD.addEventListener("click", function() { fecharCW(); document.getElementById("estrategiaOverlay").classList.add("open"); });
+      } catch(e) { /* silently fail */ }
+    }
+
+    function abrirCW(view) {
+      cwWin.setAttribute("data-view", view);
+      cwTitle.textContent = CW_TITLES[view] || view;
+      cwIcon.innerHTML    = CW_ICONS[view] || "";
+
+      if (view === "home") {
+        cwBody.innerHTML = getDashboardHTML();
+        preencherDashboard();
+      } else {
+        cwBody.innerHTML = getPlaceholderHTML(view);
+        // Bind overlay button inside placeholder
+        var btn = cwBody.querySelector(".cw-open-overlay-btn");
+        if (btn) {
+          btn.addEventListener("click", function() {
+            var overlayId = this.getAttribute("data-overlay");
+            var overlay = document.getElementById(overlayId);
+            if (overlay) overlay.classList.add("open");
+            fecharCW();
+          });
+        }
+      }
+
+      cwFooter.style.display = "none";
+      cwBackdrop.classList.add("open");
+      cwWin.classList.add("open");
+    }
+
+    function fecharCW() {
+      cwBackdrop.classList.remove("open");
+      cwWin.classList.remove("open");
+    }
+
+    // Expose globally so inline onclick attrs can call fecharJanelaCentral()
+    window.abrirJanelaCentral = abrirCW;
+    window.fecharJanelaCentral = fecharCW;
+
+    // Sidebar nav listeners
+    document.querySelectorAll(".nav-btn").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        document.querySelectorAll(".nav-btn").forEach(function(b) { b.classList.remove("nav-btn-active"); });
+        this.classList.add("nav-btn-active");
+        abrirCW(this.getAttribute("data-view"));
+      });
+    });
+
+    // Close button
+    cwCloseBtn.addEventListener("click", fecharCW);
+
+    // Backdrop click
+    cwBackdrop.addEventListener("click", fecharCW);
+
+    // ESC key — only close central window if it is open
+    document.addEventListener("keydown", function(e) {
+      if (e.key === "Escape" && cwWin.classList.contains("open")) {
+        fecharCW();
+      }
+    });
+  })();
 
   </script>
 
