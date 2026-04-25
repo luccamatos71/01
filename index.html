@@ -2495,6 +2495,76 @@
       /* Brand */
       .brand h1 { font-size: 16px; }
       .brand p { font-size: 10px; }
+
+      /* ========== MOBILE: HIDE SDR CHAT INTERFACE ========== */
+      /* Remove chat section (análise/histórico SDR) */
+      #chat {
+        display: none !important;
+      }
+
+      /* Remove composer (input area do SDR) */
+      .composer {
+        display: none !important;
+      }
+
+      /* Expandir main para ocupar todo espaço */
+      .main {
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Hide sidebar controls relacionados ao chat SDR */
+      .side-card:nth-child(2),  /* Agente atual */
+      .side-card:nth-child(3)   /* Ferramenta ativa */
+      {
+        display: none !important;
+      }
+
+      /* ========== KEEP VISIBLE (Overlays funcionam normalmente) ========== */
+      /* Leads modal: mobile-ready */
+      .leads-overlay { z-index: 100; }
+      .leads-modal {
+        width: 90vw;
+        max-width: 450px;
+        max-height: 85vh;
+      }
+
+      /* CRM overlay: mobile-ready */
+      .crm-overlay { z-index: 100; }
+      .crm-panel {
+        width: 90vw;
+        max-width: 450px;
+        max-height: 85vh;
+      }
+      .crm-ficha {
+        width: 90vw;
+        max-width: 450px;
+        max-height: 85vh;
+      }
+
+      /* Criativos overlay: mobile-ready */
+      .criativos-overlay { z-index: 100; }
+      .criativos-panel {
+        width: 90vw;
+        max-width: 450px;
+        max-height: 85vh;
+      }
+
+      /* Director comercial overlay */
+      .director-overlay { z-index: 100; }
+      .director-panel {
+        width: 90vw;
+        max-width: 450px;
+        max-height: 85vh;
+      }
+
+      /* Tráfego overlay */
+      .trafego-overlay { z-index: 100; }
+      .trafego-panel {
+        width: 90vw;
+        max-width: 450px;
+        max-height: 85vh;
+      }
     }
   </style>
 </head>
