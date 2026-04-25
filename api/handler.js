@@ -41,10 +41,10 @@ const openai = new OpenAI({
 let historico = [];
 let estadoManual = null; // { cenarioOriginal, analiseAtual }
 
-const CRM_FILE = path.join(__dirname, "leads-crm.json");
-
-// Criativos — pastas por cliente
-const UPLOADS_DIR = path.join(__dirname, "uploads");
+// Em Vercel, usar /tmp para arquivos temporários; em dev, usar local
+const IS_VERCEL = !!process.env.VERCEL;
+const CRM_FILE = IS_VERCEL ? "/tmp/leads-crm.json" : path.join(__dirname, "..", "leads-crm.json");
+const UPLOADS_DIR = IS_VERCEL ? "/tmp/uploads" : path.join(__dirname, "..", "uploads");
 const CLIENTES_CRIATIVOS = ["rivano", "com-tempero"];
 CLIENTES_CRIATIVOS.forEach(c => {
   const dir = path.join(UPLOADS_DIR, c);
