@@ -2340,286 +2340,33 @@
     /* ============================================================
        RESPONSIVO
     ============================================================ */
-    @media (max-width: 1080px) and (min-width: 1025px) {
-      /* Tablet intermediário — sidebar horizontal no rodapé */
-      .app { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
-      .sidebar {
-        order: 2;
-        flex-direction: row;
-        flex-wrap: wrap;
-        overflow-x: auto;
-        border-right: none;
-        border-top: 1px solid rgba(255,255,255,0.06);
-      }
-      .sidebar .brand { border-bottom: none; border-right: 1px solid rgba(255,255,255,0.05); }
-      .sidebar .side-card { border-bottom: none; border-right: 1px solid rgba(255,255,255,0.04); min-width: 160px; }
-      .main { order: 1; }
-    }
-
-    @media (max-width: 720px) {
-      /* Ajustes internos de overlays e conteúdo — estrutura controlada pela ≤1024px */
-
-      /* Main spacing */
-      .main-header {
-        padding: 12px 16px;
-        flex-wrap: wrap;
-      }
-      .main-title h2 { font-size: 14px; }
-      .main-title p { display: none; }
-
-      /* Chat area */
-      .chat {
-        padding: 12px 16px;
-        gap: 10px;
-      }
-      .bubble {
-        max-width: 96%;
-        padding: 9px 12px 7px;
-        font-size: 12px;
-      }
-      .empty-state { padding: 20px 16px; }
-      .empty-state strong { font-size: 13px; }
-
-      /* Composer (input area) */
-      .composer {
-        padding: 8px 12px 10px;
-        gap: 8px;
-      }
-      .composer-wrap {
-        grid-template-columns: 1fr;
-        gap: 8px;
-      }
-      .send-btn {
-        min-height: 40px;
-        width: 100%;
-      }
-
-      /* Send button: full width */
-      .send-btn {
-        width: 100%;
-      }
-
-      /* Criativos sections: stack vertically */
-      .criativos-container {
-        grid-template-columns: 1fr !important;
-        gap: 10px !important;
-      }
-      .criativos-section {
-        padding: 12px !important;
-        margin: 0 !important;
-      }
-      .criativos-section-titulo {
-        font-size: 12px !important;
-        margin-bottom: 8px !important;
-      }
-
-      /* Ficha (right drawer) */
-      .ficha {
-        padding: 12px !important;
-        gap: 10px !important;
-      }
-      .ficha-bloco {
-        gap: 4px !important;
-      }
-      .ficha-bloco-titulo {
-        font-size: 11px !important;
-      }
-      .ficha-bloco-val {
-        font-size: 12px !important;
-        padding: 8px 10px !important;
-      }
-
-      /* Cards: more compact */
-      .card {
-        padding: 10px 12px !important;
-        margin: 0 !important;
-      }
-      .card-title {
-        font-size: 12px !important;
-      }
-      .card-desc {
-        font-size: 11px !important;
-        line-height: 1.4;
-      }
-
-      /* Lead cards in list */
-      .lead-card {
-        padding: 10px 12px !important;
-      }
-
-      /* List with scroll: limit height */
-      #searcher-results,
-      [class*="leads-list"],
-      [class*="agir-agora"],
-      .chat {
-        max-height: 60vh;
-        overflow-y: auto;
-      }
-
-      /* Hide long secondary text */
-      .card-desc.secondary,
-      .text-secondary,
-      .text-muted,
-      [class*="nota"],
-      [class*="descricao"] {
-        display: none;
-      }
-
-      /* Sections: compact */
-      .section {
-        margin: 4px 0 !important;
-      }
-      .section-header {
-        padding: 5px 8px !important;
-        min-height: 24px;
-      }
-      .section-body {
-        padding: 5px 8px 6px !important;
-        font-size: 11px;
-      }
-
-      /* Inputs: full width */
-      input, select, textarea {
-        width: 100% !important;
-        font-size: 14px; /* Prevent zoom on iOS */
-      }
-
-      /* Status pill: smaller */
-      .status {
-        padding: 3px 8px;
-        font-size: 10px;
-      }
-
-      /* Typography: compact */
-      h1, h2, h3 { margin: 0 0 4px !important; }
-      p { margin: 0 0 6px !important; }
-
-      /* Remove excessive margins */
-      .field { gap: 4px !important; }
-      .bubble-head { margin-bottom: 4px !important; }
-
-      /* Brand */
-      .brand h1 { font-size: 16px; }
-      .brand p { font-size: 10px; }
-
-      /* ========== MOBILE: HIDE SDR CHAT INTERFACE ========== */
-      /* Remove chat section (análise/histórico SDR) */
-      #chat {
-        display: none !important;
-      }
-
-      /* Remove composer (input area do SDR) */
-      .composer {
-        display: none !important;
-      }
-
-      /* Main: show header only */
-      .main {
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-      }
-
-      .main-header {
-        display: flex !important;
-      }
-
-      /* Hide only SDR-related controls in horizontal sidebar */
-      .side-card:nth-child(2),  /* Agente atual */
-      .side-card:nth-child(3),  /* Ferramenta ativa */
-      .side-card:nth-child(7)   /* Como usar (long text, not needed) */
-      {
-        display: none !important;
-      }
-
-      /* Style buttons in horizontal sidebar */
-      .side-card button {
-        width: 100%;
-        padding: 8px 10px;
-        font-size: 11px;
-        margin: 0;
-      }
-
-      /* Agir agora list: compact */
-      .alertas-list {
-        display: none;
-      }
-
-      /* CRM counters: compact */
-      .crm-counters {
-        font-size: 11px;
-        margin-bottom: 6px;
-      }
-
-      /* ========== KEEP VISIBLE (Overlays funcionam normalmente) ========== */
-      /* Leads modal: mobile-ready */
-      .leads-overlay { z-index: 100; }
-      .leads-modal {
-        width: 90vw;
-        max-width: 450px;
-        max-height: 85vh;
-      }
-
-      /* CRM overlay: mobile-ready */
-      .crm-overlay { z-index: 100; }
-      .crm-panel {
-        width: 90vw;
-        max-width: 450px;
-        max-height: 85vh;
-      }
-      .crm-ficha {
-        width: 90vw;
-        max-width: 450px;
-        max-height: 85vh;
-      }
-
-      /* Criativos overlay: mobile-ready */
-      .criativos-overlay { z-index: 100; }
-      .criativos-panel {
-        width: 90vw;
-        max-width: 450px;
-        max-height: 85vh;
-      }
-
-      /* Director comercial overlay */
-      .director-overlay { z-index: 100; }
-      .director-panel {
-        width: 90vw;
-        max-width: 450px;
-        max-height: 85vh;
-      }
-
-      /* Tráfego overlay */
-      .trafego-overlay { z-index: 100; }
-      .trafego-panel {
-        width: 90vw;
-        max-width: 450px;
-        max-height: 85vh;
-      }
-    }
-
     /* ========== MOBILE LAYOUT (≤1024px) ========== */
     @media (max-width: 1024px) {
-      /* 1. Reset: scroll livre, sem altura fixa */
-      html, body {
-        height: auto;
+
+      /* 1. Reset iOS Safari */
+      html {
+        height: -webkit-fill-available;
+      }
+      body {
         min-height: 100vh;
+        min-height: -webkit-fill-available;
         overflow-x: hidden;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
       }
 
-      /* 2. Layout: coluna única, sem overflow escondido */
+      /* 2. Layout em coluna, sem altura fixa */
       .app {
         display: flex;
         flex-direction: column;
         width: 100%;
         min-height: 100vh;
+        min-height: -webkit-fill-available;
         height: auto;
         overflow: visible;
       }
 
-      /* 3. Sidebar: coluna completa, scroll interno desativado */
+      /* 3. Sidebar: full-width, cresce pelo conteúdo */
       .sidebar {
         display: flex;
         flex-direction: column;
@@ -2629,20 +2376,20 @@
         border-right: none;
         border-bottom: 1px solid rgba(255,255,255,0.06);
         padding: 16px;
-        padding-top: max(16px, env(safe-area-inset-top));     /* Dynamic Island top */
-        padding-bottom: max(16px, env(safe-area-inset-bottom)); /* iPhone home bar */
+        padding-top: max(16px, env(safe-area-inset-top));
+        padding-bottom: max(20px, env(safe-area-inset-bottom));
       }
 
-      /* Brand: compact */
+      /* 4. Brand compacto */
       .brand {
         padding: 0 0 10px;
         margin-bottom: 4px;
         border-bottom: 1px solid rgba(255,255,255,0.05);
       }
       .brand h1 { font-size: 15px; margin: 0 0 2px; }
-      .brand p { font-size: 10px; margin: 0; line-height: 1.4; }
+      .brand p   { font-size: 10px; margin: 0; line-height: 1.4; }
 
-      /* Side-cards: sem borda duplicada, sem altura fixa */
+      /* 5. Side-cards: sem bordas duplas */
       .side-card {
         display: flex;
         flex-direction: column;
@@ -2656,14 +2403,14 @@
       }
       .side-card:last-child { border-bottom: none; }
 
-      /* 4. HIDE: Agente, Ferramenta, Agir agora, Criativos, Como usar */
+      /* 6. Ocultar cards desnecessários no mobile */
       #sc-agente,
       #sc-modo,
       #alertasSideCard,
       #sc-criativos,
       #sc-usar { display: none !important; }
 
-      /* 5. KEEP: Prospecção, CRM, Estratégia, Tráfego — styled */
+      /* 7. Labels */
       .side-card h3 {
         font-size: 10px;
         font-weight: 600;
@@ -2673,10 +2420,11 @@
         margin: 0;
       }
 
+      /* 8. Botões mobile — escopo restrito ao .side-card */
       .side-card button {
         display: block;
         width: 100%;
-        padding: 12px 14px;
+        padding: 13px 14px;
         margin: 0;
         border: 1px solid rgba(255,255,255,0.09);
         background: rgba(255,255,255,0.04);
@@ -2688,19 +2436,20 @@
         cursor: pointer;
         -webkit-tap-highlight-color: transparent;
       }
+      .side-card button:active {
+        background: rgba(255,255,255,0.08);
+      }
 
-      .side-card button:active { background: rgba(255,255,255,0.08); }
-
-      /* CRM counters inside side-card */
+      /* 9. CRM counters */
       .crm-counters { margin-bottom: 4px; font-size: 12px; }
 
-      /* 6. Main: hidden (SDR não necessário no mobile) */
-      .main { display: none; }
+      /* 10. Ocultar main */
+      .main { display: none !important; }
 
-      /* 7. Inputs: previne zoom iOS (font >= 16px) */
+      /* 11. Inputs: >= 16px evita zoom iOS */
       input, select, textarea { font-size: 16px; }
 
-      /* 8. Overlays: dvh para iOS Safari (fallback vh) */
+      /* 12. Overlays: tamanho responsivo com dvh */
       .leads-modal,
       .crm-panel,
       .crm-ficha,
@@ -2709,17 +2458,26 @@
       .trafego-panel {
         width: min(92vw, 480px);
         max-height: 90vh;
-        max-height: 90dvh; /* usa dynamic viewport height quando disponível */
+        max-height: 90dvh;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
+      }
+
+      /* 13. Analysis drawer: full-width no mobile */
+      .analysis-drawer {
+        width: 100vw;
       }
     }
 
     /* ========== PORTRAIT ESTREITO (≤480px) ========== */
     @media (max-width: 480px) {
-      .sidebar { padding: 12px 12px env(safe-area-inset-bottom, 12px); }
+      .sidebar {
+        padding: 12px;
+        padding-top: max(12px, env(safe-area-inset-top));
+        padding-bottom: max(16px, env(safe-area-inset-bottom));
+      }
       .brand h1 { font-size: 14px; }
-      .brand p { font-size: 9px; }
+      .brand p   { font-size: 9px; }
       .side-card button { padding: 11px 12px; font-size: 13px; }
       .side-card { padding: 10px 0; }
     }
