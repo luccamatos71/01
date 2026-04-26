@@ -83,31 +83,54 @@ async function gerarVariacoesOutreach(lead) {
   const categoria = lead.categoria || "negócio local";
   const endereco  = lead.endereco  || "não informado";
 
-  const systemPrompt = `Você é especialista em Outreach da Lumyn. Gera 5 variações de mensagem WhatsApp para prospecção local.
+  const systemPrompt = `Você escreve mensagens de WhatsApp para prospecção local. Cada mensagem deve parecer escrita à mão por um humano — não por uma ferramenta.
 
-REGRA DE TOM (obrigatória):
-- Barbearia, restaurante, loja, pizzaria, pet shop: abertura "Fala," — informal
-- Clínica, escola, coaching, academia, salão: abertura "Olá," — acessível
-- Advocacia, contabilidade, consultoria, imobiliária: sem gírias, tom consultivo
+REGRA DE TOM (não negociável):
+- Barbearia, restaurante, loja, pizzaria, pet shop, bar: "Fala," — curto, direto, sem formalidade
+- Clínica, escola, coaching, academia, salão, estética: "Olá," — próximo, sem jargão
+- Advocacia, contabilidade, consultoria, imobiliária: sem gírias, direto e consultivo
 
-ESTRUTURA: máximo 3 linhas por mensagem. Observe o negócio. Nunca cite avaliações, notas ou dados técnicos.
+ESTRUTURA: 2–3 linhas máximo. Sem parágrafos. Sem emojis excessivos.
 
-PROIBIDO em todas as variações:
-× "Vi suas avaliações no Google"
-× "Identifiquei uma oportunidade"
-× "Faço parte de uma equipe/empresa"
-× mensagem genérica que serviria para qualquer negócio do mesmo nicho
+Cada variação tem objetivo diferente:
+- leve: abre porta sem pressão, desperta curiosidade
+- direta: vai direto ao ponto, cita o negócio pelo nome
+- provocativa: toca em uma dor real do nicho (sem ser agressiva)
+- followup: retomada natural de quem não respondeu (não parece cobrança)
+- reuniao: proposta de conversa de 15 min, simples e sem pressão
 
-Retorne APENAS JSON válido com exatamente estas 5 chaves:
-{
-  "leve": "abre porta sem pressão, tom leve",
-  "direta": "objetiva, padrão, vai direto ao ponto",
-  "provocativa": "aponta dor do nicho sem ser agressiva",
-  "followup": "acompanhamento para quem não respondeu",
-  "reuniao": "convite direto para conversa de 15-20 min"
-}`;
+PROIBIDO em todas (se usar qualquer um, está errado):
+× "aumentar visibilidade"
+× "atrair mais clientes"
+× "estratégias de marketing"
+× "identificar oportunidades"
+× "temos uma solução"
+× "poderia te ajudar a crescer"
+× "vi suas avaliações no Google"
+× mensagem que funcionaria para qualquer negócio do mesmo nicho
 
-  const userMsg = `Negócio: ${nome}\nNicho: ${categoria}\nLocalização: ${endereco}`;
+OBRIGATÓRIO:
+✓ Citar o nome do negócio em pelo menos 3 das 5 variações
+✓ Observação específica sobre o nicho (ex: barbearia → corte, atendimento, fila)
+✓ Cada mensagem soa como se quem escreveu conhece o negócio
+
+EXEMPLOS DO QUE É CERTO:
+Barbearia "Dom Barber":
+leve: "Fala! Vi a Dom Barber aqui perto — parece ter estilo próprio. Tenho uma ideia que funcionou bem pra barbearias aqui na região, posso te mostrar em 10 minutos?"
+provocativa: "Fala! Barbearia boa sem fila de espera é rara. Já ajudei algumas a resolver isso sem abrir mão do padrão. Vale 15 minutos?"
+
+Clínica odonto "Sorridente":
+direta: "Olá! Vi a Sorridente e fiquei curioso — estão aceitando novos pacientes? Trabalho com clínicas aqui na região e tenho algo que pode fazer sentido pra vocês."
+
+Retorne APENAS JSON (sem markdown, sem texto extra):
+{ "leve": "...", "direta": "...", "provocativa": "...", "followup": "...", "reuniao": "..." }`;
+
+  const userMsg = `Negócio: ${nome}
+Nicho: ${categoria}
+Localização: ${endereco}
+${lead.nota ? `Nota Google: ${lead.nota} (${lead.avaliacoes || 0} avaliações)` : "Sem nota no Google"}
+${lead.site ? "Tem site próprio" : "Sem site"}
+${lead.telefone ? "Tem telefone" : "Sem telefone"}`;
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
@@ -116,8 +139,8 @@ Retorne APENAS JSON válido com exatamente estas 5 chaves:
       { role: "user", content: userMsg }
     ],
     response_format: { type: "json_object" },
-    temperature: 0.45,
-    max_tokens: 600
+    temperature: 0.65,
+    max_tokens: 700
   });
 
   const raw = completion.choices[0].message.content;
