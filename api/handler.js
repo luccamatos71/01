@@ -2376,6 +2376,53 @@ async function processarAgente(nomeAgente, input, context = "", historico = []) 
     }
   }
 
+  // Auto-busca de dados de tráfego se @analytics menciona campanha
+  if (nomeAgente === "analytics" && !context) {
+    const msgLower = input.toLowerCase();
+    const temPalavrasTrafe = ["campanha", "tráfego", "ad", "ads", "roas", "ctr", "cpc", "criativo", "anúncio"];
+    const temPalavra = temPalavrasTrafe.some(p => msgLower.includes(p));
+
+    if (temPalavra) {
+      try {
+        // Detecta qual conta (rivano ou com_tempero)
+        let accountKey = "rivano"; // default
+        if (msgLower.includes("tempero") || msgLower.includes("com tempero")) {
+          accountKey = "com_tempero";
+        }
+
+        // Busca dados de campanhas dessa conta
+        const token = META_TOKENS[accountKey];
+        if (token) {
+          const url = `https://graph.instagram.com/v21.0/${ACCOUNT_CONFIG[accountKey].accountId}/campaigns?access_token=${token}&fields=id,name,status,objective,daily_budget,budget_remaining,start_date,stop_date`;
+          const resp = await fetch(url);
+          const data = await resp.json();
+
+          if (data.data && data.data.length > 0) {
+            // Busca insights das campanhas
+            const campanhasInfo = await Promise.all(
+              data.data.slice(0, 5).map(async (camp) => {
+                try {
+                  const insightsUrl = `https://graph.instagram.com/v21.0/${camp.id}/insights?metric=spend,impressions,clicks,actions,action_values&access_token=${token}`;
+                  const insightsResp = await fetch(insightsUrl);
+                  const insightsData = await insightsResp.json();
+                  return { name: camp.name, status: camp.status, ...insightsData.data?.[0] };
+                } catch { return { name: camp.name, status: camp.status }; }
+              })
+            );
+
+            const trafegoSummary = `[TRÁFEGO ${ACCOUNT_CONFIG[accountKey].name.toUpperCase()}]\n${campanhasInfo
+              .map(c => `- ${c.name} (${c.status}): Gasto R$${parseFloat(c.spend || 0).toFixed(2)} | ${c.impressions || 0} imp | ${c.clicks || 0} cliques | ${c.actions || 0} conversões`)
+              .join("\n")}`;
+            autoContext = autoContext ? `${trafegoSummary}\n\n${autoContext}` : trafegoSummary;
+          }
+        }
+      } catch (e) {
+        console.warn(`[Analytics auto-fetch] Erro ao buscar dados de tráfego: ${e.message}`);
+        /* fail silently, continue com contexto original */
+      }
+    }
+  }
+
   // Magic Prompt
   const inputEnriquecido = await magicPrompt(input, nomeAgente, autoContext && autoContext.trim() ? autoContext : null);
   const userContent = (autoContext && autoContext.trim())
