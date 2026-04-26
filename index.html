@@ -2697,6 +2697,8 @@
         column-gap: 12px;
         row-gap: 12px;
         width: 100%;
+        min-height: 100vh;
+        min-height: 100dvh;
         height: auto;
         overflow: visible;
         border-right: none;
@@ -2895,6 +2897,14 @@
 
       /* 13. Ocultar main */
       .main { display: none !important; }
+
+      body.mobile-chat-open .main {
+        display: flex !important;
+        min-height: 100vh;
+        min-height: 100dvh;
+        height: 100vh;
+        height: 100dvh;
+      }
 
       /* Sidebar nav mobile: grid de 2 col para os botões */
       .sidebar-nav {
@@ -4012,6 +4022,15 @@
       leadsOverlay.classList.remove("open");
     }
 
+    function mostrarResultadosMobile() {
+      if (!window.matchMedia || !window.matchMedia("(max-width: 1024px)").matches) return;
+      document.body.classList.add("mobile-chat-open");
+      setTimeout(() => {
+        const main = document.querySelector(".main");
+        if (main) main.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 0);
+    }
+
     if (leadsBtn) leadsBtn.addEventListener("click", openLeadsModal);
     if (leadsCloseBtn) leadsCloseBtn.addEventListener("click", closeLeadsModal);
     if (leadsOverlay) leadsOverlay.addEventListener("click", (e) => { if (e.target === leadsOverlay) closeLeadsModal(); });
@@ -4045,6 +4064,7 @@
       salvarBusca(query);
       salvarCidade(query);
       closeLeadsModal();
+      mostrarResultadosMobile();
       createUserBubble("Buscar leads: " + query, "LEADS");
 
       isSending = true;
