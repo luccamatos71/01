@@ -2193,8 +2193,28 @@ Regras:
       const systemPrompt = PROMPTS_AGENTES[nomeAgente];
       const hist = historicoAgentes[nomeAgente];
 
-      const userContent = context && context.trim()
-        ? `Contexto: ${context.trim()}\n\n${texto}`
+      // Auto-contexto do CRM se pergunta menciona leads/performance
+      let autoContext = context;
+      if (nomeAgente === "director" || nomeAgente === "gestor") {
+        const palavrasChave = ["prospectei", "leads", "hoje", "pipeline", "quantos", "performance", "contatos", "responderam", "fechei"];
+        const temPalavra = palavrasChave.some(p => texto.toLowerCase().includes(p));
+        if (temPalavra) {
+          try {
+            const crm = await lerCRM();
+            const leads = crm.leads || [];
+            const agora = new Date();
+            const hoje = agora.toISOString().split("T")[0];
+            const prospectadosHoje = leads.filter(l => l.atualizadoEm && l.atualizadoEm.startsWith(hoje)).length;
+            const statusCount = {};
+            leads.forEach(l => { statusCount[l.status] = (statusCount[l.status] || 0) + 1; });
+            const crmSummary = `[CRM] Total de leads: ${leads.length} | Prospectados hoje: ${prospectadosHoje} | Novos: ${statusCount.novo || 0} | Abordados: ${statusCount.abordado || 0} | Responderam: ${statusCount.respondeu || 0} | Reunião agendada: ${statusCount.reuniao || 0} | Fechados: ${statusCount.fechado || 0}`;
+            autoContext = autoContext ? `${crmSummary}\n\n${context}` : crmSummary;
+          } catch (e) { /* silently fail, use context normal */ }
+        }
+      }
+
+      const userContent = autoContext && autoContext.trim()
+        ? `Contexto: ${autoContext.trim()}\n\n${texto}`
         : texto;
 
       const messages = [
