@@ -756,6 +756,10 @@
       border-radius: var(--r-md);
     }
 
+    .leads-tool-results {
+      display: none;
+    }
+
     /* ============================================================
        LEADS CARDS — lista de resultados no chat
     ============================================================ */
@@ -3527,6 +3531,14 @@
         transform: scale(0.94);
       }
 
+      .leads-modal.results-open .leads-close-btn {
+        width: auto;
+        min-width: 72px;
+        padding: 0 12px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
       .leads-query-input,
       .estrategia-input,
       .trafego-chat-input,
@@ -3646,9 +3658,47 @@
 
       .leads-modal {
         padding-bottom: calc(24px + env(safe-area-inset-bottom));
+        overflow: hidden;
+        overscroll-behavior: contain;
+      }
+
+      .leads-modal.results-open {
+        gap: 0;
+      }
+
+      .leads-modal.results-open .leads-query-input,
+      .leads-modal.results-open .leads-historico,
+      .leads-modal.results-open .leads-chips-label,
+      .leads-modal.results-open .leads-chips,
+      .leads-modal.results-open #cidadeChipsWrap,
+      .leads-modal.results-open .leads-modal-footer {
+        display: none !important;
+      }
+
+      .leads-tool-results {
+        display: flex;
+        flex: 1;
+        min-height: 0;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
         overscroll-behavior: contain;
+        flex-direction: column;
+        gap: 12px;
+        padding: 2px 0 calc(28px + env(safe-area-inset-bottom));
+      }
+
+      .leads-tool-results:empty {
+        display: none;
+      }
+
+      .leads-tool-results .row,
+      .leads-tool-results .row.user {
+        justify-content: stretch;
+      }
+
+      .leads-tool-results .bubble {
+        width: 100%;
+        max-width: none;
       }
 
       .leads-modal-footer {
@@ -3962,6 +4012,8 @@
         <div id="cidadeChips" class="leads-chips"></div>
       </div>
 
+      <div id="leadsToolResults" class="leads-tool-results" aria-live="polite"></div>
+
       <div class="leads-modal-footer">
         <button id="leadsSearchBtn" class="leads-search-btn" type="button">Buscar leads</button>
       </div>
@@ -4219,6 +4271,20 @@
     const API_ROUTE = "/api/analisar";
 
     let isSending = false;
+    let leadsMobileMode = false;
+    let leadsToolResults = null;
+
+    function isMobileViewport() {
+      return !!(window.matchMedia && window.matchMedia("(max-width: 1024px)").matches);
+    }
+
+    function isLeadsMobileSurfaceActive() {
+      return leadsMobileMode && isMobileViewport() && leadsToolResults;
+    }
+
+    function getChatTarget() {
+      return isLeadsMobileSurfaceActive() ? leadsToolResults : chat;
+    }
 
     function escapeHtml(str) {
       return String(str)
@@ -4235,11 +4301,12 @@
     }
 
     function removeEmptyState() {
-      if (emptyState) emptyState.style.display = "none";
+      if (getChatTarget() === chat && emptyState) emptyState.style.display = "none";
     }
 
     function scrollToBottom() {
-      chat.scrollTop = chat.scrollHeight;
+      const target = getChatTarget();
+      target.scrollTop = target.scrollHeight;
     }
 
     function createUserBubble(text, roleLabel = "SDR") {
@@ -4257,7 +4324,7 @@
         </div>
       `;
 
-      chat.appendChild(row);
+      getChatTarget().appendChild(row);
       scrollToBottom();
     }
 
@@ -4371,7 +4438,7 @@
           });
       });
 
-      chat.appendChild(row);
+      getChatTarget().appendChild(row);
       scrollToBottom();
     }
 
@@ -4394,13 +4461,13 @@
         </div>
       `;
 
-      chat.appendChild(row);
+      getChatTarget().appendChild(row);
       scrollToBottom();
       return row;
     }
 
     function removeLoadingBubble() {
-      const loading = chat.querySelector('[data-loading="true"]');
+      const loading = getChatTarget().querySelector('[data-loading="true"]');
       if (loading) loading.remove();
     }
 
@@ -4480,7 +4547,7 @@
         el.addEventListener("click", () => analisarPlace(r));
       });
 
-      chat.appendChild(row);
+      getChatTarget().appendChild(row);
       scrollToBottom();
     }
 
@@ -4689,6 +4756,8 @@
     const leadsHistorico   = document.getElementById("leadsHistorico");
     const cidadeChipsWrap  = document.getElementById("cidadeChipsWrap");
     const cidadeChips      = document.getElementById("cidadeChips");
+    leadsToolResults       = document.getElementById("leadsToolResults");
+    const leadsModal       = leadsOverlay ? leadsOverlay.querySelector(".leads-modal") : null;
 
     // Guard function for elements that may not exist
     const safeCall = (fn) => { try { if (typeof fn === "function") fn(); } catch (e) { /* silently ignore */ } };
@@ -4746,6 +4815,10 @@
     }
 
     function openLeadsModal() {
+      leadsMobileMode = false;
+      if (leadsModal) leadsModal.classList.remove("results-open");
+      if (leadsToolResults) leadsToolResults.innerHTML = "";
+      if (leadsCloseBtn) leadsCloseBtn.textContent = "×";
       leadsOverlay.classList.add("open");
       renderizarHistoricoModal();
       renderizarCidadeChips();
@@ -4754,6 +4827,14 @@
 
     function closeLeadsModal() {
       leadsOverlay.classList.remove("open");
+      leadsMobileMode = false;
+      document.body.classList.remove("mobile-chat-open");
+      if (leadsModal) leadsModal.classList.remove("results-open");
+      if (leadsToolResults) leadsToolResults.innerHTML = "";
+      if (leadsCloseBtn) leadsCloseBtn.textContent = "×";
+      leadsQueue = [];
+      cardMap = new Map();
+      currentLeadIndex = -1;
     }
 
     function mostrarResultadosMobile() {
@@ -4797,8 +4878,16 @@
 
       salvarBusca(query);
       salvarCidade(query);
-      closeLeadsModal();
-      mostrarResultadosMobile();
+      const renderInMobileTool = isMobileViewport();
+      if (renderInMobileTool) {
+        leadsMobileMode = true;
+        if (leadsModal) leadsModal.classList.add("results-open");
+        if (leadsToolResults) leadsToolResults.innerHTML = "";
+        if (leadsCloseBtn) leadsCloseBtn.textContent = "Voltar";
+      } else {
+        closeLeadsModal();
+        mostrarResultadosMobile();
+      }
       createUserBubble("Buscar leads: " + query, "LEADS");
 
       isSending = true;
@@ -5181,7 +5270,7 @@
 
       bubble.appendChild(list);
       row.appendChild(bubble);
-      chat.appendChild(row);
+      getChatTarget().appendChild(row);
       scrollToBottom();
     }
     // ===================== CRM =====================
