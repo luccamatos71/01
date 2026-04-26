@@ -6492,15 +6492,27 @@
         trafegoListCol.innerHTML = '<div style="padding:40px; text-align:center; color:var(--text-3); font-size:12px;">Nenhuma campanha encontrada nos últimos 30 dias.</div>';
         return;
       }
+      // Helpers de formatação — exibe "—" quando o dado não existe na API
+      const fv  = (v, pre = "", suf = "", d = 2) => v != null ? `${pre}${parseFloat(v).toFixed(d)}${suf}` : "—";
+      const fvi = (v) => v != null ? parseInt(v).toLocaleString("pt-BR") : "—";
+
       const linhas = campanhas.map((c, i) => {
-        const alerta = c.ctr < 1 || (c.gasto > 100 && c.cliques === 0);
+        if (c.erro) {
+          return `<tr class="row-alert" data-idx="${i}">
+            <td title="${escapeHtml(c.campanha)}">${escapeHtml(c.campanha)}</td>
+            <td colspan="7" style="color:var(--danger); font-size:11px;">Erro: ${escapeHtml(c.erro)}</td>
+          </tr>`;
+        }
+        const alerta = (c.ctr != null && c.ctr < 1) || (c.gasto != null && c.gasto > 100 && c.cliques === 0);
         return `<tr class="${alerta ? 'row-alert' : ''}" data-idx="${i}">
           <td title="${escapeHtml(c.campanha)}">${escapeHtml(c.campanha)}</td>
-          <td>R$ ${c.gasto.toFixed(2)}</td>
-          <td>${c.impressoes.toLocaleString('pt-BR')}</td>
-          <td>${c.cliques.toLocaleString('pt-BR')}</td>
-          <td>${c.ctr.toFixed(2)}%</td>
-          <td>R$ ${c.cpc.toFixed(2)}</td>
+          <td>${fv(c.gasto, "R$ ")}</td>
+          <td>${fv(c.ctr, "", "%")}</td>
+          <td>${fv(c.cpc, "R$ ")}</td>
+          <td>${fv(c.roas, "", "x")}</td>
+          <td>${fvi(c.conversoes)}</td>
+          <td>${fvi(c.add_to_cart)}</td>
+          <td>${fvi(c.initiate_checkout)}</td>
         </tr>`;
       }).join('');
 
@@ -6509,7 +6521,7 @@
         <div class="trafego-table-wrap">
           <table class="trafego-table">
             <thead><tr>
-              <th>Campanha</th><th>Gasto</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>CPC</th>
+              <th>Campanha</th><th>Gasto</th><th>CTR</th><th>CPC</th><th>ROAS</th><th>Compras</th><th>Add Cart</th><th>Checkout</th>
             </tr></thead>
             <tbody>${linhas}</tbody>
           </table>
@@ -6533,13 +6545,14 @@
       campanhaAtiva = campanha;
       historicoChatTrafego = [];
 
-      // Header de métricas
+      // Header de métricas — exibe "—" para dados ausentes na API
+      const _fv  = (v, pre = "", suf = "", d = 2) => v != null ? `${pre}${parseFloat(v).toFixed(d)}${suf}` : "—";
       trafegoCampanhaNome.textContent = campanha.campanha;
       trafegoMetrics.innerHTML = [
-        { label: "Gasto",   val: `R$ ${campanha.gasto.toFixed(2)}`,   alert: false },
-        { label: "CTR",     val: `${campanha.ctr.toFixed(2)}%`,        alert: campanha.ctr < 1 },
-        { label: "CPC",     val: `R$ ${campanha.cpc.toFixed(2)}`,      alert: campanha.cpc > 5 },
-        { label: "Cliques", val: campanha.cliques.toLocaleString('pt-BR'), alert: false },
+        { label: "Gasto", val: _fv(campanha.gasto, "R$ "),       alert: false },
+        { label: "CTR",   val: _fv(campanha.ctr,  "", "%"),       alert: campanha.ctr != null && campanha.ctr < 1 },
+        { label: "CPC",   val: _fv(campanha.cpc,  "R$ "),         alert: campanha.cpc != null && campanha.cpc > 5 },
+        { label: "ROAS",  val: _fv(campanha.roas, "", "x"),       alert: campanha.roas != null && campanha.roas < 1 },
       ].map(m => `<div class="trafego-metric">
         <span class="trafego-metric-val${m.alert ? ' alert' : ''}">${escapeHtml(String(m.val))}</span>
         <span class="trafego-metric-label">${m.label}</span>

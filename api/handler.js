@@ -1454,6 +1454,15 @@ async function buscarInsightsMeta() {
   const campanhas = jsonCampanhas.data || [];
   if (campanhas.length === 0) return [];
 
+  // Extrai valor de action por tipo — retorna null se não existir, nunca inventa
+  function extrairAction(arr, tipos) {
+    if (!Array.isArray(arr) || arr.length === 0) return null;
+    const found = arr.find(a => tipos.includes(a.action_type));
+    if (!found || found.value == null) return null;
+    const val = parseFloat(found.value);
+    return isNaN(val) ? null : val;
+  }
+
   // Para cada campanha, buscar insights
   const campanhasComInsights = await Promise.all(
     campanhas.map(async (camp) => {
@@ -1464,42 +1473,75 @@ async function buscarInsightsMeta() {
 
         if (jsonInsights.error) {
           console.warn(`[Meta] Erro ao buscar insights de ${camp.name}:`, jsonInsights.error.message);
-          return null;
+          // Retorna campanha com flag de erro — não silencia, não inventa dados
+          return {
+            campanha: camp.name || "Sem nome",
+            status:   camp.status || null,
+            erro:     jsonInsights.error.message,
+          };
         }
 
         const insight = (jsonInsights.data && jsonInsights.data[0]) || {};
-        const gasto = parseFloat(insight.spend || 0);
 
-        // Conversões (purchase)
-        const actions = insight.actions || [];
-        const actionValues = insight.action_values || [];
-        const purchaseAction = actions.find(a => a.action_type === "purchase" || a.action_type === "offsite_conversion.fb_pixel_purchase");
-        const purchaseValue = actionValues.find(a => a.action_type === "purchase" || a.action_type === "offsite_conversion.fb_pixel_purchase");
-        const conversoes = purchaseAction ? parseInt(purchaseAction.value || 0) : null;
-        const receitaConversoes = purchaseValue ? parseFloat(purchaseValue.value || 0) : null;
-        const roas = (gasto > 0 && receitaConversoes !== null && receitaConversoes > 0)
-          ? parseFloat((receitaConversoes / gasto).toFixed(2))
+        // Métricas de entrega — null se o campo não vier da API, nunca default inventado
+        const gasto      = insight.spend       != null ? parseFloat(insight.spend)       : null;
+        const impressoes = insight.impressions  != null ? parseInt(insight.impressions)   : null;
+        const cliques    = insight.clicks       != null ? parseInt(insight.clicks)        : null;
+        const ctr        = insight.ctr          != null ? parseFloat(insight.ctr)         : null;
+        const cpc        = insight.cpc          != null ? parseFloat(insight.cpc)         : null;
+        const cpm        = insight.cpm          != null ? parseFloat(insight.cpm)         : null;
+        const frequencia = insight.frequency    != null ? parseFloat(insight.frequency)   : null;
+
+        // Arrays brutos de conversões
+        const rawActions      = Array.isArray(insight.actions)       ? insight.actions       : [];
+        const rawActionValues = Array.isArray(insight.action_values)  ? insight.action_values : [];
+
+        // Conversões — extraídas dos arrays da API; null = sem pixel/evento, não zero
+        const conversoes        = extrairAction(rawActions,      ["purchase",          "offsite_conversion.fb_pixel_purchase"]);
+        const purchase_value    = extrairAction(rawActionValues, ["purchase",          "offsite_conversion.fb_pixel_purchase"]);
+        const add_to_cart       = extrairAction(rawActions,      ["add_to_cart",       "offsite_conversion.fb_pixel_add_to_cart"]);
+        const initiate_checkout = extrairAction(rawActions,      ["initiate_checkout", "offsite_conversion.fb_pixel_initiate_checkout"]);
+        const leads             = extrairAction(rawActions,      ["lead",              "offsite_conversion.fb_pixel_lead"]);
+
+        // ROAS = receita / gasto — só calcula se ambos existirem e gasto > 0
+        const roas = (gasto != null && gasto > 0 && purchase_value != null && purchase_value > 0)
+          ? parseFloat((purchase_value / gasto).toFixed(2))
           : null;
-        const custoPorConversao = (conversoes && conversoes > 0 && gasto > 0)
+
+        // Custo por conversão — só calcula se conversoes > 0 e gasto conhecido
+        const custoPorConversao = (conversoes != null && conversoes > 0 && gasto != null && gasto > 0)
           ? parseFloat((gasto / conversoes).toFixed(2))
           : null;
 
         return {
-          campanha:         camp.name || "Sem nome",
-          gasto:            gasto,
-          impressoes:       parseInt(insight.impressions || 0),
-          cliques:          parseInt(insight.clicks || 0),
-          cpc:              parseFloat(insight.cpc || 0),
-          ctr:              parseFloat(insight.ctr || 0),
-          cpm:              parseFloat(insight.cpm || 0),
-          frequencia:       parseFloat(insight.frequency || 0),
-          conversoes:       conversoes,
-          roas:             roas,
-          custoPorConversao: custoPorConversao,
+          // ── EXIBIDO NA UI ──────────────────────────────────────────
+          campanha:          camp.name || "Sem nome",
+          gasto,
+          ctr,
+          cpc,
+          roas,
+          conversoes,
+          add_to_cart,
+          initiate_checkout,
+          // ── CONTEXTO DO GESTOR (não exibido na tabela) ─────────────
+          status:            camp.status  || null,
+          impressoes,
+          cliques,
+          cpm,
+          frequencia,
+          purchase_value,
+          leads,
+          custoPorConversao,
+          _actions:          rawActions,
+          _action_values:    rawActionValues,
         };
       } catch (e) {
         console.warn(`[Meta] Erro ao processar campanha ${camp.name}:`, e.message);
-        return null;
+        return {
+          campanha: camp.name || "Sem nome",
+          status:   camp.status || null,
+          erro:     e.message,
+        };
       }
     })
   );
@@ -1508,20 +1550,22 @@ async function buscarInsightsMeta() {
 }
 
 async function chatGestorTrafego(campanha, mensagem, historico) {
-  // Montar bloco de métricas com campos opcionais
+  // Helper: formata número ou retorna "sem dado" — nunca inventa valor
+  const n  = (v, pre = "", suf = "", d = 2) => v != null ? `${pre}${parseFloat(v).toFixed(d)}${suf}` : "sem dado";
+  const ni = (v) => v != null ? parseInt(v).toLocaleString("pt-BR") : "sem dado";
+
   const metricas = [
     `Nome: ${campanha.campanha}`,
-    `Gasto 30d: R$ ${campanha.gasto.toFixed(2)}`,
-    `Impressões: ${campanha.impressoes.toLocaleString("pt-BR")} | Cliques: ${campanha.cliques.toLocaleString("pt-BR")}`,
-    `CTR: ${campanha.ctr.toFixed(2)}% | CPC: R$ ${campanha.cpc.toFixed(2)} | CPM: R$ ${(campanha.cpm || 0).toFixed(2)}`,
-    `Frequência: ${(campanha.frequencia || 0).toFixed(1)}x`,
-    campanha.conversoes !== null && campanha.conversoes !== undefined
-      ? `Conversões: ${campanha.conversoes} | Custo/conv.: R$ ${campanha.custoPorConversao ?? "—"}`
-      : "Conversões: sem rastreamento de pixel",
-    campanha.roas !== null && campanha.roas !== undefined
-      ? `ROAS: ${campanha.roas}x`
-      : "ROAS: sem dados",
-  ].join("\n");
+    `Status: ${campanha.status || "desconhecido"}`,
+    `Gasto 30d: ${n(campanha.gasto, "R$ ")}`,
+    `Impressões: ${ni(campanha.impressoes)} | Cliques: ${ni(campanha.cliques)}`,
+    `CTR: ${n(campanha.ctr, "", "%")} | CPC: ${n(campanha.cpc, "R$ ")} | CPM: ${n(campanha.cpm, "R$ ")}`,
+    `Frequência: ${n(campanha.frequencia, "", "x", 1)}`,
+    `Compras: ${ni(campanha.conversoes)} | Receita: ${n(campanha.purchase_value, "R$ ")} | ROAS: ${n(campanha.roas, "", "x")}`,
+    `Custo/compra: ${n(campanha.custoPorConversao, "R$ ")}`,
+    `Add to Cart: ${ni(campanha.add_to_cart)} | Checkout iniciado: ${ni(campanha.initiate_checkout)} | Leads: ${ni(campanha.leads)}`,
+    campanha.erro ? `AVISO: erro ao carregar dados desta campanha — ${campanha.erro}` : "",
+  ].filter(Boolean).join("\n");
 
   const sistema = `Você é gestor de tráfego pago. Toma decisões operacionais com base em dados. Sem teoria. Resposta em até 4 linhas.
 
@@ -1561,16 +1605,21 @@ FORMATO OBRIGATÓRIO DA RESPOSTA:
 }
 
 async function analisarCampanhas(campanhas) {
-  // Formatar resumo legível para o modelo
+  const nd = (v, pre = "", suf = "", d = 2) => v != null ? `${pre}${parseFloat(v).toFixed(d)}${suf}` : "sem dado";
+  const ni = (v) => v != null ? parseInt(v).toLocaleString("pt-BR") : "sem dado";
+
+  // Formatar resumo completo para o modelo — inclui todos os campos, nunca inventa
   const resumoCampanhas = campanhas.map(c => {
+    if (c.erro) return `Campanha: ${c.campanha}\nSTATUS: ${c.status || "desconhecido"}\nERRO AO CARREGAR: ${c.erro}`;
     const linhas = [
-      `Campanha: ${c.campanha}`,
-      `Gasto: R$${c.gasto.toFixed(2)} | Impressões: ${c.impressoes} | Cliques: ${c.cliques}`,
-      `CTR: ${c.ctr.toFixed(2)}% | CPC: R$${c.cpc.toFixed(2)} | CPM: R$${c.cpm.toFixed(2)}`,
-      `Frequência: ${c.frequencia.toFixed(1)}x`,
+      `Campanha: ${c.campanha} | Status: ${c.status || "desconhecido"}`,
+      `Gasto: ${nd(c.gasto, "R$")} | Impressões: ${ni(c.impressoes)} | Cliques: ${ni(c.cliques)}`,
+      `CTR: ${nd(c.ctr, "", "%")} | CPC: ${nd(c.cpc, "R$")} | CPM: ${nd(c.cpm, "R$")}`,
+      `Frequência: ${nd(c.frequencia, "", "x", 1)}`,
+      `Compras: ${ni(c.conversoes)} | Receita: ${nd(c.purchase_value, "R$")} | ROAS: ${nd(c.roas, "", "x")}`,
+      `Custo/compra: ${nd(c.custoPorConversao, "R$")}`,
+      `Add to Cart: ${ni(c.add_to_cart)} | Checkout iniciado: ${ni(c.initiate_checkout)} | Leads: ${ni(c.leads)}`,
     ];
-    if (c.conversoes !== null) linhas.push(`Conversões: ${c.conversoes} | Custo/conv.: R$${c.custoPorConversao ?? "—"}`);
-    if (c.roas !== null) linhas.push(`ROAS: ${c.roas}x`);
     return linhas.join("\n");
   }).join("\n\n");
 
