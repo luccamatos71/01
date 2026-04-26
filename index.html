@@ -2627,6 +2627,363 @@
       max-width: 300px;
     }
 
+    /* ── AGENTES UI ───────────────────────────────────────────────────────── */
+    .agentes-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      gap: 0;
+    }
+
+    .agentes-selector {
+      display: flex;
+      gap: 6px;
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    .agente-tab {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.07);
+      background: transparent;
+      cursor: pointer;
+      transition: background 140ms, border-color 140ms;
+      text-align: left;
+    }
+
+    .agente-tab:hover {
+      background: rgba(255,255,255,0.04);
+    }
+
+    .agente-tab-active {
+      background: rgba(99,102,241,0.12);
+      border-color: rgba(99,102,241,0.35);
+    }
+
+    .agente-tab-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-2);
+    }
+
+    .agente-tab-active .agente-tab-label {
+      color: var(--primary);
+    }
+
+    .agente-tab-desc {
+      font-size: 10px;
+      color: var(--text-3);
+      line-height: 1.4;
+      max-width: 120px;
+    }
+
+    .agentes-chat {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+    }
+
+    .agentes-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      gap: 8px;
+      color: var(--text-3);
+      text-align: center;
+      opacity: 0.6;
+    }
+
+    .agentes-empty svg { opacity: 0.4; }
+
+    .agentes-empty p {
+      font-size: 13px;
+      color: var(--text-2);
+      margin: 0;
+    }
+
+    .agentes-empty p strong { color: var(--text-1); }
+
+    .agentes-empty span {
+      font-size: 11px;
+      max-width: 240px;
+      line-height: 1.5;
+    }
+
+    .agentes-msgs {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .agente-msg {
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.6;
+      max-width: 90%;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .agente-msg-user {
+      align-self: flex-end;
+      background: rgba(99,102,241,0.15);
+      border: 1px solid rgba(99,102,241,0.2);
+      color: var(--text-1);
+    }
+
+    .agente-msg-bot {
+      align-self: flex-start;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      color: var(--text-2);
+    }
+
+    .agente-msg-error {
+      border-color: rgba(239,68,68,0.3);
+      color: #f87171;
+      background: rgba(239,68,68,0.08);
+    }
+
+    .agente-msg-loading {
+      padding: 14px;
+    }
+
+    .agente-dots {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .agente-dots span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--text-3);
+      animation: agenteDotBounce 1.2s infinite;
+    }
+
+    .agente-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .agente-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes agenteDotBounce {
+      0%, 80%, 100% { transform: scale(0.7); opacity: 0.5; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+
+    .agente-acao-btn {
+      align-self: flex-start;
+      padding: 7px 14px;
+      border-radius: 7px;
+      border: 1px solid rgba(99,102,241,0.35);
+      background: rgba(99,102,241,0.1);
+      color: var(--primary);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 120ms;
+    }
+
+    .agente-acao-btn:hover {
+      background: rgba(99,102,241,0.2);
+    }
+
+    .agentes-input-area {
+      flex-shrink: 0;
+      padding: 12px 16px 16px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .agentes-textarea {
+      width: 100%;
+      resize: none;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 8px;
+      color: var(--text-1);
+      font-size: 13px;
+      font-family: inherit;
+      padding: 10px 12px;
+      line-height: 1.5;
+      transition: border-color 140ms;
+      box-sizing: border-box;
+    }
+
+    .agentes-textarea:focus {
+      outline: none;
+      border-color: rgba(99,102,241,0.4);
+    }
+
+    .agentes-textarea::placeholder {
+      color: var(--text-3);
+    }
+
+    .agentes-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .agentes-reset-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.07);
+      background: transparent;
+      color: var(--text-3);
+      font-size: 11px;
+      cursor: pointer;
+      transition: color 120ms, border-color 120ms;
+    }
+
+    .agentes-reset-btn:hover {
+      color: var(--text-2);
+      border-color: rgba(255,255,255,0.12);
+    }
+
+    .agentes-send-btn {
+      padding: 8px 20px;
+      border-radius: 8px;
+      border: none;
+      background: var(--primary);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 120ms;
+    }
+
+    .agentes-send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .agentes-send-btn:not(:disabled):hover {
+      opacity: 0.88;
+    }
+
+    .agentes-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      color: var(--text-3);
+      padding: 0 2px;
+    }
+
+    .agentes-char-count.over { color: #f87171; }
+
+    .agentes-trocas {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .agentes-trocas-dots {
+      display: flex;
+      gap: 2px;
+    }
+
+    .trocas-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+      transition: background 200ms;
+    }
+
+    .trocas-dot.used {
+      background: var(--primary);
+    }
+
+    /* CRM save form inline */
+    .agente-crm-form {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-self: flex-start;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .agente-crm-form-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .agente-crm-input {
+      width: 100%;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 6px;
+      color: var(--text-1);
+      font-size: 12px;
+      font-family: inherit;
+      padding: 7px 10px;
+      transition: border-color 120ms;
+      box-sizing: border-box;
+    }
+
+    .agente-crm-input:focus {
+      outline: none;
+      border-color: rgba(99,102,241,0.4);
+    }
+
+    .agente-crm-input::placeholder { color: var(--text-3); }
+
+    .agente-crm-form-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .agente-crm-salvar {
+      flex: 1;
+      padding: 7px;
+      border-radius: 6px;
+      border: none;
+      background: var(--primary);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .agente-crm-cancelar {
+      padding: 7px 12px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.09);
+      background: transparent;
+      color: var(--text-3);
+      font-size: 12px;
+      cursor: pointer;
+    }
+    /* ──────────────────────────────────────────────────────────────────────── */
+
     /* Mobile: janela central em overlay full-screen */
     @media (max-width: 1024px) {
       .central-window {
@@ -3912,6 +4269,16 @@
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
           </svg>
           <span>Director</span>
+        </button>
+
+        <button class="nav-btn" data-view="agentes" type="button" title="Agentes IA">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="8" r="4"/>
+            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+            <circle cx="19" cy="8" r="2" stroke-width="1.5"/>
+            <circle cx="5" cy="8" r="2" stroke-width="1.5"/>
+          </svg>
+          <span>Agentes</span>
         </button>
       </nav>
 
@@ -6558,6 +6925,7 @@
       crm:        `<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>`,
       trafego:    `<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>`,
       director:   `<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>`,
+      agentes:    `<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>`,
     };
 
     const CW_TITLES = {
@@ -6566,6 +6934,7 @@
       crm:        "CRM",
       trafego:    "Tráfego",
       director:   "Director",
+      agentes:    "Agentes IA",
     };
 
     function getDashboardHTML() {
@@ -6654,6 +7023,345 @@
       } catch(e) { /* silently fail */ }
     }
 
+    // ── AGENTES UI ───────────────────────────────────────────────────────────
+    var agentesState = { agente: "director", carregando: false, trocas: 0 };
+
+    var AGENTES_INFO = {
+      director: { label: "Director",  desc: "Estratégia comercial e priorização" },
+      designer: { label: "Designer",  desc: "Briefing visual e direção criativa" },
+      gestor:   { label: "Gestor",    desc: "Pipeline, CRM e follow-up" },
+      outreach: { label: "Outreach",  desc: "Mensagens de abordagem prontas" }
+    };
+
+    var MAX_CHARS = 1500;
+    var MAX_TROCAS = 3;
+
+    // localStorage helpers
+    function agenteChatKey(ag) { return "lumyn_chat_" + ag; }
+
+    function salvarChatLocal(ag, items) {
+      try { localStorage.setItem(agenteChatKey(ag), JSON.stringify(items.slice(-30))); } catch(e) {}
+    }
+
+    function lerChatLocal(ag) {
+      try { return JSON.parse(localStorage.getItem(agenteChatKey(ag)) || "[]"); } catch(e) { return []; }
+    }
+
+    function limparChatLocal(ag) {
+      try { localStorage.removeItem(agenteChatKey(ag)); } catch(e) {}
+    }
+
+    // Render items into msgs container
+    function renderChatItems(msgsEl, emptyEl, items) {
+      msgsEl.innerHTML = "";
+      if (!items.length) { if (emptyEl) emptyEl.style.display = "flex"; return; }
+      if (emptyEl) emptyEl.style.display = "none";
+      items.forEach(function(item) {
+        if (item.tipo === "user") {
+          var b = document.createElement("div");
+          b.className = "agente-msg agente-msg-user";
+          b.textContent = item.text;
+          msgsEl.appendChild(b);
+        } else if (item.tipo === "bot") {
+          var b2 = document.createElement("div");
+          b2.className = "agente-msg agente-msg-bot";
+          b2.textContent = item.text;
+          msgsEl.appendChild(b2);
+          if (item.acao) appendAcaoBtn(msgsEl, item.acao, item.text);
+        } else if (item.tipo === "erro") {
+          var b3 = document.createElement("div");
+          b3.className = "agente-msg agente-msg-bot agente-msg-error";
+          b3.textContent = item.text;
+          msgsEl.appendChild(b3);
+        }
+      });
+      msgsEl.scrollTop = msgsEl.scrollHeight;
+    }
+
+    function appendAcaoBtn(msgsEl, acao, resposta) {
+      var LABELS = { copiar: "Copiar resposta", claude_prompt: "Copiar como prompt Claude", salvar_crm: "Salvar no CRM" };
+      var btn = document.createElement("button");
+      btn.className = "agente-acao-btn";
+      btn.textContent = LABELS[acao] || acao;
+      btn.setAttribute("data-acao", acao);
+      btn.setAttribute("data-resposta", resposta);
+
+      btn.addEventListener("click", function() {
+        var ac = this.getAttribute("data-acao");
+        var resp = this.getAttribute("data-resposta");
+
+        if (ac === "copiar") {
+          navigator.clipboard.writeText(resp).then(function() {
+            btn.textContent = "✓ Copiado!";
+            setTimeout(function() { btn.textContent = LABELS[ac]; }, 2000);
+          });
+
+        } else if (ac === "claude_prompt") {
+          var formatted = "Implemente no projeto Lumyn (Node.js + Vanilla JS, sem frameworks):\n\n" + resp;
+          navigator.clipboard.writeText(formatted).then(function() {
+            btn.textContent = "✓ Prompt copiado!";
+            setTimeout(function() { btn.textContent = LABELS[ac]; }, 2000);
+          });
+
+        } else if (ac === "salvar_crm") {
+          // Remove o próprio botão e mostra form inline
+          btn.remove();
+          var form = document.createElement("div");
+          form.className = "agente-crm-form";
+          form.innerHTML = `
+            <span class="agente-crm-form-title">Salvar no CRM</span>
+            <input class="agente-crm-input" id="crmFormNome" placeholder="Nome do lead *" type="text"/>
+            <input class="agente-crm-input" id="crmFormTel" placeholder="Telefone (opcional)" type="text"/>
+            <div class="agente-crm-form-actions">
+              <button class="agente-crm-salvar" type="button">Salvar</button>
+              <button class="agente-crm-cancelar" type="button">Cancelar</button>
+            </div>`;
+          msgsEl.appendChild(form);
+          msgsEl.scrollTop = msgsEl.scrollHeight;
+
+          form.querySelector(".agente-crm-cancelar").addEventListener("click", function() { form.remove(); });
+          form.querySelector(".agente-crm-salvar").addEventListener("click", function() {
+            var nome = form.querySelector("#crmFormNome").value.trim();
+            if (!nome) { form.querySelector("#crmFormNome").style.borderColor = "rgba(239,68,68,0.5)"; return; }
+            var tel = form.querySelector("#crmFormTel").value.trim();
+            var lead = {
+              id: "agente_" + Date.now(),
+              nome: nome,
+              telefone: tel || null,
+              categoria: null,
+              prioridade: "MEDIA",
+              notas: resp.slice(0, 400)
+            };
+            fetch("/api/crm", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ modo: "salvar", lead: lead })
+            }).then(function(r) { return r.json(); }).then(function(d) {
+              form.innerHTML = d.ok
+                ? `<span style="color:var(--primary);font-size:12px;font-weight:600;">✓ ${nome} salvo no CRM${d.jaExiste ? " (já existia)" : ""}.</span>`
+                : `<span style="color:#f87171;font-size:12px;">Erro: ${d.erro}</span>`;
+            }).catch(function() {
+              form.innerHTML = `<span style="color:#f87171;font-size:12px;">Erro de conexão.</span>`;
+            });
+          });
+        }
+      });
+      msgsEl.appendChild(btn);
+    }
+
+    function getAgentesHTML() {
+      var info = AGENTES_INFO[agentesState.agente];
+      return `<div class="agentes-container">
+        <div class="agentes-selector">
+          ${Object.entries(AGENTES_INFO).map(function(e) {
+            return `<button class="agente-tab${agentesState.agente === e[0] ? " agente-tab-active" : ""}" data-agente="${e[0]}" type="button">
+              <span class="agente-tab-label">${e[1].label}</span>
+              <span class="agente-tab-desc">${e[1].desc}</span>
+            </button>`;
+          }).join("")}
+        </div>
+        <div class="agentes-chat" id="agentesChatArea">
+          <div class="agentes-empty" id="agentesEmpty">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+            <p>Fale com o <strong>${info.label}</strong></p>
+            <span>${info.desc}</span>
+          </div>
+          <div id="agentesMsgs" class="agentes-msgs"></div>
+        </div>
+        <div class="agentes-input-area">
+          <textarea id="agentesInput" class="agentes-textarea" placeholder="Digite sua pergunta ou instrução… (Enter envia, Shift+Enter nova linha)" rows="3" maxlength="${MAX_CHARS}"></textarea>
+          <div class="agentes-meta">
+            <div class="agentes-trocas" id="agentesTrocas" title="Trocas no contexto do agente">
+              <span class="agentes-trocas-dots" id="agentesDotsEl">
+                <span class="trocas-dot"></span><span class="trocas-dot"></span><span class="trocas-dot"></span>
+              </span>
+              <span id="agentesTorcasLabel">0/3 trocas</span>
+            </div>
+            <span class="agentes-char-count" id="agentesCharCount">0/${MAX_CHARS}</span>
+          </div>
+          <div class="agentes-actions">
+            <button id="agentesResetBtn" class="agentes-reset-btn" type="button" title="Limpar histórico do agente">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5.1L1 10"/></svg>
+              Limpar contexto
+            </button>
+            <button id="agentesEnviarBtn" class="agentes-send-btn" type="button">Enviar</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function atualizarTrocasUI(n) {
+      agentesState.trocas = n || 0;
+      var label = document.getElementById("agentesTorcasLabel");
+      var dots = document.getElementById("agentesDotsEl");
+      if (label) label.textContent = agentesState.trocas + "/" + MAX_TROCAS + " trocas";
+      if (dots) {
+        Array.from(dots.children).forEach(function(dot, i) {
+          dot.classList.toggle("used", i < agentesState.trocas);
+        });
+      }
+    }
+
+    function inicializarAgentesUI() {
+      // Restore from localStorage
+      var savedItems = lerChatLocal(agentesState.agente);
+      var msgsEl = document.getElementById("agentesMsgs");
+      var emptyEl = document.getElementById("agentesEmpty");
+      if (savedItems.length) renderChatItems(msgsEl, emptyEl, savedItems);
+
+      // Tab switching — saves current + loads new
+      cwBody.querySelectorAll(".agente-tab").forEach(function(tab) {
+        tab.addEventListener("click", function() {
+          var prev = agentesState.agente;
+          cwBody.querySelectorAll(".agente-tab").forEach(function(t) { t.classList.remove("agente-tab-active"); });
+          this.classList.add("agente-tab-active");
+          agentesState.agente = this.getAttribute("data-agente");
+          agentesState.trocas = 0;
+
+          var curMsgs = document.getElementById("agentesMsgs");
+          var curEmpty = document.getElementById("agentesEmpty");
+
+          // Load new agent's stored chat
+          var items = lerChatLocal(agentesState.agente);
+          renderChatItems(curMsgs, curEmpty, items);
+          atualizarTrocasUI(0);
+
+          // Update empty state label
+          if (curEmpty) {
+            var p = curEmpty.querySelector("p");
+            var s = curEmpty.querySelector("span");
+            if (p) p.innerHTML = "Fale com o <strong>" + AGENTES_INFO[agentesState.agente].label + "</strong>";
+            if (s) s.textContent = AGENTES_INFO[agentesState.agente].desc;
+          }
+
+          // Update placeholder
+          var inputEl2 = document.getElementById("agentesInput");
+          if (inputEl2) inputEl2.value = "";
+          var cc = document.getElementById("agentesCharCount");
+          if (cc) cc.textContent = "0/" + MAX_CHARS;
+        });
+      });
+
+      // Reset button
+      var resetBtn = document.getElementById("agentesResetBtn");
+      if (resetBtn) {
+        resetBtn.addEventListener("click", function() {
+          fetch("/api/agente/reset", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ agente: agentesState.agente })
+          });
+          limparChatLocal(agentesState.agente);
+          var msgsR = document.getElementById("agentesMsgs");
+          var emptyR = document.getElementById("agentesEmpty");
+          if (msgsR) msgsR.innerHTML = "";
+          if (emptyR) emptyR.style.display = "flex";
+          atualizarTrocasUI(0);
+        });
+      }
+
+      var sendBtn = document.getElementById("agentesEnviarBtn");
+      var inputEl = document.getElementById("agentesInput");
+
+      // Char counter
+      if (inputEl) {
+        inputEl.addEventListener("input", function() {
+          this.style.height = "auto";
+          this.style.height = Math.min(this.scrollHeight, 140) + "px";
+          var len = this.value.length;
+          var cc = document.getElementById("agentesCharCount");
+          if (cc) {
+            cc.textContent = len + "/" + MAX_CHARS;
+            cc.classList.toggle("over", len > MAX_CHARS - 50);
+          }
+        });
+      }
+
+      function enviarMensagem() {
+        if (agentesState.carregando) return;
+        var texto = inputEl ? inputEl.value.trim() : "";
+        if (!texto || texto.length < 3) return;
+        if (texto.length > MAX_CHARS) { alert("Mensagem muito longa. Máximo " + MAX_CHARS + " caracteres."); return; }
+
+        var msgsA = document.getElementById("agentesMsgs");
+        var emptyA = document.getElementById("agentesEmpty");
+        if (emptyA) emptyA.style.display = "none";
+
+        var userBubble = document.createElement("div");
+        userBubble.className = "agente-msg agente-msg-user";
+        userBubble.textContent = texto;
+        msgsA.appendChild(userBubble);
+
+        var loadBubble = document.createElement("div");
+        loadBubble.className = "agente-msg agente-msg-bot agente-msg-loading";
+        loadBubble.innerHTML = '<span class="agente-dots"><span></span><span></span><span></span></span>';
+        msgsA.appendChild(loadBubble);
+        msgsA.scrollTop = msgsA.scrollHeight;
+
+        inputEl.value = "";
+        inputEl.style.height = "auto";
+        var cc2 = document.getElementById("agentesCharCount");
+        if (cc2) cc2.textContent = "0/" + MAX_CHARS;
+
+        agentesState.carregando = true;
+        if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = "Aguarde…"; }
+
+        fetch("/api/" + agentesState.agente, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ input: texto })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          loadBubble.remove();
+          if (data.erro) {
+            var errBubble = document.createElement("div");
+            errBubble.className = "agente-msg agente-msg-bot agente-msg-error";
+            errBubble.textContent = "Erro: " + data.erro;
+            msgsA.appendChild(errBubble);
+            // Save to local with error
+            var stored = lerChatLocal(agentesState.agente);
+            stored.push({ tipo: "user", text: texto });
+            stored.push({ tipo: "erro", text: "Erro: " + data.erro });
+            salvarChatLocal(agentesState.agente, stored);
+          } else {
+            var botBubble = document.createElement("div");
+            botBubble.className = "agente-msg agente-msg-bot";
+            botBubble.textContent = data.resposta || "";
+            msgsA.appendChild(botBubble);
+            if (data.acao) appendAcaoBtn(msgsA, data.acao, data.resposta || "");
+            if (data.trocas !== undefined) atualizarTrocasUI(data.trocas);
+            // Persist chat
+            var stored2 = lerChatLocal(agentesState.agente);
+            stored2.push({ tipo: "user", text: texto });
+            stored2.push({ tipo: "bot", text: data.resposta || "", acao: data.acao || null });
+            salvarChatLocal(agentesState.agente, stored2);
+          }
+          msgsA.scrollTop = msgsA.scrollHeight;
+        })
+        .catch(function() {
+          loadBubble.remove();
+          var errB = document.createElement("div");
+          errB.className = "agente-msg agente-msg-bot agente-msg-error";
+          errB.textContent = "Erro de conexão. Verifique o servidor.";
+          msgsA.appendChild(errB);
+          msgsA.scrollTop = msgsA.scrollHeight;
+        })
+        .finally(function() {
+          agentesState.carregando = false;
+          if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = "Enviar"; }
+        });
+      }
+
+      if (sendBtn) sendBtn.addEventListener("click", enviarMensagem);
+      if (inputEl) {
+        inputEl.addEventListener("keydown", function(e) {
+          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviarMensagem(); }
+        });
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     function abrirCW(view) {
       cwWin.setAttribute("data-view", view);
       cwTitle.textContent = CW_TITLES[view] || view;
@@ -6662,6 +7370,9 @@
       if (view === "home") {
         cwBody.innerHTML = getDashboardHTML();
         preencherDashboard();
+      } else if (view === "agentes") {
+        cwBody.innerHTML = getAgentesHTML();
+        inicializarAgentesUI();
       } else {
         cwBody.innerHTML = getPlaceholderHTML(view);
         // Bind overlay button inside placeholder
