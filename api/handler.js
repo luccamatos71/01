@@ -2151,40 +2151,11 @@ function extrairRestricoes(historico) {
   return encontradas;
 }
 
-// Funções legacy — removidas após unificação com @analytics
+// Legacy functions removed after unification with @analytics
 // (processarMagicPrompt, montarPrompt, validarRespostaGestor, corrigirResposta)
-  const msg = (mensagem || "").toLowerCase();
 
-  let intencao = "analise_geral";
-  if (/diagnos|o que|como (está|ta|tá)|analisa|me diz/.test(msg))                intencao = "diagnostico";
-  else if (/por que|por quê|motivo|causa/.test(msg))                              intencao = "explicacao";
-  else if (/o que (fazer|devo|posso)|como (melhorar|resolver|escalar)/.test(msg)) intencao = "acao";
-  else if (/não (tenho|consigo|posso)|sem (verba|acesso|criativo|grana|budget)/.test(msg)) intencao = "restricao_operacional";
-  else if (/pausa|pausar/.test(msg))                                              intencao = "confirmacao_pausa";
-  else if (/escal|aumentar|crescer/.test(msg))                                    intencao = "escalar";
-
-  const rHist = extrairRestricoes(historico);
-  const rMsg  = extrairRestricoes([{ tipo: "user", texto: mensagem }]);
-  const tipos  = new Set(rHist.map(r => r.tipo));
-  const restricoes = [...rHist, ...rMsg.filter(r => !tipos.has(r.tipo))];
-
-  const dadosAusentes = [];
-  if (campanha.conversoes == null) dadosAusentes.push("conversões");
-  if (campanha.roas       == null) dadosAusentes.push("ROAS");
-  if (campanha.ctr        == null) dadosAusentes.push("CTR");
-  if (campanha.cpc        == null) dadosAusentes.push("CPC");
-
-  return {
-    intencao,
-    restricoes,
-    fasePixel:    calcularFasePixel(campanha, restricoes, accountConfig),
-    analiseFunil: analisarFunil(campanha),
-    dadosAusentes,
-  };
-}
-
-// Monta o prompt final com todos os blocos estruturados
-function montarPrompt(campanha, ctx, accountConfig) {
+// Fallback determinístico — rule-based, zero IA, sempre conservador
+function fallbackDeterministico(restricoes, campanha, accountConfig) {
   const n  = (v, pre = "", suf = "", d = 2) => v != null ? `${pre}${parseFloat(v).toFixed(d)}${suf}` : "sem dado";
   const ni = (v) => v != null ? parseInt(v).toLocaleString("pt-BR") : "sem dado";
 
