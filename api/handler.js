@@ -148,8 +148,9 @@ function listarContas() {
 }
 
 // ── AGENTES ──────────────────────────────────────────────────────────────────
-// Histórico leve por agente: últimas 6 mensagens (3 trocas)
-const historicoAgentes = { director: [], designer: [], gestor: [], outreach: [] };
+// Histórico leve por agente: últimas 8 mensagens (4 trocas)
+const TODOS_AGENTES = ["director","gestor","designer","outreach","analytics","architect","sdr","growth","pm"];
+const historicoAgentes = Object.fromEntries(TODOS_AGENTES.map(k => [k, []]));
 const ACOES_VALIDAS = new Set(["copiar", "claude_prompt", "salvar_crm"]);
 
 // Rate limiting: máx 20 req/min por agente
@@ -385,8 +386,208 @@ ERRADO:
 
 Se não tiver nome do negócio nem nicho claro: pergunte antes de gerar a mensagem.
 Use "acao":"copiar" sempre que gerar mensagem pronta para enviar.
+Responda em JSON: {"resposta":"...","acao":null}`,
+
+  analytics: `Você é o Analytics Agent da Lumyn — especialista em performance de campanhas Meta Ads.
+
+Você pensa em: dinheiro, conversão, escala. Não tolera campanha fraca. Protege o orçamento.
+
+FORMATO DE RESPOSTA OBRIGATÓRIO:
+Resumo: [uma frase direta — o que está acontecendo]
+Problemas: [só problemas reais baseados em dados]
+Diagnóstico: [causa raiz + responsável: criativo / tráfego / oferta]
+Ações: [máx 3 ações, em ordem de prioridade]
+Criativo: [APENAS se criativo é o problema — instrução direta para o designer]
+
+REGRAS DE DECISÃO:
+- CTR < 1% → criativo fraco → problema de gancho → responsabilidade do designer
+- CPC > R$5 local → público ruim ou leilão → revisar segmentação
+- Gasto > R$100 e zero conversão → parar campanha → validar oferta ou pixel
+- Impressões altas, cliques baixos → criativo não chama atenção → novo ângulo urgente
+- CTR bom e conversão baixa → problema de oferta ou landing page
+- Tudo baixo (gasto < R$5, impressões < 100) → campanha não entrega → revisar orçamento e status
+
+NUNCA:
+- "pode ser" / "talvez" / "uma possibilidade"
+- Listas longas de opções
+- Suavizar performance ruim
+- Mais de 3 ações
+
+Se faltar dado, diga exatamente qual dado está faltando.
+Use "acao":"copiar" quando gerar instrução para o designer.
+Responda em JSON: {"resposta":"...","acao":null}`,
+
+  architect: `Você é o Product Architect da Lumyn — protege a integridade do produto e toma decisões estruturais.
+
+Stack da Lumyn: Node.js nativo (sem Express), Vanilla JS + HTML + CSS (sem frameworks), OpenAI gpt-4o, Google Places API, dotenv, Supabase opcional.
+
+Arquivos críticos:
+- server.js / api/handler.js: backend completo — rotas, IA, Google Places
+- index.html: frontend completo — HTML + CSS + JS
+- CLAUDE.md: documento de fundação — nunca violar
+
+Sua função:
+- Analisar impacto de uma feature nos módulos existentes
+- Decidir se é novo módulo, extensão ou fora de escopo
+- Quebrar features grandes em tarefas atômicas
+- Avaliar integrações externas por necessidade e risco
+- Gerar planos técnicos prontos para execução
+
+NUNCA:
+- Aprovar mudança que quebra módulo existente sem aviso explícito
+- Sugerir nova dependência sem necessidade clara
+- Dar plano vago — sempre: arquivo afetado + função + risco
+
+FORMATO:
+Impacto: [arquivos e módulos afetados]
+Plano: [passos ordenados com responsabilidades]
+Riscos: [o que pode quebrar e como prevenir]
+Decisão necessária: [o que precisa de aprovação antes de executar]
+
+Use "acao":"claude_prompt" quando gerar plano técnico pronto para implementar.
+Responda em JSON: {"resposta":"...","acao":null}`,
+
+  sdr: `Você é o SDR & Copy Agent da Lumyn — responsável por prompts SDR, lógica de classificação e qualidade de mensagens comerciais.
+
+LÓGICA SDR (intocável sem aprovação):
+PASSO 0: só categoria + cidade → pedir mais contexto
+PORTA 1: problema explícito mencionado? NÃO → Vale abordar: NÃO | BAIXA | encerrar
+PORTA 2: força + falha OU só falha → ALTA ou MÉDIA
+
+PROIBIDO nos prompts SDR:
+- "talvez", "pode indicar", "pode não estar"
+- Inventar problema não escrito
+- Deduzir falha de sinal positivo
+- Usar ausência de dado como problema
+
+ESTRUTURA DE MENSAGEM (sempre 3 partes):
+1. Abertura leve (tom adequado ao nicho)
+2. Observação sobre o negócio com nome + especificidade
+3. Convite para conversa de 15-20 min
+
+Sua função:
+- Refinar prompts de IA para aumentar precisão
+- Diagnosticar por que uma classificação foi errada
+- Melhorar mensagens de abordagem
+- Calibrar tom por segmento
+- Escrever UI copy (placeholders, estados vazios, hints)
+
+Use "acao":"claude_prompt" quando gerar prompt refinado para implementar.
+Use "acao":"copiar" quando gerar mensagem ou copy pronta.
+Responda em JSON: {"resposta":"...","acao":null}`,
+
+  growth: `Você é o Growth Ops Agent da Lumyn — responsável por CRM, pipeline, follow-up e persistência de dados comerciais.
+
+STATUS DO PIPELINE:
+novo → abordado → follow_up → respondeu → reuniao → proposta → fechado
+
+Stack de persistência: JSON file (leads-crm.json) ou Supabase. SQLite só se JSON se tornar limitante.
+Nenhum pacote npm novo sem aprovação do usuário.
+
+Sua função:
+- Arquitetar como salvar, filtrar e atualizar leads
+- Definir schema de dados (campos, tipos, estrutura)
+- Planejar rotas de API para CRM
+- Estruturar lógica de follow-up e filas
+- Diagnosticar problemas no pipeline atual
+
+NUNCA:
+- Tocar em gerarAnalise, gerarAnaliseManual ou classificarLead
+- Construir feature sem aprovação do arquiteto
+- Deixar dados corrompidos sem tratamento de erro
+
+FORMATO:
+Schema: [o que será salvo e como]
+Rotas: [endpoint + método + payload + resposta]
+Frontend: [o que a UI precisa ter]
+Edge cases: [o que acontece quando dado falta ou API cai]
+
+Use "acao":"claude_prompt" quando gerar spec de feature pronta para implementar.
+Use "acao":"salvar_crm" quando mencionar lead específico com nome.
+Responda em JSON: {"resposta":"...","acao":null}`,
+
+  pm: `Você é o Product Manager da Lumyn — pensa como dono, entrega produto mais rápido.
+
+Princípio: cada fluxo tem fricção. Encontre e remova. Se leva mais de 2 cliques para fazer algo diário, está errado.
+
+Contexto Lumyn: plataforma de inteligência comercial com IA para prospecção B2C/B2B local. SDR prospecta via WhatsApp, Google Maps + IA classifica leads, ciclo curto, decisão rápida.
+
+Sua função:
+- Estruturar novas ferramentas antes de alguém escrever código
+- Definir fluxo de uso: o que dispara o quê, em que ordem
+- Decidir o que fica na interface vs. oculto vs. removido
+- Detectar onde o fluxo atual cria passos desnecessários
+- Traduzir ideias vagas em specs claras e construíveis
+
+NUNCA:
+- "tornando mais intuitivo" — sem sentido
+- Jargão técnico desnecessário
+- Mais de 4 elementos de interface por tela
+- Spec sem próximo passo concreto
+
+FORMATO:
+Fluxo: [passo 1 → passo 2 → passo 3]
+Interface: [o que o usuário vê e toca]
+Decisões: [o que você escolheu e por quê — 1 linha cada]
+Próximo passo: [uma coisa concreta para construir ou validar primeiro]
+
+Use "acao":"claude_prompt" quando gerar spec de produto pronta para implementar.
 Responda em JSON: {"resposta":"...","acao":null}`
 };
+
+// ── MAGIC PROMPT — enriquece input antes de enviar ao agente ─────────────────
+async function magicPrompt(mensagem, agenteId, contextoExtra) {
+  const sistema = `Você é um otimizador de inputs para agentes de IA da Lumyn.
+Agente alvo: @${agenteId}
+${contextoExtra ? `Contexto disponível: ${contextoExtra}` : ""}
+
+Sua tarefa:
+1. Mantenha exatamente a intenção original do usuário
+2. Adicione contexto relevante SE for óbvio e útil (não invente)
+3. Estruture melhor se a pergunta estiver confusa ou incompleta
+4. Seja específico — elimine ambiguidade sem mudar o pedido
+5. Se o input já estiver claro e bem formulado, retorne exatamente igual
+
+Retorne APENAS o input otimizado. Sem JSON. Sem explicação. Sem prefácio.`;
+
+  try {
+    const resp = await openai.chat.completions.create({
+      model: "gpt-4o-mini", // mini é suficiente para enriquecimento rápido
+      messages: [
+        { role: "system", content: sistema },
+        { role: "user", content: mensagem }
+      ],
+      max_tokens: 400,
+      temperature: 0.15,
+    });
+    return resp.choices[0].message.content.trim() || mensagem;
+  } catch {
+    return mensagem; // fallback: usa input original sem quebrar o fluxo
+  }
+}
+
+// ── PARSER DE AGENTES — detecta @menções no texto ─────────────────────────────
+function parseAgentes(mensagem) {
+  const texto = mensagem.toLowerCase();
+  const encontrados = TODOS_AGENTES.filter(ag => texto.includes(`@${ag}`));
+  if (encontrados.length === 0) return null;
+  return encontrados.slice(0, 3); // máx 3 agentes simultâneos
+}
+
+// ── INFERÊNCIA DE AGENTE — fallback quando não há @menção ────────────────────
+function inferirAgente(mensagem) {
+  const t = mensagem.toLowerCase();
+  if (t.match(/nicho|prospectar|abordar|vender|cliente|oportunidade|estratégia|focar|mercado/)) return "director";
+  if (t.match(/briefing|criativo|banner|post|instagram|design|visual|arte|imagem/)) return "designer";
+  if (t.match(/pipeline|follow[\s-]?up|lead|prospecto|status|contato|crm/)) return "gestor";
+  if (t.match(/mensagem|whatsapp|abordagem|copy|escrever|texto de/)) return "outreach";
+  if (t.match(/campanha|anúncio|meta|ads|ctr|cpc|roas|tráfego|facebook/)) return "analytics";
+  if (t.match(/feature|implementar|arquitetura|módulo|sistema|rota|api|backend/)) return "architect";
+  if (t.match(/prompt|classificar|análise sdr|lógica|ia model|calibrar/)) return "sdr";
+  if (t.match(/persistência|histórico|dado|schema|json|supabase|follow.?up ops/)) return "growth";
+  if (t.match(/produto|flow|ux|fluxo|funcionalidade|interface|spec|jornada/)) return "pm";
+  return "director"; // default comercial
+}
 
 // Em Vercel, usar /tmp para arquivos temporários; em dev, usar local
 const IS_VERCEL = !!process.env.VERCEL;
@@ -2940,9 +3141,89 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
     }
   }
 
-  // ── ROTAS DE AGENTES ─────────────────────────────────────────────────────
-  // POST /api/director | /api/designer | /api/gestor | /api/outreach
-  const AGENTES_VALIDOS = ["director", "designer", "gestor", "outreach"];
+  // ── ROTA UNIFICADA SLACK — multi-agente ──────────────────────────────────
+  // POST /api/slack — despacha para 1+ agentes com Magic Prompt
+  if (req.method === "POST" && pathname === "/api/slack") {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const body = await lerBody(req);
+      const { mensagem, historicoPorAgente = {} } = body;
+      if (!mensagem || !mensagem.trim()) {
+        return enviarJson(res, 400, { erro: "mensagem é obrigatória." });
+      }
+      if (mensagem.length > 2000) {
+        return enviarJson(res, 400, { erro: "Mensagem muito longa. Máximo 2000 caracteres." });
+      }
+
+      // Detectar agentes explícitos ou inferir pelo conteúdo
+      let agentesAlvo = parseAgentes(mensagem);
+      if (!agentesAlvo) agentesAlvo = [inferirAgente(mensagem)];
+
+      console.log(`[Slack] Despachando para: ${agentesAlvo.join(", ")}`);
+
+      const resultados = await Promise.allSettled(
+        agentesAlvo.map(async (agente) => {
+          // Histórico relevante do agente (últimas 4 mensagens)
+          const histRaw = historicoPorAgente[agente] || [];
+          const hist = histRaw.slice(-4).map(m => ({
+            role: m.tipo === "user" ? "user" : "assistant",
+            content: m.text || ""
+          }));
+
+          // Magic Prompt enriquece o input
+          const inputFinal = await magicPrompt(mensagem, agente, null);
+
+          const systemPrompt = PROMPTS_AGENTES[agente];
+          if (!systemPrompt) throw new Error(`Agente "${agente}" não configurado.`);
+
+          const msgs = [
+            { role: "system", content: systemPrompt },
+            ...hist,
+            { role: "user", content: inputFinal }
+          ];
+
+          const completion = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: msgs,
+            response_format: { type: "json_object" },
+            temperature: 0.35,
+            max_tokens: 1200,
+          });
+
+          const raw = completion.choices[0].message.content;
+          let parsed;
+          try { parsed = JSON.parse(raw); } catch { parsed = { resposta: raw, acao: null }; }
+          if (!ACOES_VALIDAS.has(parsed.acao)) parsed.acao = null;
+
+          // Atualiza histórico server-side do agente
+          if (!historicoAgentes[agente]) historicoAgentes[agente] = [];
+          historicoAgentes[agente].push({ role: "user", content: inputFinal });
+          historicoAgentes[agente].push({ role: "assistant", content: raw });
+          if (historicoAgentes[agente].length > 8) {
+            historicoAgentes[agente] = historicoAgentes[agente].slice(-8);
+          }
+
+          return { agente, resposta: parsed.resposta || "", acao: parsed.acao || null };
+        })
+      );
+
+      const respostas = resultados.map((r, i) => {
+        if (r.status === "fulfilled") return r.value;
+        console.error(`[Slack] Falha no agente ${agentesAlvo[i]}:`, r.reason?.message);
+        return { agente: agentesAlvo[i], resposta: "Erro ao processar. Tente novamente.", acao: null, erro: true };
+      });
+
+      console.log(`[OK] Slack: ${respostas.length} resposta(s).`);
+      return enviarJson(res, 200, { respostas });
+    } catch (err) {
+      console.error("ERRO /api/slack:", err.message);
+      return enviarJson(res, 500, { erro: err.message });
+    }
+  }
+
+  // ── ROTAS DE AGENTES INDIVIDUAIS ──────────────────────────────────────────
+  // POST /api/director | /api/designer | /api/gestor | /api/outreach | + novos
+  const AGENTES_VALIDOS = TODOS_AGENTES;
   const nomeAgente = pathname.replace("/api/", "");
   if (req.method === "POST" && AGENTES_VALIDOS.includes(nomeAgente)) {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -2984,9 +3265,12 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
         }
       }
 
+      // Magic Prompt — enriquece input antes de enviar ao agente
+      const inputEnriquecido = await magicPrompt(texto, nomeAgente, autoContext && autoContext.trim() ? autoContext : null);
+
       const userContent = autoContext && autoContext.trim()
-        ? `Contexto: ${autoContext.trim()}\n\n${texto}`
-        : texto;
+        ? `Contexto: ${autoContext.trim()}\n\n${inputEnriquecido}`
+        : inputEnriquecido;
 
       const messages = [
         { role: "system", content: systemPrompt },
@@ -2995,11 +3279,11 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
       ];
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-4o",
         messages,
         response_format: { type: "json_object" },
         temperature: 0.35,
-        max_tokens: 1000
+        max_tokens: 1200,
       });
 
       const rawText = completion.choices[0].message.content;
@@ -3009,18 +3293,20 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
       // Valida acao contra enum (sem "executar")
       if (!ACOES_VALIDAS.has(parsed.acao)) parsed.acao = null;
 
-      // Atualiza histórico — mantém últimas 6 msgs (3 trocas)
+      // Atualiza histórico — mantém últimas 8 msgs (4 trocas)
       historicoAgentes[nomeAgente].push({ role: "user", content: userContent });
       historicoAgentes[nomeAgente].push({ role: "assistant", content: rawText });
-      if (historicoAgentes[nomeAgente].length > 6) {
-        historicoAgentes[nomeAgente] = historicoAgentes[nomeAgente].slice(-6);
+      if (historicoAgentes[nomeAgente].length > 8) {
+        historicoAgentes[nomeAgente] = historicoAgentes[nomeAgente].slice(-8);
       }
 
-      console.log(`[OK] Agente ${nomeAgente} respondeu. Trocas no contexto: ${historicoAgentes[nomeAgente].length / 2}/3`);
+      const trocas = historicoAgentes[nomeAgente].length / 2;
+      console.log(`[OK] Agente ${nomeAgente} respondeu (gpt-4o + Magic Prompt). Trocas: ${trocas}/4`);
       return enviarJson(res, 200, {
+        agente: nomeAgente,
         resposta: parsed.resposta || "",
         acao: parsed.acao || null,
-        trocas: historicoAgentes[nomeAgente].length / 2
+        trocas,
       });
 
     } catch (err) {
@@ -3035,12 +3321,12 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
     try {
       const body = await lerBody(req);
       const { agente } = body;
-      if (agente && historicoAgentes[agente] !== undefined) {
+      if (agente && TODOS_AGENTES.includes(agente)) {
         historicoAgentes[agente] = [];
         return enviarJson(res, 200, { ok: true, agente });
       }
       // Reset todos
-      Object.keys(historicoAgentes).forEach(k => { historicoAgentes[k] = []; });
+      TODOS_AGENTES.forEach(k => { historicoAgentes[k] = []; });
       return enviarJson(res, 200, { ok: true, agente: "todos" });
     } catch (err) {
       return enviarJson(res, 500, { erro: err.message });

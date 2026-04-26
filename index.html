@@ -2687,12 +2687,250 @@
       max-width: 300px;
     }
 
-    /* ── AGENTES UI ───────────────────────────────────────────────────────── */
+    /* ── AGENTES UI (legado — mantido para compatibilidade) ──────────────── */
     .agentes-container {
       display: flex;
       flex-direction: column;
       height: 100%;
       gap: 0;
+    }
+
+    /* ── SLACK INTERNO ────────────────────────────────────────────────────── */
+    .slack-layout {
+      display: flex;
+      height: 100%;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Sidebar */
+    .slack-sidebar {
+      width: 210px;
+      flex-shrink: 0;
+      background: rgba(0,0,0,0.18);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 14px 0 20px;
+      scrollbar-width: thin;
+    }
+    .slack-sidebar-section-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--text-3);
+      padding: 10px 16px 4px;
+    }
+    .slack-channel-btn {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 16px;
+      width: 100%;
+      background: none;
+      border: none;
+      color: var(--text-2);
+      font-size: 13px;
+      text-align: left;
+      cursor: pointer;
+      transition: background 110ms, color 110ms;
+      border-radius: 0;
+      white-space: nowrap;
+    }
+    .slack-channel-btn:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+    .slack-channel-btn.ativo { background: rgba(99,102,241,0.14); color: var(--text); font-weight: 600; }
+    .slack-channel-btn.ativo .slack-ch-prefix { color: var(--primary); }
+    .slack-ch-prefix { font-size: 12px; color: var(--text-3); font-weight: 500; min-width: 12px; }
+
+    /* Chat area */
+    .slack-chat {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 0;
+    }
+    .slack-chat-header {
+      padding: 11px 18px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .slack-chat-header-info { flex: 1; min-width: 0; }
+    .slack-chat-header-title { font-size: 14px; font-weight: 700; color: var(--text); }
+    .slack-chat-header-desc  { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+    .slack-sidebar-toggle {
+      display: none;
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      border-radius: 6px;
+      padding: 4px 8px;
+      cursor: pointer;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .slack-sidebar-toggle:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+
+    /* Feed */
+    .slack-feed {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      scrollbar-width: thin;
+    }
+    .slack-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      height: 100%;
+      opacity: 0.5;
+    }
+    .slack-empty p { font-size: 13px; color: var(--text-2); margin: 0; }
+    .slack-empty span { font-size: 11px; color: var(--text-3); text-align: center; max-width: 220px; }
+
+    /* Messages */
+    .slack-msg-user {
+      align-self: flex-end;
+      background: rgba(99,102,241,0.14);
+      border: 1px solid rgba(99,102,241,0.22);
+      color: var(--text);
+      padding: 9px 14px;
+      border-radius: 12px 12px 2px 12px;
+      font-size: 13px;
+      max-width: 76%;
+      word-break: break-word;
+      line-height: 1.55;
+    }
+    .slack-msg-agent-wrap {
+      align-self: flex-start;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      max-width: 82%;
+    }
+    .slack-msg-badge {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--primary);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding-left: 2px;
+    }
+    .slack-msg-agent {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 9px 14px;
+      border-radius: 2px 12px 12px 12px;
+      font-size: 13px;
+      word-break: break-word;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+    .slack-msg-agent.erro { border-color: rgba(239,68,68,0.3); color: #f87171; }
+    .slack-msg-agent.loading { opacity: 0.6; }
+    .slack-msg-acao {
+      margin-top: 4px;
+      padding-left: 2px;
+    }
+
+    /* Chips */
+    .slack-chips-bar {
+      padding: 8px 14px 6px;
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+      border-top: 1px solid var(--border);
+    }
+    .slack-chip {
+      background: rgba(99,102,241,0.08);
+      border: 1px solid rgba(99,102,241,0.18);
+      color: var(--primary);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background 110ms;
+      white-space: nowrap;
+    }
+    .slack-chip:hover { background: rgba(99,102,241,0.18); }
+
+    /* Composer */
+    .slack-composer {
+      flex-shrink: 0;
+      border-top: 1px solid var(--border);
+    }
+    .slack-input-row {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+      padding: 10px 14px;
+      padding-bottom: max(10px, env(safe-area-inset-bottom));
+    }
+    .slack-textarea {
+      flex: 1;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      color: var(--text);
+      font-size: 13px;
+      padding: 9px 13px;
+      resize: none;
+      min-height: 38px;
+      max-height: 120px;
+      font-family: inherit;
+      line-height: 1.5;
+    }
+    .slack-textarea:focus { outline: none; border-color: rgba(99,102,241,0.4); }
+    .slack-textarea::placeholder { color: var(--text-3); }
+    .slack-send-btn {
+      background: var(--primary);
+      border: none;
+      color: white;
+      width: 36px;
+      height: 36px;
+      border-radius: var(--r-md);
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: opacity 120ms;
+    }
+    .slack-send-btn:hover { opacity: 0.85; }
+    .slack-send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* Mobile Slack */
+    @media (max-width: 768px) {
+      .slack-sidebar {
+        position: absolute;
+        left: -220px;
+        top: 0;
+        bottom: 0;
+        z-index: 20;
+        transition: left 200ms ease;
+        background: var(--surface-2);
+        border-right: 1px solid var(--border);
+        box-shadow: none;
+      }
+      .slack-sidebar.open {
+        left: 0;
+        box-shadow: 6px 0 24px rgba(0,0,0,0.45);
+      }
+      .slack-sidebar-toggle { display: flex; }
+      .slack-msg-user, .slack-msg-agent-wrap { max-width: 90%; }
     }
 
     .agentes-selector {
@@ -7217,60 +7455,392 @@
       } catch(e) { /* silently fail */ }
     }
 
-    // ── AGENTES UI ───────────────────────────────────────────────────────────
-    var agentesState = { agente: "director", carregando: false, trocas: 0 };
+    // ── SLACK INTERNO ─────────────────────────────────────────────────────────
+    var MAX_CHARS = 1500;
+    var MAX_TROCAS = 4;
 
-    var AGENTES_INFO = {
-      director: { label: "Director",  desc: "Estratégia comercial e priorização" },
-      designer: { label: "Designer",  desc: "Briefing visual e direção criativa" },
-      gestor:   { label: "Gestor",    desc: "Pipeline, CRM e follow-up" },
-      outreach: { label: "Outreach",  desc: "Mensagens de abordagem prontas" }
+    var SLACK_CANAIS = {
+      geral:    { prefix: "#", label: "geral",    desc: "Multi-agente — mencione @agente para direcionar" },
+      director: { prefix: "@", label: "director", desc: "Estratégia comercial e nicho" },
+      gestor:   { prefix: "@", label: "gestor",   desc: "Pipeline, CRM e follow-up" },
+      designer: { prefix: "@", label: "designer", desc: "Briefing criativo" },
+      outreach: { prefix: "@", label: "outreach", desc: "Mensagens de primeiro contato" },
+      analytics:{ prefix: "@", label: "analytics",desc: "Diagnóstico de campanhas Meta Ads" },
+      architect:{ prefix: "@", label: "architect",desc: "Arquitetura e planejamento de features" },
+      sdr:      { prefix: "@", label: "sdr",      desc: "Prompts SDR e copy comercial" },
+      growth:   { prefix: "@", label: "growth",   desc: "CRM ops, follow-up e persistência" },
+      pm:       { prefix: "@", label: "pm",       desc: "Produto, flows e interface" },
     };
 
-    var MAX_CHARS = 1500;
-    var MAX_TROCAS = 3;
+    var slackState = { canalAtivo: "geral", carregando: false };
 
-    // localStorage helpers
+    // ── localStorage helpers ────────────────────────────────────────────────
+    function slackCanalKey(canal) { return "lumyn_slack_" + canal; }
+    function salvarSlackLocal(canal, items) {
+      try { localStorage.setItem(slackCanalKey(canal), JSON.stringify(items.slice(-50))); } catch(e) {}
+    }
+    function lerSlackLocal(canal) {
+      try { return JSON.parse(localStorage.getItem(slackCanalKey(canal)) || "[]"); } catch(e) { return []; }
+    }
+    function limparSlackLocal(canal) {
+      try { localStorage.removeItem(slackCanalKey(canal)); } catch(e) {}
+    }
+
+    // Monta histórico por agente para enviar ao backend (evita enviar tudo)
+    function montarHistoricoPorAgente(items) {
+      var hist = {};
+      items.forEach(function(item) {
+        if (item.tipo === "agent" && item.agente) {
+          if (!hist[item.agente]) hist[item.agente] = [];
+          hist[item.agente].push({ tipo: "agent", text: item.text });
+        } else if (item.tipo === "user") {
+          // Adiciona msg do user ao histórico de todos os agentes que responderam antes
+          Object.keys(hist).forEach(function(ag) {
+            hist[ag].push({ tipo: "user", text: item.text });
+          });
+        }
+      });
+      // Mantém só as últimas 4 msgs por agente
+      Object.keys(hist).forEach(function(ag) { hist[ag] = hist[ag].slice(-4); });
+      return hist;
+    }
+
+    // ── Render helpers ──────────────────────────────────────────────────────
+    function criarBolhaUser(texto) {
+      var el = document.createElement("div");
+      el.className = "slack-msg-user";
+      el.textContent = texto;
+      return el;
+    }
+
+    function criarBolhaAgente(agente, texto, isError, isLoading) {
+      var wrap = document.createElement("div");
+      wrap.className = "slack-msg-agent-wrap";
+
+      var badge = document.createElement("div");
+      badge.className = "slack-msg-badge";
+      badge.textContent = "@" + agente;
+
+      var body = document.createElement("div");
+      body.className = "slack-msg-agent" + (isError ? " erro" : "") + (isLoading ? " loading" : "");
+      if (isLoading) {
+        body.innerHTML = '<span class="agente-dots"><span></span><span></span><span></span></span>';
+      } else {
+        body.textContent = texto;
+      }
+
+      wrap.appendChild(badge);
+      wrap.appendChild(body);
+      return { wrap, body };
+    }
+
+    function renderSlackFeed(feedEl, items) {
+      feedEl.innerHTML = "";
+      if (!items.length) return;
+      items.forEach(function(item) {
+        if (item.tipo === "user") {
+          feedEl.appendChild(criarBolhaUser(item.text));
+        } else if (item.tipo === "agent") {
+          var b = criarBolhaAgente(item.agente, item.text, item.erro, false);
+          feedEl.appendChild(b.wrap);
+          if (item.acao) {
+            var acaoEl = document.createElement("div");
+            acaoEl.className = "slack-msg-acao";
+            appendAcaoBtn(acaoEl, item.acao, item.text);
+            feedEl.appendChild(acaoEl);
+          }
+        }
+      });
+      feedEl.scrollTop = feedEl.scrollHeight;
+    }
+
+    // ── HTML do layout Slack ────────────────────────────────────────────────
+    function getSlackHTML() {
+      var ativo = slackState.canalAtivo;
+      var canal = SLACK_CANAIS[ativo] || SLACK_CANAIS.geral;
+      var agentesLista = Object.keys(SLACK_CANAIS).filter(function(k) { return k !== "geral"; });
+
+      var chipsHtml = "";
+      if (ativo === "geral") {
+        chipsHtml = '<div class="slack-chips-bar">' +
+          agentesLista.map(function(ag) {
+            return '<button class="slack-chip" data-agente="' + ag + '" type="button">@' + ag + '</button>';
+          }).join("") +
+          '</div>';
+      }
+
+      var sidebarItems = Object.entries(SLACK_CANAIS).map(function(entry) {
+        var key = entry[0]; var info = entry[1];
+        return '<button class="slack-channel-btn' + (ativo === key ? " ativo" : "") + '" data-canal="' + key + '" type="button">' +
+          '<span class="slack-ch-prefix">' + info.prefix + '</span>' + info.label +
+          '</button>';
+      }).join("");
+
+      return '<div class="slack-layout">' +
+        '<div class="slack-sidebar" id="slackSidebar">' +
+          '<div class="slack-sidebar-section-title">Canais</div>' +
+          '<button class="slack-channel-btn' + (ativo === "geral" ? " ativo" : "") + '" data-canal="geral" type="button">' +
+            '<span class="slack-ch-prefix">#</span>geral' +
+          '</button>' +
+          '<div class="slack-sidebar-section-title" style="margin-top:6px;">Agentes</div>' +
+          agentesLista.map(function(ag) {
+            var info = SLACK_CANAIS[ag];
+            return '<button class="slack-channel-btn' + (ativo === ag ? " ativo" : "") + '" data-canal="' + ag + '" type="button">' +
+              '<span class="slack-ch-prefix">' + info.prefix + '</span>' + ag +
+              '</button>';
+          }).join("") +
+        '</div>' +
+        '<div class="slack-chat">' +
+          '<div class="slack-chat-header">' +
+            '<button class="slack-sidebar-toggle" id="slackToggleBtn" type="button">☰</button>' +
+            '<div class="slack-chat-header-info">' +
+              '<div class="slack-chat-header-title">' + canal.prefix + canal.label + '</div>' +
+              '<div class="slack-chat-header-desc">' + canal.desc + '</div>' +
+            '</div>' +
+            '<button id="slackResetBtn" class="agentes-reset-btn" type="button" title="Limpar histórico">' +
+              '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5.1L1 10"/></svg>' +
+              ' Limpar' +
+            '</button>' +
+          '</div>' +
+          '<div class="slack-feed" id="slackFeed"></div>' +
+          '<div class="slack-composer">' +
+            chipsHtml +
+            '<div class="slack-input-row">' +
+              '<textarea id="slackInput" class="slack-textarea" placeholder="' +
+                (ativo === "geral" ? "Mencione @agente ou escreva — será roteado automaticamente…" : "Digite sua pergunta ou instrução… (Magic Prompt ativo)") +
+              '" rows="1" maxlength="' + MAX_CHARS + '"></textarea>' +
+              '<button id="slackSendBtn" class="slack-send-btn" type="button">↵</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }
+
+    // ── Inicializa Slack ────────────────────────────────────────────────────
+    function inicializarSlack() {
+      var feedEl    = document.getElementById("slackFeed");
+      var inputEl   = document.getElementById("slackInput");
+      var sendBtn   = document.getElementById("slackSendBtn");
+      var resetBtn  = document.getElementById("slackResetBtn");
+      var toggleBtn = document.getElementById("slackToggleBtn");
+      var sidebar   = document.getElementById("slackSidebar");
+
+      // Renderiza histórico salvo
+      var savedItems = lerSlackLocal(slackState.canalAtivo);
+      if (savedItems.length) renderSlackFeed(feedEl, savedItems);
+
+      // Auto-resize textarea
+      if (inputEl) {
+        inputEl.addEventListener("input", function() {
+          this.style.height = "auto";
+          this.style.height = Math.min(this.scrollHeight, 120) + "px";
+        });
+        inputEl.addEventListener("keydown", function(e) {
+          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviarSlack(); }
+        });
+      }
+
+      // Send button
+      if (sendBtn) sendBtn.addEventListener("click", enviarSlack);
+
+      // Reset canal
+      if (resetBtn) {
+        resetBtn.addEventListener("click", function() {
+          fetch("/api/agente/reset", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ agente: slackState.canalAtivo === "geral" ? null : slackState.canalAtivo })
+          }).catch(function(){});
+          limparSlackLocal(slackState.canalAtivo);
+          if (feedEl) feedEl.innerHTML = "";
+        });
+      }
+
+      // Mobile sidebar toggle
+      if (toggleBtn && sidebar) {
+        toggleBtn.addEventListener("click", function() {
+          sidebar.classList.toggle("open");
+        });
+        // Fechar sidebar ao clicar fora
+        document.addEventListener("click", function(e) {
+          if (sidebar.classList.contains("open") &&
+              !sidebar.contains(e.target) &&
+              e.target !== toggleBtn) {
+            sidebar.classList.remove("open");
+          }
+        }, true);
+      }
+
+      // Troca de canal na sidebar
+      cwBody.querySelectorAll(".slack-channel-btn").forEach(function(btn) {
+        btn.addEventListener("click", function() {
+          var novoCanal = this.getAttribute("data-canal");
+          if (novoCanal === slackState.canalAtivo) {
+            if (sidebar) sidebar.classList.remove("open");
+            return;
+          }
+          slackState.canalAtivo = novoCanal;
+          if (sidebar) sidebar.classList.remove("open");
+
+          // Rerenderiza o layout inteiro para o novo canal
+          cwBody.innerHTML = getSlackHTML();
+          inicializarSlack();
+        });
+      });
+
+      // Chips @agente no #geral
+      cwBody.querySelectorAll(".slack-chip").forEach(function(chip) {
+        chip.addEventListener("click", function() {
+          var ag = this.getAttribute("data-agente");
+          var inp = document.getElementById("slackInput");
+          if (!inp) return;
+          var val = inp.value;
+          if (!val.includes("@" + ag)) {
+            inp.value = (val ? val + " " : "") + "@" + ag + " ";
+          }
+          inp.focus();
+          inp.style.height = "auto";
+          inp.style.height = Math.min(inp.scrollHeight, 120) + "px";
+        });
+      });
+    }
+
+    // ── Enviar mensagem ─────────────────────────────────────────────────────
+    function enviarSlack() {
+      if (slackState.carregando) return;
+      var inputEl = document.getElementById("slackInput");
+      var sendBtn = document.getElementById("slackSendBtn");
+      var feedEl  = document.getElementById("slackFeed");
+      if (!inputEl || !feedEl) return;
+
+      var texto = inputEl.value.trim();
+      if (!texto || texto.length < 2) return;
+      if (texto.length > MAX_CHARS) return;
+
+      var canal = slackState.canalAtivo;
+      var items = lerSlackLocal(canal);
+
+      // Bolha do usuário
+      var userBubble = criarBolhaUser(texto);
+      feedEl.appendChild(userBubble);
+      feedEl.scrollTop = feedEl.scrollHeight;
+
+      // Salva msg do usuário
+      items.push({ tipo: "user", text: texto });
+      salvarSlackLocal(canal, items);
+
+      inputEl.value = "";
+      inputEl.style.height = "auto";
+      slackState.carregando = true;
+      if (sendBtn) { sendBtn.disabled = true; }
+
+      if (canal === "geral") {
+        // ── #geral: rota /api/slack (multi-agente) ──────────────────────────
+        var historicoPorAgente = montarHistoricoPorAgente(items.slice(0, -1));
+        var loadBubbles = {}; // agente → { wrap, body }
+
+        fetch("/api/slack", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mensagem: texto, historicoPorAgente: historicoPorAgente })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.erro) {
+            var eb = criarBolhaAgente("sistema", "Erro: " + data.erro, true, false);
+            feedEl.appendChild(eb.wrap);
+            items.push({ tipo: "agent", agente: "sistema", text: "Erro: " + data.erro, erro: true });
+          } else {
+            (data.respostas || []).forEach(function(r) {
+              var b = criarBolhaAgente(r.agente, r.resposta, r.erro, false);
+              feedEl.appendChild(b.wrap);
+              if (r.acao) {
+                var acaoEl = document.createElement("div");
+                acaoEl.className = "slack-msg-acao";
+                appendAcaoBtn(acaoEl, r.acao, r.resposta);
+                feedEl.appendChild(acaoEl);
+              }
+              items.push({ tipo: "agent", agente: r.agente, text: r.resposta, acao: r.acao || null, erro: r.erro || false });
+            });
+          }
+          salvarSlackLocal(canal, items);
+          feedEl.scrollTop = feedEl.scrollHeight;
+        })
+        .catch(function() {
+          var eb = criarBolhaAgente("sistema", "Erro de conexão. Verifique o servidor.", true, false);
+          feedEl.appendChild(eb.wrap);
+          feedEl.scrollTop = feedEl.scrollHeight;
+        })
+        .finally(function() {
+          slackState.carregando = false;
+          if (sendBtn) sendBtn.disabled = false;
+        });
+
+      } else {
+        // ── Canal individual: rota /api/{agente} ────────────────────────────
+        var loadBolha = criarBolhaAgente(canal, "", false, true);
+        feedEl.appendChild(loadBolha.wrap);
+        feedEl.scrollTop = feedEl.scrollHeight;
+
+        var histCanal = items.slice(0, -1).slice(-8).map(function(item) {
+          return { tipo: item.tipo, text: item.text };
+        });
+
+        fetch("/api/" + canal, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ input: texto })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          loadBolha.wrap.remove();
+          if (data.erro) {
+            var eb = criarBolhaAgente(canal, "Erro: " + data.erro, true, false);
+            feedEl.appendChild(eb.wrap);
+            items.push({ tipo: "agent", agente: canal, text: "Erro: " + data.erro, erro: true });
+          } else {
+            var b = criarBolhaAgente(data.agente || canal, data.resposta || "", false, false);
+            feedEl.appendChild(b.wrap);
+            if (data.acao) {
+              var acaoEl = document.createElement("div");
+              acaoEl.className = "slack-msg-acao";
+              appendAcaoBtn(acaoEl, data.acao, data.resposta || "");
+              feedEl.appendChild(acaoEl);
+            }
+            items.push({ tipo: "agent", agente: data.agente || canal, text: data.resposta || "", acao: data.acao || null });
+          }
+          salvarSlackLocal(canal, items);
+          feedEl.scrollTop = feedEl.scrollHeight;
+        })
+        .catch(function() {
+          loadBolha.wrap.remove();
+          var eb = criarBolhaAgente(canal, "Erro de conexão. Verifique o servidor.", true, false);
+          feedEl.appendChild(eb.wrap);
+          feedEl.scrollTop = feedEl.scrollHeight;
+        })
+        .finally(function() {
+          slackState.carregando = false;
+          if (sendBtn) sendBtn.disabled = false;
+        });
+      }
+    }
+
+    // ── Legado: manter appendAcaoBtn acessível (usada pelo Slack) ──────────
+    // localStorage helpers legado (mantidos para compatibilidade com reset de agente)
     function agenteChatKey(ag) { return "lumyn_chat_" + ag; }
-
     function salvarChatLocal(ag, items) {
       try { localStorage.setItem(agenteChatKey(ag), JSON.stringify(items.slice(-30))); } catch(e) {}
     }
-
     function lerChatLocal(ag) {
       try { return JSON.parse(localStorage.getItem(agenteChatKey(ag)) || "[]"); } catch(e) { return []; }
     }
-
     function limparChatLocal(ag) {
       try { localStorage.removeItem(agenteChatKey(ag)); } catch(e) {}
     }
 
-    // Render items into msgs container
-    function renderChatItems(msgsEl, emptyEl, items) {
-      msgsEl.innerHTML = "";
-      if (!items.length) { if (emptyEl) emptyEl.style.display = "flex"; return; }
-      if (emptyEl) emptyEl.style.display = "none";
-      items.forEach(function(item) {
-        if (item.tipo === "user") {
-          var b = document.createElement("div");
-          b.className = "agente-msg agente-msg-user";
-          b.textContent = item.text;
-          msgsEl.appendChild(b);
-        } else if (item.tipo === "bot") {
-          var b2 = document.createElement("div");
-          b2.className = "agente-msg agente-msg-bot";
-          b2.textContent = item.text;
-          msgsEl.appendChild(b2);
-          if (item.acao) appendAcaoBtn(msgsEl, item.acao, item.text);
-        } else if (item.tipo === "erro") {
-          var b3 = document.createElement("div");
-          b3.className = "agente-msg agente-msg-bot agente-msg-error";
-          b3.textContent = item.text;
-          msgsEl.appendChild(b3);
-        }
-      });
-      msgsEl.scrollTop = msgsEl.scrollHeight;
-    }
+    // ── LEGADO: getAgentesHTML e inicializarAgentesUI → delegam ao Slack ───
+    function getAgentesHTML() { return getSlackHTML(); }
+    function inicializarAgentesUI() { inicializarSlack(); }
 
     function appendAcaoBtn(msgsEl, acao, resposta) {
       var LABELS = { copiar: "Copiar resposta", claude_prompt: "Copiar como prompt Claude", salvar_crm: "Salvar no CRM" };
@@ -7343,217 +7913,6 @@
       msgsEl.appendChild(btn);
     }
 
-    function getAgentesHTML() {
-      var info = AGENTES_INFO[agentesState.agente];
-      return `<div class="agentes-container">
-        <div class="agentes-selector">
-          ${Object.entries(AGENTES_INFO).map(function(e) {
-            return `<button class="agente-tab${agentesState.agente === e[0] ? " agente-tab-active" : ""}" data-agente="${e[0]}" type="button">
-              <span class="agente-tab-label">${e[1].label}</span>
-              <span class="agente-tab-desc">${e[1].desc}</span>
-            </button>`;
-          }).join("")}
-        </div>
-        <div class="agentes-chat" id="agentesChatArea">
-          <div class="agentes-empty" id="agentesEmpty">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-            <p>Fale com o <strong>${info.label}</strong></p>
-            <span>${info.desc}</span>
-          </div>
-          <div id="agentesMsgs" class="agentes-msgs"></div>
-        </div>
-        <div class="agentes-input-area">
-          <textarea id="agentesInput" class="agentes-textarea" placeholder="Digite sua pergunta ou instrução… (Enter envia, Shift+Enter nova linha)" rows="3" maxlength="${MAX_CHARS}"></textarea>
-          <div class="agentes-meta">
-            <div class="agentes-trocas" id="agentesTrocas" title="Trocas no contexto do agente">
-              <span class="agentes-trocas-dots" id="agentesDotsEl">
-                <span class="trocas-dot"></span><span class="trocas-dot"></span><span class="trocas-dot"></span>
-              </span>
-              <span id="agentesTorcasLabel">0/3 trocas</span>
-            </div>
-            <span class="agentes-char-count" id="agentesCharCount">0/${MAX_CHARS}</span>
-          </div>
-          <div class="agentes-actions">
-            <button id="agentesResetBtn" class="agentes-reset-btn" type="button" title="Limpar histórico do agente">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5.1L1 10"/></svg>
-              Limpar contexto
-            </button>
-            <button id="agentesEnviarBtn" class="agentes-send-btn" type="button">Enviar</button>
-          </div>
-        </div>
-      </div>`;
-    }
-
-    function atualizarTrocasUI(n) {
-      agentesState.trocas = n || 0;
-      var label = document.getElementById("agentesTorcasLabel");
-      var dots = document.getElementById("agentesDotsEl");
-      if (label) label.textContent = agentesState.trocas + "/" + MAX_TROCAS + " trocas";
-      if (dots) {
-        Array.from(dots.children).forEach(function(dot, i) {
-          dot.classList.toggle("used", i < agentesState.trocas);
-        });
-      }
-    }
-
-    function inicializarAgentesUI() {
-      // Restore from localStorage
-      var savedItems = lerChatLocal(agentesState.agente);
-      var msgsEl = document.getElementById("agentesMsgs");
-      var emptyEl = document.getElementById("agentesEmpty");
-      if (savedItems.length) renderChatItems(msgsEl, emptyEl, savedItems);
-
-      // Tab switching — saves current + loads new
-      cwBody.querySelectorAll(".agente-tab").forEach(function(tab) {
-        tab.addEventListener("click", function() {
-          var prev = agentesState.agente;
-          cwBody.querySelectorAll(".agente-tab").forEach(function(t) { t.classList.remove("agente-tab-active"); });
-          this.classList.add("agente-tab-active");
-          agentesState.agente = this.getAttribute("data-agente");
-          agentesState.trocas = 0;
-
-          var curMsgs = document.getElementById("agentesMsgs");
-          var curEmpty = document.getElementById("agentesEmpty");
-
-          // Load new agent's stored chat
-          var items = lerChatLocal(agentesState.agente);
-          renderChatItems(curMsgs, curEmpty, items);
-          atualizarTrocasUI(0);
-
-          // Update empty state label
-          if (curEmpty) {
-            var p = curEmpty.querySelector("p");
-            var s = curEmpty.querySelector("span");
-            if (p) p.innerHTML = "Fale com o <strong>" + AGENTES_INFO[agentesState.agente].label + "</strong>";
-            if (s) s.textContent = AGENTES_INFO[agentesState.agente].desc;
-          }
-
-          // Update placeholder
-          var inputEl2 = document.getElementById("agentesInput");
-          if (inputEl2) inputEl2.value = "";
-          var cc = document.getElementById("agentesCharCount");
-          if (cc) cc.textContent = "0/" + MAX_CHARS;
-        });
-      });
-
-      // Reset button
-      var resetBtn = document.getElementById("agentesResetBtn");
-      if (resetBtn) {
-        resetBtn.addEventListener("click", function() {
-          fetch("/api/agente/reset", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ agente: agentesState.agente })
-          });
-          limparChatLocal(agentesState.agente);
-          var msgsR = document.getElementById("agentesMsgs");
-          var emptyR = document.getElementById("agentesEmpty");
-          if (msgsR) msgsR.innerHTML = "";
-          if (emptyR) emptyR.style.display = "flex";
-          atualizarTrocasUI(0);
-        });
-      }
-
-      var sendBtn = document.getElementById("agentesEnviarBtn");
-      var inputEl = document.getElementById("agentesInput");
-
-      // Char counter
-      if (inputEl) {
-        inputEl.addEventListener("input", function() {
-          this.style.height = "auto";
-          this.style.height = Math.min(this.scrollHeight, 140) + "px";
-          var len = this.value.length;
-          var cc = document.getElementById("agentesCharCount");
-          if (cc) {
-            cc.textContent = len + "/" + MAX_CHARS;
-            cc.classList.toggle("over", len > MAX_CHARS - 50);
-          }
-        });
-      }
-
-      function enviarMensagem() {
-        if (agentesState.carregando) return;
-        var texto = inputEl ? inputEl.value.trim() : "";
-        if (!texto || texto.length < 3) return;
-        if (texto.length > MAX_CHARS) { alert("Mensagem muito longa. Máximo " + MAX_CHARS + " caracteres."); return; }
-
-        var msgsA = document.getElementById("agentesMsgs");
-        var emptyA = document.getElementById("agentesEmpty");
-        if (emptyA) emptyA.style.display = "none";
-
-        var userBubble = document.createElement("div");
-        userBubble.className = "agente-msg agente-msg-user";
-        userBubble.textContent = texto;
-        msgsA.appendChild(userBubble);
-
-        var loadBubble = document.createElement("div");
-        loadBubble.className = "agente-msg agente-msg-bot agente-msg-loading";
-        loadBubble.innerHTML = '<span class="agente-dots"><span></span><span></span><span></span></span>';
-        msgsA.appendChild(loadBubble);
-        msgsA.scrollTop = msgsA.scrollHeight;
-
-        inputEl.value = "";
-        inputEl.style.height = "auto";
-        var cc2 = document.getElementById("agentesCharCount");
-        if (cc2) cc2.textContent = "0/" + MAX_CHARS;
-
-        agentesState.carregando = true;
-        if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = "Aguarde…"; }
-
-        fetch("/api/" + agentesState.agente, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ input: texto })
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          loadBubble.remove();
-          if (data.erro) {
-            var errBubble = document.createElement("div");
-            errBubble.className = "agente-msg agente-msg-bot agente-msg-error";
-            errBubble.textContent = "Erro: " + data.erro;
-            msgsA.appendChild(errBubble);
-            // Save to local with error
-            var stored = lerChatLocal(agentesState.agente);
-            stored.push({ tipo: "user", text: texto });
-            stored.push({ tipo: "erro", text: "Erro: " + data.erro });
-            salvarChatLocal(agentesState.agente, stored);
-          } else {
-            var botBubble = document.createElement("div");
-            botBubble.className = "agente-msg agente-msg-bot";
-            botBubble.textContent = data.resposta || "";
-            msgsA.appendChild(botBubble);
-            if (data.acao) appendAcaoBtn(msgsA, data.acao, data.resposta || "");
-            if (data.trocas !== undefined) atualizarTrocasUI(data.trocas);
-            // Persist chat
-            var stored2 = lerChatLocal(agentesState.agente);
-            stored2.push({ tipo: "user", text: texto });
-            stored2.push({ tipo: "bot", text: data.resposta || "", acao: data.acao || null });
-            salvarChatLocal(agentesState.agente, stored2);
-          }
-          msgsA.scrollTop = msgsA.scrollHeight;
-        })
-        .catch(function() {
-          loadBubble.remove();
-          var errB = document.createElement("div");
-          errB.className = "agente-msg agente-msg-bot agente-msg-error";
-          errB.textContent = "Erro de conexão. Verifique o servidor.";
-          msgsA.appendChild(errB);
-          msgsA.scrollTop = msgsA.scrollHeight;
-        })
-        .finally(function() {
-          agentesState.carregando = false;
-          if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = "Enviar"; }
-        });
-      }
-
-      if (sendBtn) sendBtn.addEventListener("click", enviarMensagem);
-      if (inputEl) {
-        inputEl.addEventListener("keydown", function(e) {
-          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviarMensagem(); }
-        });
-      }
-    }
     // ─────────────────────────────────────────────────────────────────────────
 
     function abrirCW(view) {
