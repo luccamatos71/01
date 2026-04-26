@@ -57,7 +57,7 @@ function verificarRateLimit(agente) {
   return true;
 }
 
-// Função interna: chama Outreach para gerar mensagem
+// Função interna: chama Outreach para gerar mensagem (usada pelo chat do agente)
 async function chamarOutreachInterno(input, context) {
   const systemPrompt = PROMPTS_AGENTES.outreach;
   const messages = [
@@ -75,6 +75,64 @@ async function chamarOutreachInterno(input, context) {
   let parsed;
   try { parsed = JSON.parse(rawText); } catch { parsed = { resposta: rawText }; }
   return parsed.resposta || "";
+}
+
+// Gera 5 variações de mensagem para um lead (chamada manual pelo usuário)
+async function gerarVariacoesOutreach(lead) {
+  const nome      = lead.nome      || "negócio";
+  const categoria = lead.categoria || "negócio local";
+  const endereco  = lead.endereco  || "não informado";
+
+  const systemPrompt = `Você é especialista em Outreach da Lumyn. Gera 5 variações de mensagem WhatsApp para prospecção local.
+
+REGRA DE TOM (obrigatória):
+- Barbearia, restaurante, loja, pizzaria, pet shop: abertura "Fala," — informal
+- Clínica, escola, coaching, academia, salão: abertura "Olá," — acessível
+- Advocacia, contabilidade, consultoria, imobiliária: sem gírias, tom consultivo
+
+ESTRUTURA: máximo 3 linhas por mensagem. Observe o negócio. Nunca cite avaliações, notas ou dados técnicos.
+
+PROIBIDO em todas as variações:
+× "Vi suas avaliações no Google"
+× "Identifiquei uma oportunidade"
+× "Faço parte de uma equipe/empresa"
+× mensagem genérica que serviria para qualquer negócio do mesmo nicho
+
+Retorne APENAS JSON válido com exatamente estas 5 chaves:
+{
+  "leve": "abre porta sem pressão, tom leve",
+  "direta": "objetiva, padrão, vai direto ao ponto",
+  "provocativa": "aponta dor do nicho sem ser agressiva",
+  "followup": "acompanhamento para quem não respondeu",
+  "reuniao": "convite direto para conversa de 15-20 min"
+}`;
+
+  const userMsg = `Negócio: ${nome}\nNicho: ${categoria}\nLocalização: ${endereco}`;
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMsg }
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0.45,
+    max_tokens: 600
+  });
+
+  const raw = completion.choices[0].message.content;
+  try {
+    const parsed = JSON.parse(raw);
+    return {
+      leve:        parsed.leve        || "",
+      direta:      parsed.direta      || "",
+      provocativa: parsed.provocativa || "",
+      followup:    parsed.followup    || "",
+      reuniao:     parsed.reuniao     || ""
+    };
+  } catch {
+    return { leve: "", direta: "", provocativa: "", followup: "", reuniao: "" };
+  }
 }
 
 const PROMPTS_AGENTES = {
@@ -1483,16 +1541,11 @@ async function handler(req, res) {
           console.log(`[OK] Manual ${ehNovo ? "nova análise" : "follow-up"} concluído.`);
         } else {
           resposta = await gerarAnaliseManual(mensagem);
-          // Gerar mensagem via Outreach com base no cenário
-          const mensagem_pronta = await chamarOutreachInterno(
-            `Gera mensagem de abordagem baseado neste cenário: ${mensagem}`,
-            resposta
-          ).catch(() => "");
-          estadoManual = { cenarioOriginal: mensagem, analiseAtual: resposta, mensagem_pronta };
-          console.log("[OK] Análise manual + mensagem concluída.");
+          estadoManual = { cenarioOriginal: mensagem, analiseAtual: resposta };
+          console.log("[OK] Análise manual concluída.");
         }
 
-        return enviarJson(res, 200, { modo: "manual", resposta, mensagem: estadoManual.mensagem_pronta || "" });
+        return enviarJson(res, 200, { modo: "manual", resposta });
       }
 
       // 🔍 BUSCAR
@@ -1604,17 +1657,6 @@ async function handler(req, res) {
             )
           );
           leadsParaAnalisar.forEach((l, i) => { l.analise = analises[i]; });
-
-          // Gerar mensagem via Outreach para cada lead
-          const mensagens = await Promise.all(
-            leadsParaAnalisar.map((l) =>
-              chamarOutreachInterno(
-                `Gera mensagem de abordagem para ${l.categoria || "negócio"} chamado ${l.nome}${l.telefone ? ` (${l.telefone})` : ""}`,
-                `Localização: ${l.endereco || "desconhecida"}. Rating: ${l.nota || "sem nota"}. Avaliações: ${l.avaliacoes || 0}`
-              ).catch(() => null)
-            )
-          );
-          leadsParaAnalisar.forEach((l, i) => { l.mensagem = mensagens[i]; });
         }
 
         const resumo = {
@@ -2023,36 +2065,36 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
     }
   }
 
-  // POST /api/crm/mensagem  { lead, tipo }
-  // Delegado ao Outreach Agent para geração centralizada de mensagens
+  // POST /api/crm/mensagem  { lead }
+  // Gera 5 variações de mensagem via Outreach para o lead do CRM
   if (req.method === "POST" && pathname === "/api/crm/mensagem") {
     try {
       const body = await lerBody(req);
-      const { lead, tipo } = body;
-      if (!lead || !tipo) return enviarJson(res, 400, { erro: "lead e tipo são obrigatórios." });
+      const { lead } = body;
+      if (!lead || !lead.nome) return enviarJson(res, 400, { erro: "lead com nome é obrigatório." });
 
-      const nome   = lead.nome || "lead";
-      const nicho  = lead.categoria || "negócio local";
-      const status = lead.status || "novo";
-      const estilo = body.estilo || "direto";
-
-      // Mapear tipo para instrução para Outreach
-      const instrucoes = {
-        abordagem: `Gera primeira mensagem de abordagem para ${nicho} chamado ${nome}. Tom: ${estilo}.`,
-        followup:  `Gera mensagem de follow-up (sem repetição) para ${nicho} ${nome} que não respondeu. Tom: ${estilo}.`,
-        reuniao:   `Gera convite para conversa de 15-20 min com ${nicho} ${nome} (status: ${status}). Tom: ${estilo}.`,
-      };
-
-      const instrucao = instrucoes[tipo];
-      if (!instrucao) return enviarJson(res, 400, { erro: "Tipo inválido. Use: abordagem, followup ou reuniao." });
-
-      const contexto = `Lead: ${nome} | Nicho: ${nicho} | Status: ${status} | Endereço: ${lead.endereco || "não informado"}`;
-      const mensagem = await chamarOutreachInterno(instrucao, contexto);
-
-      console.log(`[CRM] Mensagem gerada via Outreach (${tipo}): ${nome}`);
-      return enviarJson(res, 200, { mensagem });
+      const variacoes = await gerarVariacoesOutreach(lead);
+      console.log(`[CRM] Variações geradas via Outreach: ${lead.nome}`);
+      return enviarJson(res, 200, { variacoes });
     } catch (err) {
       console.error("ERRO /api/crm/mensagem:", err.message);
+      return enviarJson(res, 500, { erro: err.message });
+    }
+  }
+
+  // POST /api/gerar-variacoes  { lead }
+  // Gera 5 variações de mensagem via Outreach (usado pelo drawer de prospecção)
+  if (req.method === "POST" && pathname === "/api/gerar-variacoes") {
+    try {
+      const body = await lerBody(req);
+      const { lead } = body;
+      if (!lead || !lead.nome) return enviarJson(res, 400, { erro: "lead com nome é obrigatório." });
+
+      const variacoes = await gerarVariacoesOutreach(lead);
+      console.log(`[OK] Variações geradas: ${lead.nome}`);
+      return enviarJson(res, 200, { variacoes });
+    } catch (err) {
+      console.error("ERRO /api/gerar-variacoes:", err.message);
       return enviarJson(res, 500, { erro: err.message });
     }
   }

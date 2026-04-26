@@ -957,6 +957,38 @@
       gap: 6px;
       margin-bottom: 10px;
     }
+    .estilo-tabs.outreach-tabs {
+      grid-template-columns: repeat(5, 1fr);
+    }
+    @media (max-width: 520px) {
+      .estilo-tabs.outreach-tabs { grid-template-columns: repeat(3, 1fr); }
+    }
+    .outreach-gerar-btn {
+      width: 100%;
+      background: var(--primary-dim);
+      border: 1px solid var(--primary-border);
+      border-radius: var(--r-md);
+      color: #a5b4fc;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px 16px;
+      cursor: pointer;
+      transition: background 0.15s;
+      margin-top: 4px;
+    }
+    .outreach-gerar-btn:hover { background: rgba(99,102,241,0.18); }
+    .outreach-regenerar-btn {
+      margin-top: 10px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      color: var(--text-2);
+      font-size: 11px;
+      padding: 5px 10px;
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+    .outreach-regenerar-btn:hover { color: var(--text); }
     .estilo-tab {
       background: transparent;
       border: 1px solid var(--border);
@@ -5355,12 +5387,24 @@
 
     let currentAnalysisText = "";
     let currentLead = null;
-    let currentEstilo = "direta"; // leve | direta | agressiva
-    let currentMensagens = { leve: "", direta: "", agressiva: "", quandoUsar: "", legado: "" };
+    let currentMsgText = ""; // Mensagem da aba selecionada no drawer
 
     function mensagemAtual() {
-      if (currentMensagens.legado) return currentMensagens.legado;
-      return currentMensagens[currentEstilo] || currentMensagens.direta || currentMensagens.leve || currentMensagens.agressiva || "";
+      return currentMsgText;
+    }
+
+    // ── OUTREACH CACHE (localStorage) ────────────────────────────────────────
+    function outreachCacheKey(lead) {
+      return `outreach_v_${lead?.id || lead?.nome || "?"}`;
+    }
+    function getOutreachCache(lead) {
+      try { return JSON.parse(localStorage.getItem(outreachCacheKey(lead)) || "null"); } catch { return null; }
+    }
+    function setOutreachCache(lead, variacoes) {
+      localStorage.setItem(outreachCacheKey(lead), JSON.stringify(variacoes));
+    }
+    function clearOutreachCache(lead) {
+      localStorage.removeItem(outreachCacheKey(lead));
     }
 
     // Fila de navegação entre leads
@@ -5399,55 +5443,104 @@
       cardMap.forEach(c => c.classList.remove("ativo"));
       currentAnalysisText = "";
       currentLead = null;
-      currentMensagens = { leve: "", direta: "", agressiva: "", quandoUsar: "", legado: "" };
+      currentMsgText = "";
     }
 
     function renderAnaliseNoDrawer(texto) {
       currentAnalysisText = texto || "";
-      currentMensagens = extrairMensagens(currentAnalysisText);
-
-      // Se legado (mensagem única), renderiza análise crua
-      if (currentMensagens.legado && !currentMensagens.leve && !currentMensagens.direta && !currentMensagens.agressiva) {
-        analysisDrawerBody.innerHTML = `<div class="analysis-text">${formatTextToHtml(currentAnalysisText)}</div>`;
-        return;
-      }
-
-      // Remove o bloco "Mensagem pronta: ..." da análise para mostrar em separado
+      // Remove o bloco "Mensagem pronta: ..." da análise para exibir limpo
       const analiseSemMsg = currentAnalysisText.replace(/Mensagem pronta:[\s\S]*$/i, "").trim();
-
-      const estilos = [
-        { key: "leve",      label: "Leve",      desc: "abre porta sem pressão" },
-        { key: "direta",    label: "Direta",    desc: "objetiva, padrão" },
-        { key: "agressiva", label: "Agressiva", desc: "aponta dor do nicho" },
-      ];
-
-      const tabsHtml = estilos.map(e => `
-        <button class="estilo-tab ${e.key === currentEstilo ? 'ativo' : ''}" data-estilo="${e.key}" type="button">
-          <span class="estilo-label">${e.label}</span>
-          <span class="estilo-desc">${e.desc}</span>
-        </button>`).join("");
-
-      const quandoUsar = currentMensagens.quandoUsar
-        ? `<div class="quando-usar"><b>Quando usar:</b> ${escapeHtml(currentMensagens.quandoUsar)}</div>`
-        : "";
-
       analysisDrawerBody.innerHTML = `
         <div class="analysis-text">${formatTextToHtml(analiseSemMsg)}</div>
+        <div id="variacoesSection"></div>
+      `;
+      // Renderizar variações (cache ou botão)
+      renderVariacoesSection(currentLead);
+    }
+
+    // Renderiza a seção de variações de mensagem no drawer (cache ou botão Gerar)
+    function renderVariacoesSection(lead) {
+      const section = document.getElementById("variacoesSection");
+      if (!section || !lead) return;
+
+      const cached = getOutreachCache(lead);
+      if (cached) {
+        renderVariacoesHTML(section, cached, lead);
+      } else {
+        section.innerHTML = `
+          <div class="mensagem-wrap">
+            <div class="mensagem-titulo">Mensagem de abordagem</div>
+            <button class="outreach-gerar-btn" id="btnGerarVariacoes" type="button">Gerar mensagem</button>
+          </div>`;
+        document.getElementById("btnGerarVariacoes")?.addEventListener("click", async () => {
+          await gerarEExibirVariacoes(lead, section);
+        });
+      }
+    }
+
+    // Chama API e exibe as 5 variações
+    async function gerarEExibirVariacoes(lead, section) {
+      if (!section) section = document.getElementById("variacoesSection");
+      if (!section) return;
+      section.innerHTML = `<div class="mensagem-wrap"><div class="loading"><span class="spinner"></span><span>Gerando mensagens...</span></div></div>`;
+      try {
+        const r = await fetch("/api/gerar-variacoes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lead })
+        });
+        const data = await r.json();
+        if (data.variacoes) {
+          setOutreachCache(lead, data.variacoes);
+          renderVariacoesHTML(section, data.variacoes, lead);
+        } else {
+          section.innerHTML = `<div class="mensagem-wrap"><div class="error-box">${escapeHtml(data.erro || "Erro ao gerar.")}</div></div>`;
+        }
+      } catch {
+        section.innerHTML = `<div class="mensagem-wrap"><div class="error-box">Erro de conexão.</div></div>`;
+      }
+    }
+
+    // Renderiza HTML das 5 variações em um container
+    function renderVariacoesHTML(container, variacoes, lead) {
+      const tipos = [
+        { key: "leve",        label: "Leve",        desc: "sem pressão" },
+        { key: "direta",      label: "Direta",      desc: "padrão" },
+        { key: "provocativa", label: "Provocativa", desc: "aponta dor" },
+        { key: "followup",    label: "Follow-up",   desc: "acompanhamento" },
+        { key: "reuniao",     label: "Reunião",      desc: "convite" },
+      ];
+      const tabsHtml = tipos.map((t, i) => `
+        <button class="estilo-tab ${i === 1 ? 'ativo' : ''}" data-tipo="${t.key}" type="button">
+          <span class="estilo-label">${t.label}</span>
+          <span class="estilo-desc">${t.desc}</span>
+        </button>`).join("");
+
+      const inicial = variacoes.direta || variacoes.leve || "";
+      currentMsgText = inicial;
+
+      container.innerHTML = `
         <div class="mensagem-wrap">
           <div class="mensagem-titulo">Mensagem de abordagem</div>
-          <div class="estilo-tabs">${tabsHtml}</div>
-          <div class="mensagem-box" id="mensagemBox">${escapeHtml(mensagemAtual())}</div>
-          ${quandoUsar}
-        </div>
-      `;
+          <div class="estilo-tabs outreach-tabs">${tabsHtml}</div>
+          <div class="mensagem-box" id="mensagemBox">${escapeHtml(inicial)}</div>
+          <button class="outreach-regenerar-btn" id="btnRegenerarVariacoes" type="button">Gerar novas variações</button>
+        </div>`;
 
-      analysisDrawerBody.querySelectorAll(".estilo-tab").forEach(btn => {
+      container.querySelectorAll(".estilo-tab").forEach(btn => {
         btn.addEventListener("click", () => {
-          currentEstilo = btn.dataset.estilo;
-          analysisDrawerBody.querySelectorAll(".estilo-tab").forEach(b => b.classList.toggle("ativo", b === btn));
-          const box = document.getElementById("mensagemBox");
-          if (box) box.textContent = mensagemAtual();
+          container.querySelectorAll(".estilo-tab").forEach(b => b.classList.toggle("ativo", b === btn));
+          const tipo = btn.dataset.tipo;
+          currentMsgText = variacoes[tipo] || "";
+          const box = container.querySelector("#mensagemBox");
+          if (box) box.textContent = currentMsgText;
         });
+      });
+
+      container.querySelector("#btnRegenerarVariacoes")?.addEventListener("click", async () => {
+        clearOutreachCache(lead);
+        currentMsgText = "";
+        await gerarEExibirVariacoes(lead, container);
       });
     }
 
@@ -5577,7 +5670,8 @@
         if (waBtn) {
           waBtn.addEventListener("click", (e) => {
             e.stopPropagation();
-            const msg = lead.analise ? extrairMensagemPronta(lead.analise) : "";
+            const cached = getOutreachCache(lead);
+            const msg = cached ? (cached.direta || cached.leve || "") : (lead.analise ? extrairMensagemPronta(lead.analise) : "");
             window.open(montarLinkWhatsApp(lead.telefone, msg), "_blank");
             marcarContatado(lead);
           });
@@ -5896,19 +5990,8 @@
 
         <div class="ficha-bloco" id="fichaSecaoMensagens">
           <div class="ficha-bloco-titulo">Mensagens</div>
-          <div class="ficha-estilo-tabs">
-            <button class="ficha-estilo-tab" data-estilo="leve">Leve</button>
-            <button class="ficha-estilo-tab ativo" data-estilo="direto">Direto</button>
-            <button class="ficha-estilo-tab" data-estilo="provocativo">Provocativo</button>
-          </div>
-          <div class="ficha-acoes-row" style="flex-wrap:wrap; gap:6px;">
-            <button class="ficha-btn" data-tipo="abordagem">1ª abordagem</button>
-            <button class="ficha-btn" data-tipo="followup">Follow-up</button>
-            <button class="ficha-btn" data-tipo="reuniao">Convite reunião</button>
-          </div>
-          <div id="fichaMensagemBox" style="display:none">
-            <div class="ficha-bloco-val textarea-like" id="fichaMensagemTexto"></div>
-            <button class="ficha-btn" id="btnCopiarMensagemGerada">Copiar mensagem</button>
+          <div id="fichaMensagensContent">
+            <button class="outreach-gerar-btn" id="btnGerarMsgCRM" type="button">Gerar mensagem</button>
           </div>
         </div>
 
@@ -5962,60 +6045,95 @@
         await carregarCRM();
       });
 
-      // Geração de mensagens
-      const fichaMensagemBox   = fichaBody.querySelector("#fichaMensagemBox");
-      const fichaMensagemTexto = fichaBody.querySelector("#fichaMensagemTexto");
-      const btnCopiarMensagemGerada = fichaBody.querySelector("#btnCopiarMensagemGerada");
+      // Mensagens via Outreach — cache localStorage por lead.id
+      const fichaMsgContainer = fichaBody.querySelector("#fichaMensagensContent");
+      const cacheKey = `outreach_crm_${lead.id}`;
 
-      let estiloAtivo = "direto";
-      fichaBody.querySelectorAll(".ficha-estilo-tab").forEach(tab => {
-        tab.addEventListener("click", () => {
-          fichaBody.querySelectorAll(".ficha-estilo-tab").forEach(t => t.classList.remove("ativo"));
-          tab.classList.add("ativo");
-          estiloAtivo = tab.dataset.estilo;
+      function renderFichaMsgCRM(variacoes) {
+        const tipos = [
+          { key: "leve",        label: "Leve",        desc: "sem pressão" },
+          { key: "direta",      label: "Direta",      desc: "padrão" },
+          { key: "provocativa", label: "Provocativa", desc: "aponta dor" },
+          { key: "followup",    label: "Follow-up",   desc: "acompanhamento" },
+          { key: "reuniao",     label: "Reunião",      desc: "convite" },
+        ];
+        const tabsHtml = tipos.map((t, i) => `
+          <button class="ficha-estilo-tab ${i === 1 ? 'ativo' : ''}" data-tipo="${t.key}" type="button">
+            ${t.label} <span style="opacity:.5; font-size:10px;">${t.desc}</span>
+          </button>`).join("");
+
+        const inicial = variacoes.direta || variacoes.leve || "";
+        fichaMsgContainer.innerHTML = `
+          <div class="ficha-estilo-tabs" style="flex-wrap:wrap;">${tabsHtml}</div>
+          <div class="ficha-bloco-val textarea-like" id="fichaMsgTexto">${escapeHtml(inicial)}</div>
+          <div class="ficha-acoes-row" style="gap:6px; flex-wrap:wrap;">
+            <button class="ficha-btn" id="btnCopiarFichaMsgNova">Copiar</button>
+            ${lead.telefone ? `<button class="ficha-btn primary" id="btnWaFichaMsgNova">WhatsApp</button>` : ""}
+            <button class="ficha-btn" id="btnRegerarFichaMsgNova">Gerar novas</button>
+          </div>`;
+
+        let textoAtivo = inicial;
+        fichaMsgContainer.querySelectorAll(".ficha-estilo-tab").forEach(btn => {
+          btn.addEventListener("click", () => {
+            fichaMsgContainer.querySelectorAll(".ficha-estilo-tab").forEach(b => b.classList.remove("ativo"));
+            btn.classList.add("ativo");
+            textoAtivo = variacoes[btn.dataset.tipo] || "";
+            const box = fichaMsgContainer.querySelector("#fichaMsgTexto");
+            if (box) box.textContent = textoAtivo;
+          });
         });
-      });
 
-      fichaBody.querySelectorAll("[data-tipo]").forEach(btn => {
-        btn.addEventListener("click", async () => {
-          const tipo = btn.dataset.tipo;
-          const labelOriginal = btn.textContent;
-          btn.disabled = true;
-          btn.textContent = "Gerando...";
-          fichaMensagemBox.style.display = "none";
+        fichaMsgContainer.querySelector("#btnCopiarFichaMsgNova")?.addEventListener("click", () => {
+          navigator.clipboard.writeText(textoAtivo).then(() => {
+            fichaMsgContainer.querySelector("#btnCopiarFichaMsgNova").textContent = "Copiado!";
+            setTimeout(() => { const b = fichaMsgContainer.querySelector("#btnCopiarFichaMsgNova"); if (b) b.textContent = "Copiar"; }, 1400);
+          });
+        });
 
-          try {
-            const r = await fetch("/api/crm/mensagem", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ lead, tipo, estilo: estiloAtivo }),
-            });
-            const data = await r.json();
-            if (data.mensagem) {
-              fichaMensagemTexto.textContent = data.mensagem;
-              fichaMensagemBox.style.display = "flex";
-              fichaMensagemBox.style.flexDirection = "column";
-              fichaMensagemBox.style.gap = "8px";
-            } else {
-              fichaMensagemTexto.textContent = data.erro || "Erro ao gerar.";
-              fichaMensagemBox.style.display = "block";
-            }
-          } catch {
-            fichaMensagemTexto.textContent = "Erro de conexão.";
-            fichaMensagemBox.style.display = "block";
-          } finally {
-            btn.disabled = false;
-            btn.textContent = labelOriginal;
+        fichaMsgContainer.querySelector("#btnWaFichaMsgNova")?.addEventListener("click", () => {
+          window.open(montarLinkWhatsApp(lead.telefone, textoAtivo), "_blank");
+        });
+
+        fichaMsgContainer.querySelector("#btnRegerarFichaMsgNova")?.addEventListener("click", async () => {
+          localStorage.removeItem(cacheKey);
+          await gerarFichaMsgCRM();
+        });
+      }
+
+      async function gerarFichaMsgCRM() {
+        fichaMsgContainer.innerHTML = `<div class="loading"><span class="spinner"></span><span>Gerando mensagens...</span></div>`;
+        try {
+          const r = await fetch("/api/crm/mensagem", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lead }),
+          });
+          const data = await r.json();
+          if (data.variacoes) {
+            localStorage.setItem(cacheKey, JSON.stringify(data.variacoes));
+            renderFichaMsgCRM(data.variacoes);
+          } else {
+            fichaMsgContainer.innerHTML = `<div class="error-box">${escapeHtml(data.erro || "Erro ao gerar.")}</div>`;
           }
-        });
-      });
+        } catch {
+          fichaMsgContainer.innerHTML = `<div class="error-box">Erro de conexão.</div>`;
+        }
+      }
 
-      btnCopiarMensagemGerada.addEventListener("click", () => {
-        navigator.clipboard.writeText(fichaMensagemTexto.textContent).then(() => {
-          btnCopiarMensagemGerada.textContent = "Copiado!";
-          setTimeout(() => { btnCopiarMensagemGerada.textContent = "Copiar mensagem"; }, 1400);
-        });
-      });
+      // Checar cache e inicializar seção de mensagens
+      try {
+        const cachedCRM = JSON.parse(localStorage.getItem(cacheKey) || "null");
+        if (cachedCRM) {
+          renderFichaMsgCRM(cachedCRM);
+        } else {
+          // Mostrar botão Gerar
+          fichaMsgContainer.querySelector("#btnGerarMsgCRM")?.addEventListener("click", async () => {
+            await gerarFichaMsgCRM();
+          });
+        }
+      } catch {
+        // Se localStorage falhar, apenas mostra o botão padrão
+      }
 
       const agora = new Date().toISOString();
 
@@ -6553,7 +6671,8 @@
           }
           if (!drawerAberto && leadHovered?.telefone) {
             e.preventDefault();
-            const msg = leadHovered.analise ? extrairMensagemPronta(leadHovered.analise) : "";
+            const cachedHov = getOutreachCache(leadHovered);
+            const msg = cachedHov ? (cachedHov.direta || cachedHov.leve || "") : (leadHovered.analise ? extrairMensagemPronta(leadHovered.analise) : "");
             window.open(montarLinkWhatsApp(leadHovered.telefone, msg), "_blank");
             marcarContatado(leadHovered);
             return;
