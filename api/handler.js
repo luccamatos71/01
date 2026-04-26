@@ -388,7 +388,15 @@ Se não tiver nome do negócio nem nicho claro: pergunte antes de gerar a mensag
 Use "acao":"copiar" sempre que gerar mensagem pronta para enviar.
 Responda em JSON: {"resposta":"...","acao":null}`,
 
-  analytics: `Você é o Analytics Agent da Lumyn — especialista em performance de campanhas Meta Ads.
+  analytics: `[AGENTE DESABILITADO PARA ANÁLISE DE TRÁFEGO]
+
+Para análise de campanhas Meta Ads com dados reais, use a rota dedicada de tráfego.
+
+SE PERGUNTA É SOBRE TRÁFEGO/CAMPANHAS:
+Responda: "Para análise de tráfego com dados reais, use o painel Gestor de Tráfego ou mensione a conta (Rivano/Com Tempero) que vou buscar os dados atualizados automaticamente."
+
+SE PERGUNTA É GENÉRICA (não sobre tráfego):
+Você é o Analytics Agent da Lumyn — especialista em performance de campanhas Meta Ads.
 
 Você pensa em: dinheiro, conversão, escala. Não tolera campanha fraca. Protege o orçamento.
 
@@ -3502,6 +3510,42 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
       TODOS_AGENTES.forEach(k => { historicoAgentes[k] = []; });
       return enviarJson(res, 200, { ok: true, agente: "todos" });
     } catch (err) {
+      return enviarJson(res, 500, { erro: err.message });
+    }
+  }
+
+  // POST /api/trafego — análise de tráfego com dados reais (para Slack)
+  if (req.method === "POST" && pathname === "/api/trafego") {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const body = await lerBody(req);
+      const { mensagem, accountKey = "rivano" } = body;
+      if (!mensagem || !mensagem.trim()) {
+        return enviarJson(res, 400, { erro: "mensagem é obrigatória." });
+      }
+
+      // Busca campanhas da conta
+      const campanhas = await buscarInsightsMeta(accountKey);
+      if (!campanhas || campanhas.length === 0) {
+        return enviarJson(res, 200, {
+          resposta: "Nenhuma campanha encontrada para análise nesta conta.",
+          acao: null,
+        });
+      }
+
+      // Pega primeira campanha como referência
+      const campanha = campanhas[0];
+
+      // Roda análise via @analytics com contexto enriquecido
+      const resultado = await analisarCampanha(campanha, mensagem, [], accountKey);
+
+      console.log(`[OK] Análise de tráfego no Slack (${accountKey}) — ${resultado.parsed?.acao}`);
+      return enviarJson(res, 200, {
+        resposta: `${resultado.parsed?.justificativa}\n\nAção: ${resultado.parsed?.acao}`,
+        acao: resultado.parsed?.acao || null,
+      });
+    } catch (err) {
+      console.error(`ERRO /api/trafego:`, err.message);
       return enviarJson(res, 500, { erro: err.message });
     }
   }
