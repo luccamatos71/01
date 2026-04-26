@@ -2360,10 +2360,10 @@ async function processarAgente(nomeAgente, input, context = "", historico = []) 
   // Se é @analytics + pergunta sobre tráfego, delega pra rota especializada
   if (nomeAgente === "analytics") {
     const msgLower = input.toLowerCase();
-    const temPalavrasTrafe = ["campanha", "tráfego", "ad", "ads", "roas", "ctr", "cpc", "criativo", "anúncio", "performance", "gasto", "análise"];
+    const temPalavrasTrafe = ["campanha", "tráfego", "ad", "ads", "roas", "ctr", "cpc", "criativo", "anúncio", "performance", "gasto", "análise", "gestor"];
     const temPalavra = temPalavrasTrafe.some(p => msgLower.includes(p));
 
-    if (temPalavra) {
+    if (temPalavra) {  // Sempre delega pra análise de tráfego
       try {
         // Detecta qual conta
         let accountKey = "rivano";
