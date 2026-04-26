@@ -21,6 +21,11 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 const META_AD_ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID;
+// Tokens e IDs por conta — fallback para variáveis globais se não definidas
+const META_TOKENS = {
+  rivano:      process.env.META_ACCESS_TOKEN_RIVANO      || process.env.META_ACCESS_TOKEN,
+  com_tempero: process.env.META_ACCESS_TOKEN_CONTEMPERO  || process.env.META_ACCESS_TOKEN,
+};
 const GOOGLE_GEMINI_API_KEY = process.env.GOOGLE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -45,6 +50,9 @@ let estadoManual = null; // { cenarioOriginal, analiseAtual }
 // Todos os thresholds vivem aqui. Nunca usar valores fixos no código ou prompt.
 const ACCOUNT_CONFIG = {
   rivano: {
+    // Identidade
+    name: "Rivano",
+    accountId: process.env.META_AD_ACCOUNT_ID || "",   // Lido do .env
     // Thresholds operacionais
     ctr_min: 0.8,
     cpc_max: 2.5,
@@ -68,16 +76,21 @@ const ACCOUNT_CONFIG = {
     proxima_fase: "Validar eventos de pixel (AddToCart, Purchase) no Events Manager antes de qualquer otimização de conversão",
   },
 
-  contempero: {
+  com_tempero: {
+    // Identidade
+    name: "Com Tempero",
+    accountId: process.env.META_AD_ACCOUNT_ID_CONTEMPERO || "519061177918794",
+    // Thresholds operacionais
     ctr_min: 1.2,
     cpc_max: 3.5,
     roas_min: 1.8,
     gasto_min_decisao: 30,
     frequencia_max: 3.5,
     conversoes_min_escala: 10,
-    tipo_produto: "restaurante / delivery",
-    ticket_medio: "R$40–80",
-    objetivo: "pedidos / delivery",
+    // Contexto de negócio
+    tipo_produto: "restaurante marmitaria fitness / delivery",
+    ticket_medio: "médio/alto",
+    objetivo: "pedidos",
     maturidade_conta: "intermediária",
     estagio_pixel: "com dados — histórico parcial de conversão",
     historico_testes: "Conta com histórico de campanhas de pedido. Métricas de referência estabelecidas.",
@@ -87,6 +100,8 @@ const ACCOUNT_CONFIG = {
   },
 
   _default: {
+    name: "Conta desconhecida",
+    accountId: "",
     ctr_min: 1.0,
     cpc_max: 5.0,
     roas_min: 1.5,
@@ -105,7 +120,9 @@ const ACCOUNT_CONFIG = {
   },
 };
 
-function getAccountConfig(nomeCampanha) {
+// Retorna config pelo accountKey direto (quando vem do frontend) ou por nome de campanha (fallback)
+function getAccountConfig(nomeCampanha, accountKey) {
+  if (accountKey && ACCOUNT_CONFIG[accountKey]) return ACCOUNT_CONFIG[accountKey];
   const nome = (nomeCampanha || "").toLowerCase();
   for (const [chave, config] of Object.entries(ACCOUNT_CONFIG)) {
     if (chave !== "_default" && nome.includes(chave)) return config;
@@ -113,12 +130,21 @@ function getAccountConfig(nomeCampanha) {
   return ACCOUNT_CONFIG._default;
 }
 
-function getAccountId(nomeCampanha) {
+// Retorna accountKey: usa direto se fornecido, senão tenta adivinhar pelo nome da campanha
+function getAccountId(nomeCampanha, accountKey) {
+  if (accountKey && ACCOUNT_CONFIG[accountKey]) return accountKey;
   const nome = (nomeCampanha || "").toLowerCase();
   for (const chave of Object.keys(ACCOUNT_CONFIG)) {
     if (chave !== "_default" && nome.includes(chave)) return chave;
   }
   return "_default";
+}
+
+// Retorna lista de contas disponíveis para o frontend (sem expor tokens ou IDs)
+function listarContas() {
+  return Object.entries(ACCOUNT_CONFIG)
+    .filter(([key]) => key !== "_default")
+    .map(([key, cfg]) => ({ key, name: cfg.name }));
 }
 
 // ── AGENTES ──────────────────────────────────────────────────────────────────
@@ -1499,17 +1525,26 @@ async function editarImagemGemini(base64Input, mimeType, promptEdicao) {
   });
 }
 
-async function buscarInsightsMeta() {
-  if (!META_ACCESS_TOKEN || !META_AD_ACCOUNT_ID) {
-    const err = new Error("API Meta não configurada. Adicione META_ACCESS_TOKEN e META_AD_ACCOUNT_ID nas variáveis de ambiente.");
+async function buscarInsightsMeta(accountKey) {
+  // Resolve token e accountId para a conta selecionada
+  const cfg = (accountKey && ACCOUNT_CONFIG[accountKey]) ? ACCOUNT_CONFIG[accountKey] : null;
+  const token     = (accountKey && META_TOKENS[accountKey]) ? META_TOKENS[accountKey] : META_ACCESS_TOKEN;
+  const accountId = cfg?.accountId || META_AD_ACCOUNT_ID;
+
+  if (!token || !accountId) {
+    const err = new Error(
+      accountKey
+        ? `Conta "${accountKey}" não configurada. Verifique META_ACCESS_TOKEN e META_AD_ACCOUNT_ID no .env.`
+        : "API Meta não configurada. Adicione META_ACCESS_TOKEN e META_AD_ACCOUNT_ID nas variáveis de ambiente."
+    );
     err.tipo = "config";
     throw err;
   }
 
   let resp;
   try {
-    // Buscar lista de campanhas
-    const urlCampanhas = `https://graph.facebook.com/v19.0/act_${META_AD_ACCOUNT_ID}/campaigns?fields=id,name,status&access_token=${META_ACCESS_TOKEN}`;
+    // Buscar lista de campanhas com objective para distinguir tráfego vs conversão
+    const urlCampanhas = `https://graph.facebook.com/v19.0/act_${accountId}/campaigns?fields=id,name,status,objective&access_token=${token}`;
     resp = await fetch(urlCampanhas);
   } catch (e) {
     const err = new Error("Sem conexão com a API do Meta. Verifique sua internet.");
@@ -1547,7 +1582,7 @@ async function buscarInsightsMeta() {
   const campanhasComInsights = await Promise.all(
     campanhas.map(async (camp) => {
       try {
-        const urlInsights = `https://graph.facebook.com/v19.0/${camp.id}/insights?fields=spend,impressions,clicks,cpc,ctr,cpm,frequency,actions,action_values&date_preset=last_30d&access_token=${META_ACCESS_TOKEN}`;
+        const urlInsights = `https://graph.facebook.com/v19.0/${camp.id}/insights?fields=spend,impressions,clicks,cpc,ctr,cpm,frequency,actions,action_values&date_preset=last_30d&access_token=${token}`;
         const respInsights = await fetch(urlInsights);
         const jsonInsights = await respInsights.json();
 
@@ -1604,7 +1639,8 @@ async function buscarInsightsMeta() {
           add_to_cart,
           initiate_checkout,
           // ── CONTEXTO DO GESTOR (não exibido na tabela) ─────────────
-          status:            camp.status  || null,
+          status:            camp.status    || null,
+          objective:         camp.objective || null,  // tipo de campanha da Meta (CONVERSIONS, TRAFFIC, etc.)
           impressoes,
           cliques,
           cpm,
@@ -2020,9 +2056,9 @@ function fallbackDeterministico(restricoes, campanha, accountConfig) {
 }
 
 // Orquestrador: 1 chamada IA + correção se necessário + fallback determinístico
-async function analisarCampanha(campanha, mensagem, historico) {
-  const accountConfig = getAccountConfig(campanha.campanha);
-  const accountId     = getAccountId(campanha.campanha);
+async function analisarCampanha(campanha, mensagem, historico, accountKey) {
+  const accountConfig = getAccountConfig(campanha.campanha, accountKey);
+  const accountId     = getAccountId(campanha.campanha, accountKey);
 
   // Carregar e mesclar restrições persistentes da conta
   const restricoesSalvas = carregarRestricoesConta(accountId);
@@ -2096,8 +2132,8 @@ async function analisarCampanha(campanha, mensagem, historico) {
 }
 
 // Formata resultado para o frontend — mantém compatibilidade com UI atual
-async function chatGestorTrafego(campanha, mensagem, historico) {
-  const { parsed, usouFallback } = await analisarCampanha(campanha, mensagem, historico);
+async function chatGestorTrafego(campanha, mensagem, historico, accountKey) {
+  const { parsed, usouFallback } = await analisarCampanha(campanha, mensagem, historico, accountKey);
 
   const linhas = [
     `Diagnóstico: ${parsed.base_dados}`,
@@ -2821,12 +2857,12 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const body = await lerBody(req);
-      const { campanha, mensagem, historico = [] } = body;
+      const { campanha, mensagem, historico = [], accountKey } = body;
       if (!campanha || !mensagem) {
         return enviarJson(res, 400, { erro: "campanha e mensagem são obrigatórios." });
       }
-      const resultado = await chatGestorTrafego(campanha, mensagem, historico);
-      console.log(`[OK] Chat tráfego — acao:${resultado.analise?.acao} confianca:${resultado.analise?.confianca}`);
+      const resultado = await chatGestorTrafego(campanha, mensagem, historico, accountKey || null);
+      console.log(`[OK] Chat tráfego (${accountKey || "auto"}) — acao:${resultado.analise?.acao} confianca:${resultado.analise?.confianca}`);
       return enviarJson(res, 200, resultado);
     } catch (err) {
       console.error("ERRO /ads/chat:", err.message);
@@ -2873,14 +2909,24 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
     }
   }
 
-  // GET /ads/insights
+  // GET /ads/accounts — lista contas disponíveis para o frontend
+  if (req.method === "GET" && pathname === "/ads/accounts") {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    return enviarJson(res, 200, { contas: listarContas() });
+  }
+
+  // GET /ads/insights?account=rivano
   if (req.method === "GET" && pathname === "/ads/insights") {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
-      const campanhas = await buscarInsightsMeta();
+      // Lê accountKey da query string — ?account=rivano ou ?account=com_tempero
+      const urlObj = new URL(req.url, `http://localhost`);
+      const accountKey = urlObj.searchParams.get("account") || null;
+      const campanhas = await buscarInsightsMeta(accountKey);
       // Só analisa se houver campanhas
       const analise = campanhas.length > 0 ? await analisarCampanhas(campanhas) : null;
-      console.log(`[OK] Insights Meta: ${campanhas.length} campanha(s).`);
+      const nomeConta = accountKey ? (ACCOUNT_CONFIG[accountKey]?.name || accountKey) : "conta padrão";
+      console.log(`[OK] Insights Meta (${nomeConta}): ${campanhas.length} campanha(s).`);
       return enviarJson(res, 200, { campanhas, analise });
     } catch (err) {
       console.error("ERRO Meta:", err.message);

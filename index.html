@@ -2215,6 +2215,34 @@
 
     .trafego-header-actions { display: flex; gap: 8px; align-items: center; }
 
+    /* Seletor de conta */
+    .trafego-account-selector {
+      display: flex;
+      gap: 4px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: 3px;
+    }
+    .trafego-account-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-3);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 120ms, color 120ms;
+      white-space: nowrap;
+    }
+    .trafego-account-btn:hover { color: var(--text-2); background: rgba(255,255,255,0.04); }
+    .trafego-account-btn.ativa {
+      background: var(--primary-dim);
+      color: var(--primary);
+      border: 1px solid var(--primary-border);
+    }
+
     .trafego-refresh-btn {
       background: transparent;
       border: 1px solid var(--border);
@@ -4612,7 +4640,11 @@
       <div class="trafego-header">
         <div>
           <h3>Gestor de Tráfego</h3>
-          <p>Campanhas Meta Ads — últimos 30 dias</p>
+          <p id="trafegoContaLabel">Campanhas Meta Ads — últimos 30 dias</p>
+        </div>
+        <div class="trafego-account-selector" id="trafegoAccountSelector">
+          <button class="trafego-account-btn ativa" data-account="rivano" type="button">Rivano</button>
+          <button class="trafego-account-btn" data-account="com_tempero" type="button">Com Tempero</button>
         </div>
         <div class="trafego-header-actions">
           <button id="trafegoRefreshBtn" class="trafego-refresh-btn" type="button">↻ Atualizar</button>
@@ -6437,22 +6469,47 @@
     // ============================================================
     //  GESTOR DE TRÁFEGO — assistente conversacional
     // ============================================================
-    const trafegoBtn         = document.getElementById("trafegoBtn");
-    const trafegoOverlay     = document.getElementById("trafegoOverlay");
-    const trafegoListCol     = document.getElementById("trafegoListCol");
-    const trafegoChatCol     = document.getElementById("trafegoChatCol");
+    const trafegoBtn          = document.getElementById("trafegoBtn");
+    const trafegoOverlay      = document.getElementById("trafegoOverlay");
+    const trafegoListCol      = document.getElementById("trafegoListCol");
+    const trafegoChatCol      = document.getElementById("trafegoChatCol");
     const trafegoCampanhaNome = document.getElementById("trafegoCampanhaNome");
-    const trafegoMetrics     = document.getElementById("trafegoMetrics");
-    const trafegoChatMsgs    = document.getElementById("trafegoChatMsgs");
-    const trafegoChatInput   = document.getElementById("trafegoChatInput");
-    const trafegoChatSendBtn = document.getElementById("trafegoChatSendBtn");
-    const trafegoRefreshBtn  = document.getElementById("trafegoRefreshBtn");
-    const trafegoCloseBtn    = document.getElementById("trafegoCloseBtn");
+    const trafegoMetrics      = document.getElementById("trafegoMetrics");
+    const trafegoChatMsgs     = document.getElementById("trafegoChatMsgs");
+    const trafegoChatInput    = document.getElementById("trafegoChatInput");
+    const trafegoChatSendBtn  = document.getElementById("trafegoChatSendBtn");
+    const trafegoRefreshBtn   = document.getElementById("trafegoRefreshBtn");
+    const trafegoCloseBtn     = document.getElementById("trafegoCloseBtn");
+    const trafegoContaLabel   = document.getElementById("trafegoContaLabel");
+    const trafegoAccountSelector = document.getElementById("trafegoAccountSelector");
 
     let campanhaAtiva = null;
     let historicoChatTrafego = [];
     let trafegoChatEnviando = false;
     let campanhasCache = [];
+    let contaAtiva = "rivano"; // conta selecionada — nunca expõe tokens ao frontend
+
+    // Troca de conta: reseta estado e recarrega campanhas
+    if (trafegoAccountSelector) {
+      trafegoAccountSelector.addEventListener("click", (e) => {
+        const btn = e.target.closest(".trafego-account-btn");
+        if (!btn) return;
+        const novaChave = btn.dataset.account;
+        if (novaChave === contaAtiva) return;
+        contaAtiva = novaChave;
+        // Atualiza visual do seletor
+        trafegoAccountSelector.querySelectorAll(".trafego-account-btn").forEach(b => {
+          b.classList.toggle("ativa", b.dataset.account === contaAtiva);
+        });
+        // Limpa estado da conta anterior
+        campanhaAtiva = null;
+        historicoChatTrafego = [];
+        trafegoChatCol.classList.remove("aberta");
+        trafegoListCol.classList.remove("comprimida");
+        // Recarrega campanhas da nova conta
+        carregarTrafego();
+      });
+    }
 
     function abrirTrafego() {
       trafegoOverlay.classList.add("open");
@@ -6468,6 +6525,10 @@
     }
 
     async function carregarTrafego() {
+      // Atualiza label da conta ativa
+      const nomesContas = { rivano: "Rivano", com_tempero: "Com Tempero" };
+      if (trafegoContaLabel) trafegoContaLabel.textContent = `${nomesContas[contaAtiva] || contaAtiva} — Meta Ads · últimos 30 dias`;
+
       trafegoListCol.innerHTML = '<div style="padding:40px; text-align:center; color:var(--text-3); font-size:12px;">Carregando campanhas...</div>';
       trafegoRefreshBtn.disabled = true;
       campanhaAtiva = null;
@@ -6475,7 +6536,7 @@
       trafegoChatCol.classList.remove("aberta");
       trafegoListCol.classList.remove("comprimida");
       try {
-        const resp = await fetch("/ads/insights");
+        const resp = await fetch(`/ads/insights?account=${encodeURIComponent(contaAtiva)}`);
         const data = await resp.json();
         if (data.erro) throw new Error(data.erro);
         campanhasCache = data.campanhas || [];
@@ -6567,7 +6628,7 @@
         const resp = await fetch("/ads/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ campanha, mensagem: "Diagnóstico inicial desta campanha.", historico: [] }),
+          body: JSON.stringify({ campanha, mensagem: "Diagnóstico inicial desta campanha.", historico: [], accountKey: contaAtiva }),
         });
         const data = await resp.json();
         if (data.erro) throw new Error(data.erro);
@@ -6617,6 +6678,7 @@
             campanha: campanhaAtiva,
             mensagem: texto,
             historico: historicoChatTrafego.slice(-6),
+            accountKey: contaAtiva,
           }),
         });
         const data = await resp.json();
