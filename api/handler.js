@@ -2361,6 +2361,40 @@ async function processarAgente(nomeAgente, input, context = "", historico = []) 
     throw new Error(`Agente "${nomeAgente}" não existe.`);
   }
 
+  // Se é @analytics + pergunta sobre tráfego, delega pra rota especializada
+  if (nomeAgente === "analytics") {
+    const msgLower = input.toLowerCase();
+    const temPalavrasTrafe = ["campanha", "tráfego", "ad", "ads", "roas", "ctr", "cpc", "criativo", "anúncio", "performance", "gasto"];
+    const temPalavra = temPalavrasTrafe.some(p => msgLower.includes(p));
+
+    if (temPalavra) {
+      try {
+        // Detecta qual conta
+        let accountKey = "rivano";
+        if (msgLower.includes("tempero") || msgLower.includes("com tempero")) {
+          accountKey = "com_tempero";
+        }
+
+        // Chama /api/trafego internamente
+        const campanhas = await buscarInsightsMeta(accountKey);
+        if (campanhas && campanhas.length > 0) {
+          const campanha = campanhas[0];
+          const resultado = await analisarCampanha(campanha, input, historico, accountKey);
+          console.log(`[OK] @analytics delegou pra /api/trafego (${accountKey}) — ${resultado.parsed?.acao}`);
+          return {
+            agente: nomeAgente,
+            resposta: resultado.parsed?.justificativa || "Análise realizada",
+            acao: resultado.parsed?.acao || null,
+            trocas: historicoAgentes[nomeAgente].length / 2,
+          };
+        }
+      } catch (e) {
+        console.warn(`[Analytics] Erro ao delegar pra trafego: ${e.message}`);
+        // Falls through to normal processing se falhar
+      }
+    }
+  }
+
   const systemPrompt = PROMPTS_AGENTES[nomeAgente];
   const hist = historicoAgentes[nomeAgente];
 
