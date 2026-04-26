@@ -57,6 +57,26 @@ function verificarRateLimit(agente) {
   return true;
 }
 
+// Função interna: chama Outreach para gerar mensagem
+async function chamarOutreachInterno(input, context) {
+  const systemPrompt = PROMPTS_AGENTES.outreach;
+  const messages = [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: context ? `Contexto: ${context}\n\n${input}` : input }
+  ];
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages,
+    response_format: { type: "json_object" },
+    temperature: 0.35,
+    max_tokens: 400
+  });
+  const rawText = completion.choices[0].message.content;
+  let parsed;
+  try { parsed = JSON.parse(rawText); } catch { parsed = { resposta: rawText }; }
+  return parsed.resposta || "";
+}
+
 const PROMPTS_AGENTES = {
   director: `Você é o Director Comercial da Lumyn — plataforma de prospecção B2B/B2C local com IA.
 O SDR vem até você para saber o que fazer AGORA. Tome decisões. Não filosofe.
@@ -1463,11 +1483,16 @@ async function handler(req, res) {
           console.log(`[OK] Manual ${ehNovo ? "nova análise" : "follow-up"} concluído.`);
         } else {
           resposta = await gerarAnaliseManual(mensagem);
-          estadoManual = { cenarioOriginal: mensagem, analiseAtual: resposta };
-          console.log("[OK] Análise manual concluída.");
+          // Gerar mensagem via Outreach com base no cenário
+          const mensagem_pronta = await chamarOutreachInterno(
+            `Gera mensagem de abordagem baseado neste cenário: ${mensagem}`,
+            resposta
+          ).catch(() => "");
+          estadoManual = { cenarioOriginal: mensagem, analiseAtual: resposta, mensagem_pronta };
+          console.log("[OK] Análise manual + mensagem concluída.");
         }
 
-        return enviarJson(res, 200, { modo: "manual", resposta });
+        return enviarJson(res, 200, { modo: "manual", resposta, mensagem: estadoManual.mensagem_pronta || "" });
       }
 
       // 🔍 BUSCAR
@@ -1579,6 +1604,17 @@ async function handler(req, res) {
             )
           );
           leadsParaAnalisar.forEach((l, i) => { l.analise = analises[i]; });
+
+          // Gerar mensagem via Outreach para cada lead
+          const mensagens = await Promise.all(
+            leadsParaAnalisar.map((l) =>
+              chamarOutreachInterno(
+                `Gera mensagem de abordagem para ${l.categoria || "negócio"} chamado ${l.nome}${l.telefone ? ` (${l.telefone})` : ""}`,
+                `Localização: ${l.endereco || "desconhecida"}. Rating: ${l.nota || "sem nota"}. Avaliações: ${l.avaliacoes || 0}`
+              ).catch(() => null)
+            )
+          );
+          leadsParaAnalisar.forEach((l, i) => { l.mensagem = mensagens[i]; });
         }
 
         const resumo = {
@@ -1988,80 +2024,32 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
   }
 
   // POST /api/crm/mensagem  { lead, tipo }
+  // Delegado ao Outreach Agent para geração centralizada de mensagens
   if (req.method === "POST" && pathname === "/api/crm/mensagem") {
     try {
       const body = await lerBody(req);
       const { lead, tipo } = body;
       if (!lead || !tipo) return enviarJson(res, 400, { erro: "lead e tipo são obrigatórios." });
 
-      const nome     = lead.nome     || "lead";
-      const nicho    = lead.categoria || "negócio local";
-      const status   = lead.status   || "novo";
-
+      const nome   = lead.nome || "lead";
+      const nicho  = lead.categoria || "negócio local";
+      const status = lead.status || "novo";
       const estilo = body.estilo || "direto";
-      const estiloInstrucao = {
-        leve:        "Tom: suave, sem pressão, abre porta devagar. Linguagem amigável, sem urgência.",
-        direto:      "Tom: objetivo e claro. Vai direto ao ponto sem rodeio, mas sem ser grosseiro.",
-        provocativo: "Tom: aponta um problema real do negócio de forma direta. Gera leve desconforto produtivo. Não ofende, mas incomoda o suficiente para gerar resposta.",
-      }[estilo] || "";
 
-      const prompts = {
-        abordagem: `Você é o outreach-message-agent. Escreva UMA mensagem de primeiro contato no WhatsApp.
-
-Lead: ${nome}
-Nicho: ${nicho}
-Estilo: ${estiloInstrucao}
-
-Regras obrigatórias:
-- Máximo 2 frases curtas
-- Natural, humano — parece mensagem de pessoa, não de empresa
-- Inclua uma observação específica sobre o tipo de negócio (${nicho})
-- Inclua uma oportunidade clara e concreta
-- Termine com uma pergunta leve
-- NUNCA pedir reunião ou marcar horário
-- NUNCA usar: "atrair mais clientes", "aumentar visibilidade", "tenho uma proposta"
-- NUNCA soar como agência ou vendedor
-- Retorne APENAS a mensagem, sem explicação, sem aspas`,
-
-        followup: `Escreva UMA mensagem de follow-up para um lead que não respondeu à primeira mensagem.
-
-Lead: ${nome}
-Nicho: ${nicho}
-Estilo: ${estiloInstrucao}
-
-Regras:
-- Máximo 2 frases curtas
-- Retome o contato de forma natural
-- Não mencione que está fazendo follow-up
-- Não peça reunião
-- Retorne APENAS a mensagem, sem explicação, sem aspas`,
-
-        reuniao: `Escreva UMA mensagem convidando o lead para uma conversa de 15-20 minutos.
-
-Lead: ${nome}
-Nicho: ${nicho}
-Etapa atual: ${status}
-Estilo: ${estiloInstrucao}
-
-Regras:
-- Máximo 2 frases curtas
-- Peça o tempo explicitamente (15-20 min)
-- Deixe claro que é rápido e sem compromisso
-- Retorne APENAS a mensagem, sem explicação, sem aspas`,
+      // Mapear tipo para instrução para Outreach
+      const instrucoes = {
+        abordagem: `Gera primeira mensagem de abordagem para ${nicho} chamado ${nome}. Tom: ${estilo}.`,
+        followup:  `Gera mensagem de follow-up (sem repetição) para ${nicho} ${nome} que não respondeu. Tom: ${estilo}.`,
+        reuniao:   `Gera convite para conversa de 15-20 min com ${nicho} ${nome} (status: ${status}). Tom: ${estilo}.`,
       };
 
-      const prompt = prompts[tipo];
-      if (!prompt) return enviarJson(res, 400, { erro: "Tipo inválido. Use: abordagem, followup ou reuniao." });
+      const instrucao = instrucoes[tipo];
+      if (!instrucao) return enviarJson(res, 400, { erro: "Tipo inválido. Use: abordagem, followup ou reuniao." });
 
-      const resp = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 120,
-        temperature: 0.7,
-      });
+      const contexto = `Lead: ${nome} | Nicho: ${nicho} | Status: ${status} | Endereço: ${lead.endereco || "não informado"}`;
+      const mensagem = await chamarOutreachInterno(instrucao, contexto);
 
-      const mensagem = resp.choices[0].message.content.trim().replace(/^["']|["']$/g, "");
-      console.log(`[CRM] Mensagem gerada (${tipo}): ${nome}`);
+      console.log(`[CRM] Mensagem gerada via Outreach (${tipo}): ${nome}`);
       return enviarJson(res, 200, { mensagem });
     } catch (err) {
       console.error("ERRO /api/crm/mensagem:", err.message);
@@ -2272,6 +2260,24 @@ Regras:
       Object.keys(historicoAgentes).forEach(k => { historicoAgentes[k] = []; });
       return enviarJson(res, 200, { ok: true, agente: "todos" });
     } catch (err) {
+      return enviarJson(res, 500, { erro: err.message });
+    }
+  }
+
+  // POST /api/gerar-mensagem — gera mensagem de abordagem via Outreach
+  if (req.method === "POST" && pathname === "/api/gerar-mensagem") {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const body = await lerBody(req);
+      const { input, context } = body;
+      if (!input || !input.trim()) {
+        return enviarJson(res, 400, { erro: "input é obrigatório." });
+      }
+      const mensagem = await chamarOutreachInterno(input.trim(), context || "");
+      console.log(`[OK] Mensagem gerada via Outreach.`);
+      return enviarJson(res, 200, { mensagem });
+    } catch (err) {
+      console.error(`ERRO /api/gerar-mensagem:`, err.message);
       return enviarJson(res, 500, { erro: err.message });
     }
   }
