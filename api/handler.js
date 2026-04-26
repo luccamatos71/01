@@ -2357,50 +2357,6 @@ async function processarAgente(nomeAgente, input, context = "", historico = []) 
     throw new Error(`Agente "${nomeAgente}" não existe.`);
   }
 
-  // Se é @analytics + pergunta sobre tráfego, delega pra rota especializada
-  if (nomeAgente === "analytics") {
-    const msgLower = input.toLowerCase();
-    const temPalavrasTrafe = ["campanha", "tráfego", "ad", "ads", "roas", "ctr", "cpc", "criativo", "anúncio", "performance", "gasto", "análise", "gestor"];
-    const temPalavra = temPalavrasTrafe.some(p => msgLower.includes(p));
-
-    if (temPalavra) {  // Sempre delega pra análise de tráfego
-      try {
-        // Detecta qual conta
-        let accountKey = "rivano";
-        if (msgLower.includes("tempero") || msgLower.includes("com tempero")) {
-          accountKey = "com_tempero";
-        }
-
-        // Chama /api/trafego internamente
-        const campanhas = await buscarInsightsMeta(accountKey);
-        if (campanhas && campanhas.length > 0) {
-          const campanha = campanhas[0];
-          const resultado = await analisarCampanha(campanha, input, historico, accountKey);
-          const resposta = resultado.parsed?.justificativa ?
-            `${resultado.parsed.justificativa}\n\n**Ação: ${resultado.parsed.acao}**` :
-            `Análise: ${resultado.parsed?.acao}`;
-
-          console.log(`[OK] @analytics delegou pra traffic analysis (${accountKey}) — ${resultado.parsed?.acao}`);
-          return {
-            agente: nomeAgente,
-            resposta,
-            acao: resultado.parsed?.acao || null,
-            trocas: historicoAgentes[nomeAgente].length / 2,
-          };
-        } else {
-          throw new Error("Nenhuma campanha encontrada");
-        }
-      } catch (e) {
-        console.error(`[Analytics DELEGATION FAILED] ${e.message}`);
-        return {
-          agente: nomeAgente,
-          resposta: `Erro ao buscar dados de tráfego: ${e.message}. Tente novamente ou use o painel Gestor de Tráfego.`,
-          acao: null,
-          trocas: 0,
-        };
-      }
-    }
-  }
 
   const systemPrompt = PROMPTS_AGENTES[nomeAgente];
   const hist = historicoAgentes[nomeAgente];
@@ -3520,7 +3476,39 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
       if (texto.length < 3) return enviarJson(res, 400, { erro: "Input muito curto." });
       if (texto.length > 1500) return enviarJson(res, 400, { erro: "Input muito longo. Máximo 1500 caracteres." });
 
-      // Processa através do agente
+      // DELEGAÇÃO: Se @analytics + pergunta sobre tráfego, analisa com dados reais
+      if (nomeAgente === "analytics") {
+        const msgLower = texto.toLowerCase();
+        const temPalavrasTrafe = ["campanha", "tráfego", "ad", "ads", "roas", "ctr", "cpc", "criativo", "anúncio", "performance", "gasto", "análise", "conjunto", "gestor"];
+        const temPalavra = temPalavrasTrafe.some(p => msgLower.includes(p));
+
+        if (temPalavra) {
+          try {
+            let accountKey = "rivano";
+            if (msgLower.includes("tempero") || msgLower.includes("com tempero")) {
+              accountKey = "com_tempero";
+            }
+
+            const campanhas = await buscarInsightsMeta(accountKey);
+            if (campanhas && campanhas.length > 0) {
+              const campanha = campanhas[0];
+              const resultado = await analisarCampanha(campanha, texto, [], accountKey);
+              console.log(`[OK] @analytics → traffic analysis (${accountKey}) — ${resultado.parsed?.acao}`);
+              return enviarJson(res, 200, {
+                agente: nomeAgente,
+                resposta: resultado.parsed?.justificativa || "Análise realizada",
+                acao: resultado.parsed?.acao || null,
+                trocas: 1,
+              });
+            }
+          } catch (e) {
+            console.warn(`[Analytics delegation] ${e.message}`);
+            // Falls through to normal processing
+          }
+        }
+      }
+
+      // Processa através do agente normalmente
       const resultado = await processarAgente(nomeAgente, texto, context || "");
 
       console.log(`[OK] Agente ${nomeAgente} respondeu (gpt-4o + Magic Prompt). Trocas: ${resultado.trocas}/4`);
