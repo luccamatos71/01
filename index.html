@@ -2293,10 +2293,29 @@
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
     }
+    .trafego-campanha-header-top {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; margin-bottom: 8px;
+    }
     .trafego-campanha-nome {
       font-size: 12px; font-weight: 700; color: var(--text);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      margin-bottom: 8px;
+      flex: 1; min-width: 0;
+    }
+    .trafego-budget-toggle {
+      display: flex; gap: 2px; flex-shrink: 0;
+    }
+    .trafego-budget-btn {
+      padding: 3px 8px; font-size: 10px; font-weight: 600;
+      border-radius: 4px; border: 1px solid var(--border);
+      background: transparent; color: var(--text-3);
+      cursor: pointer; transition: all 120ms ease;
+      letter-spacing: 0.04em;
+    }
+    .trafego-budget-btn:hover { background: rgba(255,255,255,0.04); color: var(--text-2); }
+    .trafego-budget-btn.active {
+      background: var(--primary-dim); border-color: var(--primary-border);
+      color: #a5b4fc;
     }
     .trafego-metrics { display: flex; gap: 14px; flex-wrap: wrap; }
     .trafego-metric { display: flex; flex-direction: column; gap: 1px; }
@@ -4893,7 +4912,13 @@
         <div id="trafegoListCol" class="trafego-list-col"></div>
         <div id="trafegoChatCol" class="trafego-chat-col">
           <div class="trafego-campanha-header">
-            <div id="trafegoCampanhaNome" class="trafego-campanha-nome"></div>
+            <div class="trafego-campanha-header-top">
+              <div id="trafegoCampanhaNome" class="trafego-campanha-nome"></div>
+              <div class="trafego-budget-toggle" id="trafegoBudgetToggle">
+                <button class="trafego-budget-btn active" data-budget="CBO">CBO</button>
+                <button class="trafego-budget-btn" data-budget="ABO">ABO</button>
+              </div>
+            </div>
             <div id="trafegoMetrics" class="trafego-metrics"></div>
           </div>
           <div id="trafegoChatMsgs" class="trafego-chat-msgs"></div>
@@ -6724,6 +6749,7 @@
     let campanhaAtiva = null;
     let historicoChatTrafego = [];
     let trafegoChatEnviando = false;
+    let tipoBudgetAtivo = "CBO"; // CBO (nível campanha) ou ABO (nível conjunto)
     let campanhasCache = [];
     let contaAtiva = "rivano"; // conta selecionada — nunca expõe tokens ao frontend
 
@@ -6866,7 +6892,7 @@
         const resp = await fetch("/ads/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ campanha, mensagem: "Diagnóstico inicial desta campanha.", historico: [], accountKey: contaAtiva }),
+          body: JSON.stringify({ campanha: { ...campanha, tipoBudget: tipoBudgetAtivo }, mensagem: "Diagnóstico inicial desta campanha.", historico: [], accountKey: contaAtiva }),
         });
         const data = await resp.json();
         if (data.erro) throw new Error(data.erro);
@@ -6913,7 +6939,7 @@
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            campanha: campanhaAtiva,
+            campanha: { ...campanhaAtiva, tipoBudget: tipoBudgetAtivo },
             mensagem: texto,
             historico: historicoChatTrafego.slice(-6),
             accountKey: contaAtiva,
@@ -6950,6 +6976,17 @@
     if (trafegoCloseBtn) trafegoCloseBtn.addEventListener("click", fecharTrafego);
     if (trafegoChatSendBtn) trafegoChatSendBtn.addEventListener("click", enviarMsgTrafego);
     if (trafegoOverlay) trafegoOverlay.addEventListener("click", e => { if (e.target === trafegoOverlay) fecharTrafego(); });
+
+    // CBO/ABO toggle
+    const trafegoBudgetToggle = document.getElementById("trafegoBudgetToggle");
+    if (trafegoBudgetToggle) {
+      trafegoBudgetToggle.addEventListener("click", (e) => {
+        const btn = e.target.closest(".trafego-budget-btn");
+        if (!btn) return;
+        tipoBudgetAtivo = btn.dataset.budget;
+        trafegoBudgetToggle.querySelectorAll(".trafego-budget-btn").forEach(b => b.classList.toggle("active", b === btn));
+      });
+    }
 
     // ESC fecha painéis — tráfego incluído
     document.addEventListener("keydown", (e) => {
