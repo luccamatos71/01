@@ -2646,6 +2646,18 @@
       .dashboard-card {
         padding: 16px !important;
       }
+
+      .dashboard-item {
+        min-height: 48px;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: var(--r-md);
+        background: rgba(255,255,255,0.03);
+      }
+
+      .dashboard-item:active {
+        transform: scale(0.98);
+      }
     }
 
     /* ============================================================
@@ -2934,12 +2946,110 @@
       .crm-panel,
       .crm-ficha,
       .criativos-panel,
+      .estrategia-panel,
       .director-panel,
       .trafego-panel {
-        width: min(92vw, 480px);
-        max-height: 90vh;
-        max-height: 90dvh;
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        max-height: 100vh;
+        max-height: 100dvh;
+        border-radius: 0;
         overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .leads-overlay,
+      .trafego-overlay,
+      .estrategia-overlay {
+        align-items: stretch;
+        justify-content: stretch;
+      }
+
+      .leads-modal {
+        display: flex;
+        flex-direction: column;
+        padding: max(18px, env(safe-area-inset-top)) 16px max(18px, env(safe-area-inset-bottom));
+        transform: none;
+      }
+
+      .leads-overlay.open .leads-modal {
+        transform: none;
+      }
+
+      .leads-query-input,
+      .leads-search-btn {
+        min-height: 44px;
+      }
+
+      .leads-modal-footer {
+        margin-top: auto;
+      }
+
+      .leads-search-btn {
+        width: 100%;
+      }
+
+      .crm-overlay {
+        overflow: hidden;
+      }
+
+      .crm-panel,
+      .trafego-panel,
+      .estrategia-panel {
+        max-width: none;
+        box-shadow: none;
+        transform: none;
+      }
+
+      .crm-overlay.open .crm-panel,
+      .trafego-overlay.open .trafego-panel,
+      .estrategia-overlay.open .estrategia-panel {
+        transform: none;
+      }
+
+      .crm-columns {
+        flex-direction: column;
+        overflow-x: hidden;
+        overflow-y: auto;
+      }
+
+      .crm-column {
+        flex: 0 0 auto;
+        min-height: 150px;
+        border-right: none;
+        border-bottom: 1px solid var(--border-soft);
+      }
+
+      .crm-column:last-child {
+        border-bottom: none;
+      }
+
+      .crm-ficha {
+        width: 100vw;
+      }
+
+      .trafego-body {
+        flex-direction: column;
+        overflow-y: auto;
+      }
+
+      .trafego-list-col,
+      .trafego-list-col.comprimida {
+        flex: 0 0 auto;
+        width: 100%;
+        min-width: 0;
+        border-right: none;
+      }
+
+      .trafego-chat-col,
+      .trafego-chat-col.aberta {
+        width: 100%;
+        min-height: 52vh;
+      }
+
+      .trafego-table-wrap {
+        overflow-x: auto;
         -webkit-overflow-scrolling: touch;
       }
 
@@ -5669,9 +5779,9 @@
         var goP = document.getElementById("cwGoProspeccao");
         var goC = document.getElementById("cwGoCrm");
         var goD = document.getElementById("cwGoDirector");
-        if (goP) goP.addEventListener("click", function() { abrirCW("prospeccao"); });
-        if (goC) goC.addEventListener("click", function() { abrirCW("crm"); });
-        if (goD) goD.addEventListener("click", function() { abrirCW("director"); });
+        if (goP) goP.addEventListener("click", function() { if (isMobileLayout() && acionarFerramenta("prospeccao")) return; abrirCW("prospeccao"); });
+        if (goC) goC.addEventListener("click", function() { if (isMobileLayout() && acionarFerramenta("crm")) return; abrirCW("crm"); });
+        if (goD) goD.addEventListener("click", function() { if (isMobileLayout() && acionarFerramenta("director")) return; abrirCW("director"); });
       } catch(e) { /* silently fail */ }
     }
 
@@ -5710,6 +5820,27 @@
       cwWin.classList.remove("open");
     }
 
+    function isMobileLayout() {
+      return window.matchMedia && window.matchMedia("(max-width: 1024px)").matches;
+    }
+
+    function acionarFerramenta(view) {
+      var triggers = {
+        prospeccao: "leadsBtn",
+        crm: "crmPanelBtn",
+        trafego: "trafegoBtn",
+        director: "estrategiaBtn"
+      };
+      var triggerId = triggers[view];
+      var trigger = triggerId ? document.getElementById(triggerId) : null;
+      if (trigger) {
+        fecharCW();
+        trigger.click();
+        return true;
+      }
+      return false;
+    }
+
     // Expose globally so inline onclick attrs can call fecharJanelaCentral()
     window.abrirJanelaCentral = abrirCW;
     window.fecharJanelaCentral = fecharCW;
@@ -5719,7 +5850,9 @@
       btn.addEventListener("click", function() {
         document.querySelectorAll(".nav-btn").forEach(function(b) { b.classList.remove("nav-btn-active"); });
         this.classList.add("nav-btn-active");
-        abrirCW(this.getAttribute("data-view"));
+        var view = this.getAttribute("data-view");
+        if (isMobileLayout() && view !== "home" && acionarFerramenta(view)) return;
+        abrirCW(view);
       });
     });
 
