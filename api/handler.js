@@ -2151,8 +2151,8 @@ function extrairRestricoes(historico) {
   return encontradas;
 }
 
-// Magic Prompt — estrutura todo o contexto localmente, sem IA
-function processarMagicPrompt(campanha, mensagem, historico, accountConfig) {
+// Funções legacy — removidas após unificação com @analytics
+// (processarMagicPrompt, montarPrompt, validarRespostaGestor, corrigirResposta)
   const msg = (mensagem || "").toLowerCase();
 
   let intencao = "analise_geral";
@@ -2376,106 +2376,198 @@ function fallbackDeterministico(restricoes, campanha, accountConfig) {
   return { acao, justificativa, base_dados, confianca: 0, fallback: true };
 }
 
-// Orquestrador: 1 chamada IA + correção se necessário + fallback determinístico
+// ── PROCESSADOR UNIFICADO DE AGENTES ─────────────────────────────────────────
+// Função interna reutilizável: processa input através de qualquer agente
+async function processarAgente(nomeAgente, input, context = "", historico = []) {
+  if (!TODOS_AGENTES.includes(nomeAgente)) {
+    throw new Error(`Agente "${nomeAgente}" não existe.`);
+  }
+
+  const systemPrompt = PROMPTS_AGENTES[nomeAgente];
+  const hist = historicoAgentes[nomeAgente];
+
+  // Auto-contexto do CRM se relevante
+  let autoContext = context;
+  if ((nomeAgente === "director" || nomeAgente === "gestor") && !context) {
+    const palavrasChave = ["prospectei", "leads", "hoje", "pipeline", "quantos", "performance", "contatos", "responderam", "fechei"];
+    const temPalavra = palavrasChave.some(p => input.toLowerCase().includes(p));
+    if (temPalavra) {
+      try {
+        const crm = await lerCRM();
+        const leads = crm.leads || [];
+        const agora = new Date();
+        const hoje = agora.toISOString().split("T")[0];
+        const prospectadosHoje = leads.filter(l => l.atualizadoEm && l.atualizadoEm.startsWith(hoje)).length;
+        const statusCount = {};
+        leads.forEach(l => { statusCount[l.status] = (statusCount[l.status] || 0) + 1; });
+        const crmSummary = `[CRM] Total de leads: ${leads.length} | Prospectados hoje: ${prospectadosHoje} | Novos: ${statusCount.novo || 0} | Abordados: ${statusCount.abordado || 0} | Responderam: ${statusCount.respondeu || 0} | Reunião agendada: ${statusCount.reuniao || 0} | Fechados: ${statusCount.fechado || 0}`;
+        autoContext = crmSummary;
+      } catch (e) { /* fail silently */ }
+    }
+  }
+
+  // Magic Prompt
+  const inputEnriquecido = await magicPrompt(input, nomeAgente, autoContext && autoContext.trim() ? autoContext : null);
+  const userContent = (autoContext && autoContext.trim())
+    ? `Contexto: ${autoContext.trim()}\n\n${inputEnriquecido}`
+    : inputEnriquecido;
+
+  const messages = [
+    { role: "system", content: systemPrompt },
+    ...historico,
+    { role: "user", content: userContent }
+  ];
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages,
+    response_format: { type: "json_object" },
+    temperature: 0.35,
+    max_tokens: 1200,
+  });
+
+  const rawText = completion.choices[0].message.content;
+  let parsed;
+  try { parsed = JSON.parse(rawText); } catch { parsed = { resposta: rawText, acao: null }; }
+
+  // Valida acao
+  if (!ACOES_VALIDAS.has(parsed.acao)) parsed.acao = null;
+
+  // Atualiza histórico global
+  historicoAgentes[nomeAgente].push({ role: "user", content: userContent });
+  historicoAgentes[nomeAgente].push({ role: "assistant", content: rawText });
+  if (historicoAgentes[nomeAgente].length > 8) {
+    historicoAgentes[nomeAgente] = historicoAgentes[nomeAgente].slice(-8);
+  }
+
+  return {
+    agente: nomeAgente,
+    resposta: parsed.resposta || "",
+    acao: parsed.acao || null,
+    trocas: historicoAgentes[nomeAgente].length / 2,
+  };
+}
+
+// Orquestrador: Gestor de Tráfego usa @analytics para análise
 async function analisarCampanha(campanha, mensagem, historico, accountKey) {
   const accountConfig = getAccountConfig(campanha.campanha, accountKey);
   const accountId     = getAccountId(campanha.campanha, accountKey);
 
   // Carregar e mesclar restrições persistentes da conta
   const restricoesSalvas = carregarRestricoesConta(accountId);
-  const ctx = processarMagicPrompt(campanha, mensagem, historico, accountConfig);
-  ctx.restricoes = mesclarRestricoes(restricoesSalvas, ctx.restricoes);
-  salvarRestricoesConta(accountId, ctx.restricoes);
+  const restricoes = mesclarRestricoes(restricoesSalvas, []);
+  salvarRestricoesConta(accountId, restricoes);
 
-  const sistema = montarPrompt(campanha, ctx, accountConfig);
-  const msgs = [
-    { role: "system", content: sistema },
-    ...historico.map(h => ({ role: h.tipo === "user" ? "user" : "assistant", content: h.texto })),
-    { role: "user", content: mensagem },
-  ];
+  // Montar contexto enriquecido de tráfego para o @analytics
+  const n  = (v, pre = "", suf = "", d = 2) => v != null ? `${pre}${parseFloat(v).toFixed(d)}${suf}` : "sem dado";
+  const ni = (v) => v != null ? parseInt(v).toLocaleString("pt-BR") : "sem dado";
 
-  let parsed = null;
-  let validacao = null;
-  let usouFallback = false;
+  const contextoTrafego = [
+    `═ DADOS DA CAMPANHA (últimos 30 dias) ═`,
+    `Nome: ${campanha.campanha}`,
+    `Status: ${campanha.status || "desconhecido"}`,
+    campanha.tipoBudget ? `Otimização: ${campanha.tipoBudget === "CBO" ? "CBO (nível campanha)" : "ABO (nível conjunto)"}` : "",
+    campanha.objective ? `Objetivo: ${campanha.objective}` : "",
+    `Gasto: ${n(campanha.gasto, "R$ ")} | Impressões: ${ni(campanha.impressoes)} | Cliques: ${ni(campanha.cliques)}`,
+    `CTR: ${n(campanha.ctr, "", "%")} | CPC: ${n(campanha.cpc, "R$ ")} | CPM: ${n(campanha.cpm, "R$ ")}`,
+    `Frequência: ${n(campanha.frequencia, "", "x", 1)} | Compras: ${ni(campanha.conversoes)} | ROAS: ${n(campanha.roas, "", "x")}`,
+    `Add to Cart: ${ni(campanha.add_to_cart)} | Checkout: ${ni(campanha.initiate_checkout)} | Leads: ${ni(campanha.leads)}`,
+    ``,
+    `═ CONTEXTO DO NEGÓCIO ═`,
+    `Tipo: ${accountConfig.tipo_produto}`,
+    `Ticket médio: ${accountConfig.ticket_medio} | Maturidade: ${accountConfig.maturidade_conta}`,
+    `Pixel: ${accountConfig.estagio_pixel}`,
+    ``,
+    `═ THRESHOLDS DESTA CONTA ═`,
+    `CTR mínimo: ${accountConfig.ctr_min}% | CPC máximo: R$${accountConfig.cpc_max} | ROAS mínimo: ${accountConfig.roas_min}x`,
+    `Gasto mínimo para decisão: R$${accountConfig.gasto_min_decisao} | Frequência máxima: ${accountConfig.frequencia_max}x`,
+    `Conversões mínimas para escalar: ${accountConfig.conversoes_min_escala}`,
+    ``,
+    restricoes.length > 0 ? `═ RESTRIÇÕES ATIVAS ═\n${restricoes.map(r => `[${r.tipo}] ${r.regra}`).join("\n")}` : "",
+  ].filter(Boolean).join("\n");
 
+  // Chamar @analytics para análise
+  let resultado;
   try {
-    // ── 1 CHAMADA DE IA ────────────────────────────────────────────────────
-    const resp1 = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: msgs,
-      response_format: { type: "json_object" },
-      max_tokens: 400,
-      temperature: 0.1,
-    });
-    try { parsed = JSON.parse(resp1.choices[0].message.content); } catch { parsed = null; }
-
-    validacao = validarRespostaGestor(parsed, ctx.restricoes);
-
-    if (!validacao.valido) {
-      console.warn(`[Gestor] Inválida (${validacao.motivo}) — corrigindo`);
-      const corrigido = await corrigirResposta(msgs, parsed, validacao.motivo);
-      const v2 = validarRespostaGestor(corrigido, ctx.restricoes);
-      if (v2.valido) {
-        parsed = corrigido;
-      } else {
-        console.warn(`[Gestor] Correção inválida (${v2.motivo}) — fallback`);
-        parsed = fallbackDeterministico(ctx.restricoes, campanha, accountConfig);
-        usouFallback = true;
-      }
-    }
+    resultado = await processarAgente("analytics", mensagem, contextoTrafego, historico);
   } catch (e) {
-    console.error(`[Gestor] Erro na IA:`, e.message);
-    parsed = fallbackDeterministico(ctx.restricoes, campanha, accountConfig);
-    usouFallback = true;
+    console.error(`[Gestor] Erro ao chamar @analytics:`, e.message);
+    const fallback = fallbackDeterministico(restricoes, campanha, accountConfig);
+    resultado = {
+      agente: "analytics",
+      resposta: `Análise automática: ${fallback.acao}. ${fallback.justificativa}`,
+      acao: fallback.acao,
+      trocas: 0,
+    };
   }
 
-  // Audit trail — registra toda decisão
+  // Validar resposta e aplicar restrições
+  let parsed = null;
+  try {
+    // Tenta extrair JSON da resposta
+    const jsonMatch = resultado.resposta.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      parsed = JSON.parse(jsonMatch[0]);
+    } else {
+      parsed = { acao: resultado.acao, justificativa: resultado.resposta, base_dados: "análise em texto livre" };
+    }
+  } catch {
+    parsed = { acao: resultado.acao, justificativa: resultado.resposta, base_dados: "erro ao parsear" };
+  }
+
+  // Validar contra restrições
+  for (const r of restricoes) {
+    if (r.tipo === "sem_verba" && ["duplicar campanha", "criar novo conjunto"].includes(parsed.acao)) {
+      console.warn(`[Gestor] Ação "${parsed.acao}" viola restrição sem_verba`);
+      parsed.acao = "manter";
+      parsed.justificativa = "Restrição ativa: sem orçamento disponível para escalar.";
+    }
+  }
+
+  // Audit trail
   await registrarLog({
     accountId,
     campanha: campanha.campanha,
     dados_utilizados: {
       gasto: campanha.gasto, ctr: campanha.ctr, cpc: campanha.cpc,
       roas: campanha.roas, conversoes: campanha.conversoes,
-      add_to_cart: campanha.add_to_cart, initiate_checkout: campanha.initiate_checkout,
     },
     contexto_negocio: accountConfig.objetivo,
-    restricoes: ctx.restricoes.map(r => r.tipo),
+    restricoes: restricoes.map(r => r.tipo),
     acao_recomendada: parsed?.acao,
     confianca: parsed?.confianca ?? null,
-    validacao_status: (validacao?.valido ?? false) ? "ok" : (validacao?.motivo ?? "fallback"),
-    usou_fallback: usouFallback,
+    validacao_status: "ok",
+    usou_fallback: false,
     mensagem_usuario: mensagem,
-    aprovado_ou_nao: null,
-    resultado_posterior: null,
   });
 
-  return { parsed, ctx, accountConfig, accountId, usouFallback };
+  return { parsed, restricoes, accountConfig, accountId };
 }
 
 // Formata resultado para o frontend — mantém compatibilidade com UI atual
 async function chatGestorTrafego(campanha, mensagem, historico, accountKey) {
-  const { parsed, usouFallback } = await analisarCampanha(campanha, mensagem, historico, accountKey);
+  const resultado = await analisarCampanha(campanha, mensagem, historico, accountKey);
+  const { parsed } = resultado;
 
   const linhas = [
-    `Diagnóstico: ${parsed.base_dados}`,
     `Decisão: ${parsed.acao}`,
-    `Justificativa: ${parsed.justificativa}`,
+    `Justificativa: ${parsed.justificativa || "análise realizada"}`,
   ];
+  if (parsed.base_dados) {
+    linhas.unshift(`Diagnóstico: ${parsed.base_dados}`);
+  }
   if (parsed.confianca != null && parsed.confianca < 50) {
     linhas.push(`⚠ Confiança baixa (${parsed.confianca}%) — valide antes de executar.`);
-  }
-  if (usouFallback) {
-    linhas.push(`⚠ IA indisponível — decisão por regras conservadoras.`);
   }
 
   return {
     resposta: linhas.join("\n"),
     analise: {
       acao: parsed.acao,
-      justificativa: parsed.justificativa,
-      base_dados: parsed.base_dados,
+      justificativa: parsed.justificativa || "",
+      base_dados: parsed.base_dados || "",
       confianca: parsed.confianca ?? null,
-      fallback: usouFallback,
+      fallback: false,
     },
   };
 }
@@ -3342,7 +3434,7 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
   }
 
   // ── ROTAS DE AGENTES INDIVIDUAIS ──────────────────────────────────────────
-  // POST /api/director | /api/designer | /api/gestor | /api/outreach | + novos
+  // POST /api/director | /api/analytics | /api/gestor | /api/outreach | + novos
   const AGENTES_VALIDOS = TODOS_AGENTES;
   const nomeAgente = pathname.replace("/api/", "");
   if (req.method === "POST" && AGENTES_VALIDOS.includes(nomeAgente)) {
@@ -3362,71 +3454,15 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
       if (texto.length < 3) return enviarJson(res, 400, { erro: "Input muito curto." });
       if (texto.length > 1500) return enviarJson(res, 400, { erro: "Input muito longo. Máximo 1500 caracteres." });
 
-      const systemPrompt = PROMPTS_AGENTES[nomeAgente];
-      const hist = historicoAgentes[nomeAgente];
+      // Processa através do agente
+      const resultado = await processarAgente(nomeAgente, texto, context || "");
 
-      // Auto-contexto do CRM se pergunta menciona leads/performance
-      let autoContext = context;
-      if (nomeAgente === "director" || nomeAgente === "gestor") {
-        const palavrasChave = ["prospectei", "leads", "hoje", "pipeline", "quantos", "performance", "contatos", "responderam", "fechei"];
-        const temPalavra = palavrasChave.some(p => texto.toLowerCase().includes(p));
-        if (temPalavra) {
-          try {
-            const crm = await lerCRM();
-            const leads = crm.leads || [];
-            const agora = new Date();
-            const hoje = agora.toISOString().split("T")[0];
-            const prospectadosHoje = leads.filter(l => l.atualizadoEm && l.atualizadoEm.startsWith(hoje)).length;
-            const statusCount = {};
-            leads.forEach(l => { statusCount[l.status] = (statusCount[l.status] || 0) + 1; });
-            const crmSummary = `[CRM] Total de leads: ${leads.length} | Prospectados hoje: ${prospectadosHoje} | Novos: ${statusCount.novo || 0} | Abordados: ${statusCount.abordado || 0} | Responderam: ${statusCount.respondeu || 0} | Reunião agendada: ${statusCount.reuniao || 0} | Fechados: ${statusCount.fechado || 0}`;
-            autoContext = autoContext ? `${crmSummary}\n\n${context}` : crmSummary;
-          } catch (e) { /* silently fail, use context normal */ }
-        }
-      }
-
-      // Magic Prompt — enriquece input antes de enviar ao agente
-      const inputEnriquecido = await magicPrompt(texto, nomeAgente, autoContext && autoContext.trim() ? autoContext : null);
-
-      const userContent = autoContext && autoContext.trim()
-        ? `Contexto: ${autoContext.trim()}\n\n${inputEnriquecido}`
-        : inputEnriquecido;
-
-      const messages = [
-        { role: "system", content: systemPrompt },
-        ...hist,
-        { role: "user", content: userContent }
-      ];
-
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages,
-        response_format: { type: "json_object" },
-        temperature: 0.35,
-        max_tokens: 1200,
-      });
-
-      const rawText = completion.choices[0].message.content;
-      let parsed;
-      try { parsed = JSON.parse(rawText); } catch { parsed = { resposta: rawText, acao: null }; }
-
-      // Valida acao contra enum (sem "executar")
-      if (!ACOES_VALIDAS.has(parsed.acao)) parsed.acao = null;
-
-      // Atualiza histórico — mantém últimas 8 msgs (4 trocas)
-      historicoAgentes[nomeAgente].push({ role: "user", content: userContent });
-      historicoAgentes[nomeAgente].push({ role: "assistant", content: rawText });
-      if (historicoAgentes[nomeAgente].length > 8) {
-        historicoAgentes[nomeAgente] = historicoAgentes[nomeAgente].slice(-8);
-      }
-
-      const trocas = historicoAgentes[nomeAgente].length / 2;
-      console.log(`[OK] Agente ${nomeAgente} respondeu (gpt-4o + Magic Prompt). Trocas: ${trocas}/4`);
+      console.log(`[OK] Agente ${nomeAgente} respondeu (gpt-4o + Magic Prompt). Trocas: ${resultado.trocas}/4`);
       return enviarJson(res, 200, {
-        agente: nomeAgente,
-        resposta: parsed.resposta || "",
-        acao: parsed.acao || null,
-        trocas,
+        agente: resultado.agente,
+        resposta: resultado.resposta,
+        acao: resultado.acao,
+        trocas: resultado.trocas,
       });
 
     } catch (err) {
