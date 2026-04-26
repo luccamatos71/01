@@ -42,33 +42,66 @@ let historico = [];
 let estadoManual = null; // { cenarioOriginal, analiseAtual }
 
 // ── GESTOR DE TRÁFEGO — CONFIGURAÇÃO POR CONTA ───────────────────────────────
+// Todos os thresholds vivem aqui. Nunca usar valores fixos no código ou prompt.
 const ACCOUNT_CONFIG = {
   rivano: {
+    // Thresholds operacionais
     ctr_min: 0.8,
     cpc_max: 2.5,
     roas_min: 2.0,
-    tipo_produto: "eyewear / moda",
-    ticket_medio: "médio",
-    objetivo: "vendas",
+    gasto_min_decisao: 50,
+    frequencia_max: 3.0,
+    conversoes_min_escala: 20,
+    // Contexto de negócio
+    tipo_produto: "eyewear / moda premium",
+    ticket_medio: "R$200–400",
+    objetivo: "vendas / primeira compra",
     maturidade_conta: "nova",
+    estagio_pixel: "novo — sem histórico de conversão",
+    // Conhecimento estratégico da conta
+    historico_testes: "6 campanhas testadas. 5 sem volume significativo. 1 campanha (Site) com R$265 gastos, CTR 1.55%, CPC R$1.00, 3 add_to_carts, 0 compras. Pixel configurado.",
+    aprendizados: "Entrega funcionando (CTR e CPC saudáveis). Problema está nos eventos de pixel ou no checkout. Ainda não tivemos um teste com conversão rastreada.",
+    restricoes_permanentes: [
+      "não escalar antes de 20 compras registradas no pixel",
+      "não pausar campanha de awareness em menos de 7 dias de veiculação",
+    ],
+    proxima_fase: "Validar eventos de pixel (AddToCart, Purchase) no Events Manager antes de qualquer otimização de conversão",
   },
+
   contempero: {
     ctr_min: 1.2,
     cpc_max: 3.5,
     roas_min: 1.8,
-    tipo_produto: "restaurante / alimentação",
-    ticket_medio: "baixo / médio",
-    objetivo: "pedidos",
+    gasto_min_decisao: 30,
+    frequencia_max: 3.5,
+    conversoes_min_escala: 10,
+    tipo_produto: "restaurante / delivery",
+    ticket_medio: "R$40–80",
+    objetivo: "pedidos / delivery",
     maturidade_conta: "intermediária",
+    estagio_pixel: "com dados — histórico parcial de conversão",
+    historico_testes: "Conta com histórico de campanhas de pedido. Métricas de referência estabelecidas.",
+    aprendizados: "Campanha de pedidos funciona melhor com público local segmentado e criativos focados no produto.",
+    restricoes_permanentes: [],
+    proxima_fase: "Otimizar custo por pedido e testar criativos de produto",
   },
+
   _default: {
     ctr_min: 1.0,
     cpc_max: 5.0,
     roas_min: 1.5,
+    gasto_min_decisao: 50,
+    frequencia_max: 3.5,
+    conversoes_min_escala: 15,
     tipo_produto: "não especificado",
     ticket_medio: "não especificado",
     objetivo: "conversões",
     maturidade_conta: "desconhecida",
+    estagio_pixel: "desconhecido",
+    historico_testes: "Sem histórico registrado.",
+    aprendizados: "Sem aprendizados registrados.",
+    restricoes_permanentes: [],
+    proxima_fase: "Definir objetivo, configurar pixel e estabelecer métricas de referência",
   },
 };
 
@@ -78,6 +111,14 @@ function getAccountConfig(nomeCampanha) {
     if (chave !== "_default" && nome.includes(chave)) return config;
   }
   return ACCOUNT_CONFIG._default;
+}
+
+function getAccountId(nomeCampanha) {
+  const nome = (nomeCampanha || "").toLowerCase();
+  for (const chave of Object.keys(ACCOUNT_CONFIG)) {
+    if (chave !== "_default" && nome.includes(chave)) return chave;
+  }
+  return "_default";
 }
 
 // ── AGENTES ──────────────────────────────────────────────────────────────────
@@ -1588,54 +1629,95 @@ async function buscarInsightsMeta() {
   return campanhasComInsights.filter(c => c !== null);
 }
 
-// ── GESTOR: FUNÇÕES AUXILIARES ────────────────────────────────────────────────
+// ── GESTOR: PERSISTÊNCIA DE RESTRIÇÕES (memória server-side por conta) ────────
+const _restricoesPorConta = new Map(); // accountId → [{tipo, regra}]
 
-// Ações válidas que o gestor pode escolher
+function carregarRestricoesConta(accountId) {
+  return _restricoesPorConta.get(accountId) || [];
+}
+function salvarRestricoesConta(accountId, restricoes) {
+  _restricoesPorConta.set(accountId, restricoes);
+}
+function mesclarRestricoes(existentes, novas) {
+  const tipos = new Set(existentes.map(r => r.tipo));
+  return [...existentes, ...novas.filter(r => !tipos.has(r.tipo))];
+}
+
+// ── GESTOR: AUDIT TRAIL ────────────────────────────────────────────────────────
+const _auditTrail = [];
+
+async function registrarLog(entrada) {
+  const log = {
+    id: `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+    timestamp: new Date().toISOString(),
+    ...entrada,
+  };
+  _auditTrail.push(log);
+  if (_auditTrail.length > 500) _auditTrail.shift();
+  console.log(`[AUDIT] ${log.timestamp} | conta:${log.accountId} | acao:${log.acao_recomendada} | confianca:${log.confianca ?? "—"} | fallback:${log.usou_fallback}`);
+  if (supabase) {
+    try {
+      await supabase.from("gestor_audit").insert([{ id: log.id, dados: log, criado_em: log.timestamp }]);
+    } catch { /* tabela opcional — falha silenciosa */ }
+  }
+}
+
+// ── GESTOR: CONSTANTES ────────────────────────────────────────────────────────
 const ACOES_GESTOR_VALIDAS = [
   "manter", "subir criativo", "criar novo conjunto", "duplicar campanha",
   "pausar", "revisar criativo", "revisar público", "aguardar dados",
 ];
 
-// Padrões de linguagem ambígua que invalidam uma resposta
 const LINGUAGEM_GENERICA = [
   "você pode", "considere", "talvez", "pode ser", "uma opção",
   "outra alternativa", "seria interessante", "recomendo que você",
 ];
 
-// Fase do pixel: calculada localmente, sem IA
-function calcularFasePixel(campanha) {
-  if (campanha.conversoes == null && campanha.leads == null) {
-    return "Pixel não instalado ou sem eventos registrados — dados de conversão indisponíveis.";
+// ── GESTOR: ANÁLISE LOCAL (sem IA) ────────────────────────────────────────────
+
+// Fase do pixel — considera restrições declaradas e thresholds da conta
+function calcularFasePixel(campanha, restricoes, accountConfig) {
+  const { conversoes, leads, gasto, ctr, add_to_cart } = campanha;
+  const gastoNum     = gasto || 0;
+  const totalEventos = (conversoes || 0) + (leads || 0) + (add_to_cart || 0);
+  const pixelDeclaradoInstalado = restricoes.some(r => r.tipo === "pixel_instalado");
+
+  if (conversoes == null && leads == null) {
+    // Entrega ok + gasto relevante + zero conversões → problema de rastreamento/checkout
+    if (gastoNum > accountConfig.gasto_min_decisao && ctr != null && ctr > 0.5) {
+      if (pixelDeclaradoInstalado) {
+        return `Pixel instalado mas sem eventos de conversão registrados. Gasto R$${gastoNum.toFixed(2)}, CTR ${ctr.toFixed(2)}% — entrega saudável. Verificar eventos (AddToCart, Purchase) no Events Manager.`;
+      }
+      return `R$${gastoNum.toFixed(2)} gastos com CTR ${ctr.toFixed(2)}% — entrega funcionando. Ausência de conversões: verificar se pixel rastreia AddToCart e Purchase.`;
+    }
+    return "Pixel sem eventos de conversão registrados.";
   }
-  const totalEventos = (campanha.conversoes || 0) + (campanha.leads || 0);
-  const gasto = campanha.gasto || 0;
-  if (totalEventos < 10 || gasto < 50) {
-    return `Fase de aprendizado — ${totalEventos} evento(s) / R$${gasto.toFixed(2)} gastos. Aguardar ao menos 10 eventos e R$50 antes de otimizar.`;
+
+  if (totalEventos < 10 || gastoNum < accountConfig.gasto_min_decisao) {
+    return `Fase de aprendizado — ${totalEventos} evento(s), R$${gastoNum.toFixed(2)} gastos. Mínimo: 10 eventos e R$${accountConfig.gasto_min_decisao} para decisão confiável.`;
   }
-  return `Pixel ativo — ${totalEventos} evento(s) registrados. Dados suficientes para decisão.`;
+  return `Pixel ativo — ${totalEventos} evento(s). Dados suficientes para decisão.`;
 }
 
-// Análise do funil: detecta padrões de abandono
+// Funil — detecta abandono precoce e abandono no checkout
 function analisarFunil(campanha) {
   const { add_to_cart, initiate_checkout, conversoes } = campanha;
   if (add_to_cart == null && initiate_checkout == null && conversoes == null) return null;
   if (add_to_cart != null && add_to_cart > 5 &&
       (initiate_checkout == null || initiate_checkout < 2) &&
       (conversoes == null || conversoes < 1)) {
-    return "ABANDONO PRECOCE: alto add_to_cart, quase nenhum checkout iniciado → problema pode ser no carrinho ou oferta, não na campanha";
+    return `ABANDONO PRECOCE: ${add_to_cart} add_to_carts, ~${initiate_checkout ?? 0} checkouts → problema no carrinho/oferta, não na campanha`;
   }
-  if (initiate_checkout != null && initiate_checkout > 3 &&
-      (conversoes == null || conversoes < 1)) {
-    return "ABANDONO NO CHECKOUT: usuários chegam ao checkout mas não convertem → revisar página de pagamento ou frete, não a campanha";
+  if (initiate_checkout != null && initiate_checkout > 3 && (conversoes == null || conversoes < 1)) {
+    return `ABANDONO NO CHECKOUT: ${initiate_checkout} chegaram ao checkout, 0 compraram → revisar página de pagamento/frete`;
   }
   if (add_to_cart != null && add_to_cart > 0 && conversoes != null && conversoes > 0) {
-    const taxa = ((conversoes / add_to_cart) * 100).toFixed(1);
-    return `Funil funcional: ${taxa}% de add_to_cart chegam a compra`;
+    return `Funil funcional: ${((conversoes / add_to_cart) * 100).toFixed(1)}% de add_to_cart convertem`;
   }
   return null;
 }
 
-// Extração de restrições do histórico: padrões amplos sem AI
+// Restrições — padrões semânticos amplos, acumulativo por histórico
 function extrairRestricoes(historico) {
   const regras = {
     sem_verba: {
@@ -1643,144 +1725,114 @@ function extrairRestricoes(historico) {
         "sem grana", "sem verba", "sem budget", "não tenho verba", "tô sem grana",
         "não dá pra aumentar", "orçamento apertado", "não posso gastar mais",
         "não tem budget", "budget limitado", "não consigo porque não tenho verba",
+        "verba pequena", "investimento baixo", "não quero aumentar",
       ],
-      regra: "não sugerir aumentar orçamento, duplicar campanha ou criar novo conjunto com orçamento adicional",
+      regra: "não sugerir aumentar orçamento, duplicar campanha ou criar novo conjunto",
     },
     sem_acesso: {
       padroes: [
         "sem acesso", "não consigo acessar", "não posso mexer", "sem permissão",
-        "não tenho acesso", "não posso mexer agora",
+        "não tenho acesso", "não posso mexer agora", "acesso bloqueado",
       ],
-      regra: "não sugerir ação que exija acesso ao gerenciador de anúncios",
+      regra: "não sugerir ação que exija acesso ao gerenciador",
+    },
+    pixel_instalado: {
+      padroes: [
+        "pixel instalado", "pixel está instalado", "pixel já está instalado",
+        "já instalei o pixel", "pixel tá lá", "pixel configurado",
+        "o pixel tá instalado", "pixel funcionando",
+      ],
+      regra: "pixel declarado como instalado — focar em validação de eventos, não em instalação",
     },
     pixel_novo: {
       padroes: [
         "pixel novo", "pixel recém instalado", "acabei de instalar o pixel",
         "pixel não tem dados", "pixel sem histórico",
       ],
-      regra: "não sugerir escala agressiva — pixel em fase inicial",
+      regra: "não sugerir escala — pixel em fase de coleta inicial",
     },
     sem_criativo: {
       padroes: [
         "sem criativo", "não tenho criativo", "não tem arte", "cliente não aprovou",
         "aguardando aprovação", "sem imagem nova", "sem material novo",
+        "criativo em aprovação", "sem peça nova",
       ],
-      regra: "não sugerir subir criativo ou revisar criativo com novos materiais",
+      regra: "não sugerir subir ou revisar criativo com novos materiais",
     },
     sem_tempo: {
       padroes: [
         "sem tempo", "não consigo agora", "não posso mexer agora",
-        "ocupado", "não tenho disponibilidade",
+        "ocupado", "não tenho disponibilidade", "depois vejo isso",
       ],
       regra: "priorizar ações simples — não sugerir reestruturação complexa",
     },
+    foco_roi: {
+      padroes: [
+        "foco em roi", "preciso de retorno", "tem que dar resultado",
+        "não posso desperdiçar", "cada real conta", "orçamento enxuto",
+      ],
+      regra: "priorizar decisões conservadoras que protejam o orçamento",
+    },
+    evitar_testes: {
+      padroes: [
+        "sem mais testes", "não quero testar", "chega de teste",
+        "quero resultado direto", "sem experimento agora",
+      ],
+      regra: "não sugerir novos testes — focar em otimizar o que existe",
+    },
   };
 
-  const textoHistorico = historico
+  const texto = historico
     .filter(h => h.tipo === "user")
     .map(h => (h.texto || "").toLowerCase())
     .join(" ");
 
   const encontradas = [];
   for (const [tipo, config] of Object.entries(regras)) {
-    if (config.padroes.some(p => textoHistorico.includes(p))) {
+    if (config.padroes.some(p => texto.includes(p))) {
       encontradas.push({ tipo, regra: config.regra });
     }
   }
   return encontradas;
 }
 
-// Magic Prompt: pré-processamento local — estrutura o contexto sem chamada de IA
+// Magic Prompt — estrutura todo o contexto localmente, sem IA
 function processarMagicPrompt(campanha, mensagem, historico, accountConfig) {
   const msg = (mensagem || "").toLowerCase();
 
-  // Detectar intenção da mensagem atual
   let intencao = "analise_geral";
-  if (/diagnos|o que|como (está|ta|tá)|analisa|me diz/.test(msg))   intencao = "diagnostico";
-  else if (/por que|por quê|motivo|causa/.test(msg))                 intencao = "explicacao";
+  if (/diagnos|o que|como (está|ta|tá)|analisa|me diz/.test(msg))                intencao = "diagnostico";
+  else if (/por que|por quê|motivo|causa/.test(msg))                              intencao = "explicacao";
   else if (/o que (fazer|devo|posso)|como (melhorar|resolver|escalar)/.test(msg)) intencao = "acao";
   else if (/não (tenho|consigo|posso)|sem (verba|acesso|criativo|grana|budget)/.test(msg)) intencao = "restricao_operacional";
-  else if (/pausa|pausar/.test(msg))                                 intencao = "confirmacao_pausa";
-  else if (/escal|aumentar|crescer/.test(msg))                       intencao = "escalar";
+  else if (/pausa|pausar/.test(msg))                                              intencao = "confirmacao_pausa";
+  else if (/escal|aumentar|crescer/.test(msg))                                    intencao = "escalar";
 
-  // Restrições acumuladas do histórico + mensagem atual (sem duplicatas)
-  const restricoesHistorico  = extrairRestricoes(historico);
-  const restricoesMensagem   = extrairRestricoes([{ tipo: "user", texto: mensagem }]);
-  const tiposExistentes      = new Set(restricoesHistorico.map(r => r.tipo));
-  const restricoes = [
-    ...restricoesHistorico,
-    ...restricoesMensagem.filter(r => !tiposExistentes.has(r.tipo)),
-  ];
+  const rHist = extrairRestricoes(historico);
+  const rMsg  = extrairRestricoes([{ tipo: "user", texto: mensagem }]);
+  const tipos  = new Set(rHist.map(r => r.tipo));
+  const restricoes = [...rHist, ...rMsg.filter(r => !tipos.has(r.tipo))];
 
-  // Dados ausentes (informação semântica, não erro)
   const dadosAusentes = [];
-  if (campanha.conversoes  == null) dadosAusentes.push("conversões (pixel sem eventos ou não instalado)");
-  if (campanha.roas        == null) dadosAusentes.push("ROAS (sem receita registrada)");
-  if (campanha.ctr         == null) dadosAusentes.push("CTR (campanha sem entrega)");
-  if (campanha.cpc         == null) dadosAusentes.push("CPC (sem cliques)");
+  if (campanha.conversoes == null) dadosAusentes.push("conversões");
+  if (campanha.roas       == null) dadosAusentes.push("ROAS");
+  if (campanha.ctr        == null) dadosAusentes.push("CTR");
+  if (campanha.cpc        == null) dadosAusentes.push("CPC");
 
   return {
     intencao,
     restricoes,
-    fasePixel:    calcularFasePixel(campanha),
+    fasePixel:    calcularFasePixel(campanha, restricoes, accountConfig),
     analiseFunil: analisarFunil(campanha),
     dadosAusentes,
-    accountConfig,
   };
 }
 
-// Valida resposta: ação válida + sem linguagem genérica + sem violação de restrição
-function validarRespostaGestor(texto, restricoes) {
-  const lower = texto.toLowerCase();
-
-  if (!ACOES_GESTOR_VALIDAS.some(a => lower.includes(a))) {
-    return { valido: false, motivo: "nenhuma ação válida identificada" };
-  }
-
-  const generica = LINGUAGEM_GENERICA.find(p => lower.includes(p));
-  if (generica) return { valido: false, motivo: `linguagem ambígua: "${generica}"` };
-
-  for (const r of restricoes) {
-    if (r.tipo === "sem_verba") {
-      const viola = ["aumentar orçamento", "duplicar campanha", "criar novo conjunto"].find(a => lower.includes(a));
-      if (viola) return { valido: false, motivo: `viola sem_verba: sugeriu "${viola}"` };
-    }
-    if (r.tipo === "sem_criativo") {
-      const viola = ["subir criativo", "revisar criativo"].find(a => lower.includes(a));
-      if (viola) return { valido: false, motivo: `viola sem_criativo: sugeriu "${viola}"` };
-    }
-    if (r.tipo === "sem_acesso") {
-      const viola = ["pausar", "duplicar campanha", "criar novo conjunto", "subir criativo"].find(a => lower.includes(a));
-      if (viola) return { valido: false, motivo: `viola sem_acesso: sugeriu "${viola}"` };
-    }
-  }
-
-  return { valido: true };
-}
-
-// Fallback seguro: usado quando o modelo falha 2 vezes seguidas
-function respostaFallback(restricoes, campanha) {
-  if (restricoes.some(r => r.tipo === "sem_verba")) {
-    return "Diagnóstico: Restrição de orçamento ativa — ações que exigem verba adicional estão bloqueadas.\nDecisão: manter\nComo executar: Mantenha a campanha rodando no orçamento atual e acompanhe os dados nos próximos dias.";
-  }
-  if (restricoes.some(r => r.tipo === "sem_acesso")) {
-    return "Diagnóstico: Sem acesso ao gerenciador — não é possível executar ações técnicas agora.\nDecisão: aguardar dados\nComo executar: Monitore as métricas e execute as mudanças quando tiver acesso disponível.";
-  }
-  if (campanha.gasto == null || campanha.ctr == null) {
-    return "Diagnóstico: Dados insuficientes para análise — campanha sem métricas de entrega.\nDecisão: aguardar dados\nComo executar: Aguarde a campanha gerar impressões e dados antes de otimizar.";
-  }
-  return "Diagnóstico: Múltiplas restrições ou contexto indefinido.\nDecisão: manter\nComo executar: Mantenha a campanha sem alterações e reavalie quando o contexto mudar.";
-}
-
-async function chatGestorTrafego(campanha, mensagem, historico) {
+// Monta o prompt final com todos os blocos estruturados
+function montarPrompt(campanha, ctx, accountConfig) {
   const n  = (v, pre = "", suf = "", d = 2) => v != null ? `${pre}${parseFloat(v).toFixed(d)}${suf}` : "sem dado";
   const ni = (v) => v != null ? parseInt(v).toLocaleString("pt-BR") : "sem dado";
 
-  // ── MAGIC PROMPT: pré-processamento local, zero chamadas de IA ──────────────
-  const accountConfig = getAccountConfig(campanha.campanha);
-  const ctx = processarMagicPrompt(campanha, mensagem, historico, accountConfig);
-
-  // ── BLOCO: MÉTRICAS DA CAMPANHA ────────────────────────────────────────────
   const blocoMetricas = [
     `Nome: ${campanha.campanha}`,
     `Status: ${campanha.status || "desconhecido"}`,
@@ -1790,34 +1842,32 @@ async function chatGestorTrafego(campanha, mensagem, historico) {
     `Frequência: ${n(campanha.frequencia, "", "x", 1)}`,
     `Compras: ${ni(campanha.conversoes)} | Receita: ${n(campanha.purchase_value, "R$ ")} | ROAS: ${n(campanha.roas, "", "x")}`,
     `Custo/compra: ${n(campanha.custoPorConversao, "R$ ")}`,
-    `Add to Cart: ${ni(campanha.add_to_cart)} | Checkout iniciado: ${ni(campanha.initiate_checkout)} | Leads: ${ni(campanha.leads)}`,
-    campanha.erro ? `⚠ ERRO AO CARREGAR DADOS: ${campanha.erro}` : "",
+    `Add to Cart: ${ni(campanha.add_to_cart)} | Checkout: ${ni(campanha.initiate_checkout)} | Leads: ${ni(campanha.leads)}`,
+    campanha.erro ? `⚠ ERRO: ${campanha.erro}` : "",
   ].filter(Boolean).join("\n");
 
-  // ── BLOCO: DADOS AUSENTES ──────────────────────────────────────────────────
-  const blocoAusentes = ctx.dadosAusentes.length > 0
-    ? `Ausentes: ${ctx.dadosAusentes.join(" | ")}. Use a ausência como informação — não invente valores.`
-    : "Todos os dados principais presentes.";
-
-  // ── BLOCO: RESTRIÇÕES (prioridade máxima) ─────────────────────────────────
-  const blocoRestricoes = ctx.restricoes.length > 0
-    ? `RESTRIÇÕES ATIVAS — PRIORIDADE MÁXIMA. Não viole nenhuma delas:\n${ctx.restricoes.map(r => `- [${r.tipo}] ${r.regra}`).join("\n")}`
-    : "Sem restrições operacionais ativas.";
-
-  // ── BLOCO: CONTEXTO DO NEGÓCIO ─────────────────────────────────────────────
   const blocoNegocio = [
-    `Tipo de produto: ${accountConfig.tipo_produto}`,
+    `Tipo: ${accountConfig.tipo_produto}`,
     `Ticket médio: ${accountConfig.ticket_medio}`,
     `Objetivo: ${accountConfig.objetivo}`,
-    `Maturidade da conta: ${accountConfig.maturidade_conta}`,
-    `Limiares desta conta — CTR mín.: ${accountConfig.ctr_min}% | CPC máx.: R$${accountConfig.cpc_max} | ROAS mín.: ${accountConfig.roas_min}x`,
-  ].join("\n");
+    `Maturidade: ${accountConfig.maturidade_conta}`,
+    `Pixel: ${accountConfig.estagio_pixel}`,
+    `Histórico: ${accountConfig.historico_testes}`,
+    accountConfig.aprendizados !== "Sem aprendizados registrados." ? `Aprendizados: ${accountConfig.aprendizados}` : "",
+    accountConfig.restricoes_permanentes.length > 0 ? `Restrições permanentes: ${accountConfig.restricoes_permanentes.join("; ")}` : "",
+    `Próxima fase: ${accountConfig.proxima_fase}`,
+  ].filter(Boolean).join("\n");
 
-  // ── SYSTEM PROMPT FINAL ────────────────────────────────────────────────────
-  const sistema = `Você é um gestor de tráfego pago operacional. Não é consultor, não é assistente.
-Analisa dados, toma UMA decisão e orienta execução. Sempre.
-Nunca use linguagem condicional. Nunca dê múltiplas opções.
-Nunca comece com "Com base nos dados...".
+  const blocoRestricoes = ctx.restricoes.length > 0
+    ? `RESTRIÇÕES ATIVAS — PRIORIDADE MÁXIMA. Nunca viole:\n${ctx.restricoes.map(r => `- [${r.tipo}] ${r.regra}`).join("\n")}`
+    : "Sem restrições operacionais ativas.";
+
+  const blocoAusentes = ctx.dadosAusentes.length > 0
+    ? `Ausentes (não invente): ${ctx.dadosAusentes.join(", ")}`
+    : "Todos os dados principais presentes.";
+
+  return `Você é gestor de tráfego pago operacional. Analisa dados, toma UMA decisão, orienta execução.
+Nunca use linguagem condicional. Nunca dê múltiplas opções. Retorne sempre JSON válido.
 
 ═══════════════════════════════════
 DADOS DA CAMPANHA (últimos 30 dias)
@@ -1850,79 +1900,227 @@ RESTRIÇÕES DO USUÁRIO
 ${blocoRestricoes}
 
 ═══════════════════════════════════
-INTENÇÃO DA MENSAGEM: ${ctx.intencao}
+INTENÇÃO: ${ctx.intencao}
 ═══════════════════════════════════
 
 LÓGICA DE DECISÃO — avalie nessa ordem, pare na primeira que se aplicar:
-1. Sem dados de entrega (ctr = sem dado e gasto = sem dado) → aguardar dados
-2. Fase de aprendizado ativa (pixel novo / < 10 eventos / < R$50 gastos) → aguardar dados
-3. Erro de entrega: gasto > R$80 + impressões < 100 → pausar
-4. Frequência > 3.5 + CTR abaixo de ${accountConfig.ctr_min}% → revisar público
-5. CTR < ${accountConfig.ctr_min}% + impressões > 800 → revisar criativo
-6. CPC > R$${accountConfig.cpc_max} + CTR ok → revisar público
-7. add_to_cart alto + checkout iniciado baixo + conversões = 0 → manter (problema no site, não na campanha)
-8. initiate_checkout alto + conversões = 0 → revisar criativo (tráfego qualificado, queda na última etapa)
-9. ROAS < 1 + conversões > 5 → pausar
-10. ROAS entre 1 e ${accountConfig.roas_min} + conversões > 3 → subir criativo
-11. ROAS > ${accountConfig.roas_min} + CTR > ${(accountConfig.ctr_min * 1.5).toFixed(1)}% → duplicar campanha
-12. Nenhum problema identificado → manter
+1. Sem entrega (gasto = sem dado OU impressões < 10) → aguardar dados
+2. Gasto < R$${accountConfig.gasto_min_decisao} e eventos de conversão < 10 → aguardar dados (aprendizado)
+3. Entrega ok (CTR > 0) + gasto > R$${accountConfig.gasto_min_decisao} + zero conversões → manter (problema de rastreamento/checkout, não de campanha)
+4. Gasto > R$80 + impressões < 100 → pausar (problema de entrega)
+5. Frequência > ${accountConfig.frequencia_max}x → revisar público (público esgotado)
+6. CTR < ${accountConfig.ctr_min}% + impressões > 800 → revisar criativo
+7. CPC > R$${accountConfig.cpc_max} + CTR ok → revisar público
+8. add_to_cart alto + checkout baixo + conversões = 0 → manter (problema no site/carrinho)
+9. initiate_checkout alto + conversões = 0 → manter (problema no checkout final)
+10. ROAS < 1 + conversões > 5 → pausar (prejuízo confirmado)
+11. ROAS entre 1 e ${accountConfig.roas_min}x + conversões > 3 → subir criativo
+12. ROAS > ${accountConfig.roas_min}x + CTR ok + conversões > ${accountConfig.conversoes_min_escala} → duplicar campanha
+13. Nenhum problema identificado → manter
 
 AÇÕES VÁLIDAS — escolha exatamente uma:
 manter | subir criativo | criar novo conjunto | duplicar campanha | pausar | revisar criativo | revisar público | aguardar dados
 
-PROIBIDO:
-- "você pode", "considere", "talvez", "pode ser", "uma opção", "seria interessante"
-- Sugerir ação que viole qualquer restrição listada acima
-- Inventar valores ausentes
-- Dar duas ações ao mesmo tempo
-- Responder com mais de 6 linhas
+PROIBIÇÕES ABSOLUTAS:
+- "talvez", "pode ser", "considere", "você pode", "uma opção", "seria interessante"
+- Mais de uma ação
+- Violar restrições ativas
+- Inventar dados ausentes
+- Decidir com base em dado não presente
 
-FORMATO OBRIGATÓRIO — use exatamente este:
-Diagnóstico: [o que os dados mostram — inclua números reais]
-Decisão: [ação escolhida da lista]
-Como executar: [instrução prática de 1 linha no Gerenciador de Anúncios]`;
+RETORNE APENAS ESTE JSON — sem texto adicional:
+{
+  "acao": "uma da lista acima",
+  "justificativa": "razão direta em 1-2 frases com números reais",
+  "base_dados": "dados específicos que embasam esta decisão",
+  "confianca": 0-100
+}`;
+}
 
-  // ── CHAMADA IA — única por requisição normal ───────────────────────────────
+// Valida resposta estruturada JSON do modelo
+function validarRespostaGestor(parsed, restricoes) {
+  if (!parsed || typeof parsed !== "object") {
+    return { valido: false, motivo: "resposta não é JSON válido" };
+  }
+  if (!ACOES_GESTOR_VALIDAS.includes(parsed.acao)) {
+    return { valido: false, motivo: `ação inválida: "${parsed.acao}"` };
+  }
+  const texto = `${parsed.justificativa || ""} ${parsed.base_dados || ""}`.toLowerCase();
+  const generica = LINGUAGEM_GENERICA.find(p => texto.includes(p));
+  if (generica) return { valido: false, motivo: `linguagem ambígua: "${generica}"` };
+  if (!parsed.justificativa || parsed.justificativa.length < 10) {
+    return { valido: false, motivo: "justificativa ausente ou muito curta" };
+  }
+  if (!parsed.base_dados || parsed.base_dados.length < 5) {
+    return { valido: false, motivo: "base_dados ausente" };
+  }
+  for (const r of restricoes) {
+    if (r.tipo === "sem_verba" && ["duplicar campanha", "criar novo conjunto"].includes(parsed.acao)) {
+      return { valido: false, motivo: `viola sem_verba: ação "${parsed.acao}"` };
+    }
+    if (r.tipo === "sem_criativo" && ["subir criativo", "revisar criativo"].includes(parsed.acao)) {
+      return { valido: false, motivo: `viola sem_criativo: ação "${parsed.acao}"` };
+    }
+    if (r.tipo === "sem_acesso" && ["pausar", "duplicar campanha", "criar novo conjunto", "subir criativo"].includes(parsed.acao)) {
+      return { valido: false, motivo: `viola sem_acesso: ação "${parsed.acao}"` };
+    }
+  }
+  return { valido: true };
+}
+
+// Prompt de correção — enviado ao modelo após resposta inválida
+async function corrigirResposta(msgs, respostaAnterior, motivo) {
+  const retryMsgs = [
+    ...msgs,
+    { role: "assistant", content: typeof respostaAnterior === "string" ? respostaAnterior : JSON.stringify(respostaAnterior) },
+    {
+      role: "user",
+      content: `Resposta inválida: ${motivo}. Corrija retornando JSON: { "acao": uma da lista válida, "justificativa": 1-2 frases diretas com números reais, "base_dados": dados específicos, "confianca": 0-100 }. Sem linguagem ambígua. Sem violar restrições.`,
+    },
+  ];
+  try {
+    const resp = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: retryMsgs,
+      response_format: { type: "json_object" },
+      max_tokens: 400,
+      temperature: 0,
+    });
+    return JSON.parse(resp.choices[0].message.content);
+  } catch { return null; }
+}
+
+// Fallback determinístico — rule-based, zero IA, sempre conservador
+function fallbackDeterministico(restricoes, campanha, accountConfig) {
+  let acao = "manter", justificativa = "", base_dados = "";
+
+  if (restricoes.some(r => r.tipo === "sem_verba")) {
+    acao = "manter";
+    justificativa = "Restrição de orçamento ativa — ações com custo adicional bloqueadas.";
+    base_dados = "Restrição sem_verba detectada no histórico.";
+  } else if (restricoes.some(r => r.tipo === "sem_acesso")) {
+    acao = "aguardar dados";
+    justificativa = "Sem acesso ao gerenciador — nenhuma ação executável agora.";
+    base_dados = "Restrição sem_acesso detectada.";
+  } else if (campanha.gasto == null || campanha.ctr == null) {
+    acao = "aguardar dados";
+    justificativa = "Dados insuficientes — campanha sem métricas de entrega.";
+    base_dados = `Gasto: ${campanha.gasto ?? "sem dado"} | CTR: ${campanha.ctr ?? "sem dado"}`;
+  } else if (campanha.gasto > accountConfig.gasto_min_decisao && campanha.ctr != null && campanha.conversoes == null) {
+    acao = "manter";
+    justificativa = "Entrega funcionando mas sem eventos de conversão — problema de rastreamento, não de campanha.";
+    base_dados = `Gasto: R$${campanha.gasto.toFixed(2)} | CTR: ${campanha.ctr.toFixed(2)}%`;
+  } else {
+    acao = "manter";
+    justificativa = "Sinais inconclusivos — decisão conservadora por segurança.";
+    base_dados = "Fallback determinístico ativado após falha na análise de IA.";
+  }
+
+  return { acao, justificativa, base_dados, confianca: 0, fallback: true };
+}
+
+// Orquestrador: 1 chamada IA + correção se necessário + fallback determinístico
+async function analisarCampanha(campanha, mensagem, historico) {
+  const accountConfig = getAccountConfig(campanha.campanha);
+  const accountId     = getAccountId(campanha.campanha);
+
+  // Carregar e mesclar restrições persistentes da conta
+  const restricoesSalvas = carregarRestricoesConta(accountId);
+  const ctx = processarMagicPrompt(campanha, mensagem, historico, accountConfig);
+  ctx.restricoes = mesclarRestricoes(restricoesSalvas, ctx.restricoes);
+  salvarRestricoesConta(accountId, ctx.restricoes);
+
+  const sistema = montarPrompt(campanha, ctx, accountConfig);
   const msgs = [
     { role: "system", content: sistema },
     ...historico.map(h => ({ role: h.tipo === "user" ? "user" : "assistant", content: h.texto })),
     { role: "user", content: mensagem },
   ];
 
-  const resposta1 = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: msgs,
-    max_tokens: 500,
-    temperature: 0.1,
-  });
-  const texto1 = resposta1.choices[0].message.content.trim();
+  let parsed = null;
+  let validacao = null;
+  let usouFallback = false;
 
-  // ── VALIDAÇÃO + 1 RETRY (se necessário) ───────────────────────────────────
-  const v1 = validarRespostaGestor(texto1, ctx.restricoes);
-  if (v1.valido) return texto1;
+  try {
+    // ── 1 CHAMADA DE IA ────────────────────────────────────────────────────
+    const resp1 = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: msgs,
+      response_format: { type: "json_object" },
+      max_tokens: 400,
+      temperature: 0.1,
+    });
+    try { parsed = JSON.parse(resp1.choices[0].message.content); } catch { parsed = null; }
 
-  console.warn(`[Gestor] Resposta inválida (${v1.motivo}) — retry com temp=0`);
-  const retryMsgs = [
-    ...msgs,
-    { role: "assistant", content: texto1 },
-    {
-      role: "user",
-      content: `Resposta inválida: ${v1.motivo}. Corrija. Use o formato obrigatório. Escolha UMA ação da lista. Sem linguagem ambígua. Sem violar restrições.`,
+    validacao = validarRespostaGestor(parsed, ctx.restricoes);
+
+    if (!validacao.valido) {
+      console.warn(`[Gestor] Inválida (${validacao.motivo}) — corrigindo`);
+      const corrigido = await corrigirResposta(msgs, parsed, validacao.motivo);
+      const v2 = validarRespostaGestor(corrigido, ctx.restricoes);
+      if (v2.valido) {
+        parsed = corrigido;
+      } else {
+        console.warn(`[Gestor] Correção inválida (${v2.motivo}) — fallback`);
+        parsed = fallbackDeterministico(ctx.restricoes, campanha, accountConfig);
+        usouFallback = true;
+      }
+    }
+  } catch (e) {
+    console.error(`[Gestor] Erro na IA:`, e.message);
+    parsed = fallbackDeterministico(ctx.restricoes, campanha, accountConfig);
+    usouFallback = true;
+  }
+
+  // Audit trail — registra toda decisão
+  await registrarLog({
+    accountId,
+    campanha: campanha.campanha,
+    dados_utilizados: {
+      gasto: campanha.gasto, ctr: campanha.ctr, cpc: campanha.cpc,
+      roas: campanha.roas, conversoes: campanha.conversoes,
+      add_to_cart: campanha.add_to_cart, initiate_checkout: campanha.initiate_checkout,
     },
-  ];
-  const resposta2 = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: retryMsgs,
-    max_tokens: 500,
-    temperature: 0,
+    contexto_negocio: accountConfig.objetivo,
+    restricoes: ctx.restricoes.map(r => r.tipo),
+    acao_recomendada: parsed?.acao,
+    confianca: parsed?.confianca ?? null,
+    validacao_status: (validacao?.valido ?? false) ? "ok" : (validacao?.motivo ?? "fallback"),
+    usou_fallback: usouFallback,
+    mensagem_usuario: mensagem,
+    aprovado_ou_nao: null,
+    resultado_posterior: null,
   });
-  const texto2 = resposta2.choices[0].message.content.trim();
 
-  const v2 = validarRespostaGestor(texto2, ctx.restricoes);
-  if (v2.valido) return texto2;
+  return { parsed, ctx, accountConfig, accountId, usouFallback };
+}
 
-  console.warn(`[Gestor] Retry também inválido (${v2.motivo}) — usando fallback seguro`);
-  return respostaFallback(ctx.restricoes, campanha);
+// Formata resultado para o frontend — mantém compatibilidade com UI atual
+async function chatGestorTrafego(campanha, mensagem, historico) {
+  const { parsed, usouFallback } = await analisarCampanha(campanha, mensagem, historico);
+
+  const linhas = [
+    `Diagnóstico: ${parsed.base_dados}`,
+    `Decisão: ${parsed.acao}`,
+    `Justificativa: ${parsed.justificativa}`,
+  ];
+  if (parsed.confianca != null && parsed.confianca < 50) {
+    linhas.push(`⚠ Confiança baixa (${parsed.confianca}%) — valide antes de executar.`);
+  }
+  if (usouFallback) {
+    linhas.push(`⚠ IA indisponível — decisão por regras conservadoras.`);
+  }
+
+  return {
+    resposta: linhas.join("\n"),
+    analise: {
+      acao: parsed.acao,
+      justificativa: parsed.justificativa,
+      base_dados: parsed.base_dados,
+      confianca: parsed.confianca ?? null,
+      fallback: usouFallback,
+    },
+  };
 }
 
 async function analisarCampanhas(campanhas) {
@@ -2627,9 +2825,9 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
       if (!campanha || !mensagem) {
         return enviarJson(res, 400, { erro: "campanha e mensagem são obrigatórios." });
       }
-      const resposta = await chatGestorTrafego(campanha, mensagem, historico);
-      console.log("[OK] Chat tráfego respondido.");
-      return enviarJson(res, 200, { resposta });
+      const resultado = await chatGestorTrafego(campanha, mensagem, historico);
+      console.log(`[OK] Chat tráfego — acao:${resultado.analise?.acao} confianca:${resultado.analise?.confianca}`);
+      return enviarJson(res, 200, resultado);
     } catch (err) {
       console.error("ERRO /ads/chat:", err.message);
       return enviarJson(res, 500, { erro: err.message });
