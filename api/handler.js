@@ -1426,23 +1426,22 @@ async function buscarInsightsMeta() {
     throw err;
   }
 
-  const fields = "campaign_name,spend,impressions,clicks,cpc,ctr,cpm,frequency,actions,action_values";
-  const url = `https://graph.facebook.com/v19.0/act_${META_AD_ACCOUNT_ID}/insights?fields=${fields}&date_preset=last_30d&level=campaign&access_token=${META_ACCESS_TOKEN}`;
-
   let resp;
   try {
-    resp = await fetch(url);
+    // Buscar lista de campanhas
+    const urlCampanhas = `https://graph.facebook.com/v19.0/act_${META_AD_ACCOUNT_ID}/campaigns?fields=id,name,status&access_token=${META_ACCESS_TOKEN}`;
+    resp = await fetch(urlCampanhas);
   } catch (e) {
     const err = new Error("Sem conexão com a API do Meta. Verifique sua internet.");
     err.tipo = "rede";
     throw err;
   }
 
-  const json = await resp.json();
+  const jsonCampanhas = await resp.json();
 
-  if (json.error) {
-    const codigo = json.error.code;
-    let msg = json.error.message;
+  if (jsonCampanhas.error) {
+    const codigo = jsonCampanhas.error.code;
+    let msg = jsonCampanhas.error.message;
     if (codigo === 190) msg = "Token Meta expirado ou inválido. Gere um novo em developers.facebook.com.";
     else if (codigo === 100) msg = "ID da conta de anúncios inválido. Verifique META_AD_ACCOUNT_ID.";
     else if (codigo === 10 || codigo === 200) msg = "Permissões insuficientes. O token precisa de ads_read.";
@@ -1452,37 +1451,60 @@ async function buscarInsightsMeta() {
     throw err;
   }
 
-  return (json.data || []).map((c) => {
-    const gasto = parseFloat(c.spend || 0);
+  const campanhas = jsonCampanhas.data || [];
+  if (campanhas.length === 0) return [];
 
-    // Conversões (purchase) — pode não existir se pixel não configurado
-    const actions = c.actions || [];
-    const actionValues = c.action_values || [];
-    const purchaseAction = actions.find(a => a.action_type === "purchase" || a.action_type === "offsite_conversion.fb_pixel_purchase");
-    const purchaseValue = actionValues.find(a => a.action_type === "purchase" || a.action_type === "offsite_conversion.fb_pixel_purchase");
-    const conversoes = purchaseAction ? parseInt(purchaseAction.value || 0) : null;
-    const receitaConversoes = purchaseValue ? parseFloat(purchaseValue.value || 0) : null;
-    const roas = (gasto > 0 && receitaConversoes !== null && receitaConversoes > 0)
-      ? parseFloat((receitaConversoes / gasto).toFixed(2))
-      : null;
-    const custoPorConversao = (conversoes && conversoes > 0 && gasto > 0)
-      ? parseFloat((gasto / conversoes).toFixed(2))
-      : null;
+  // Para cada campanha, buscar insights
+  const campanhasComInsights = await Promise.all(
+    campanhas.map(async (camp) => {
+      try {
+        const urlInsights = `https://graph.facebook.com/v19.0/${camp.id}/insights?fields=spend,impressions,clicks,cpc,ctr,cpm,frequency,actions,action_values&date_preset=last_30d&access_token=${META_ACCESS_TOKEN}`;
+        const respInsights = await fetch(urlInsights);
+        const jsonInsights = await respInsights.json();
 
-    return {
-      campanha:         c.campaign_name || "Sem nome",
-      gasto:            gasto,
-      impressoes:       parseInt(c.impressions || 0),
-      cliques:          parseInt(c.clicks || 0),
-      cpc:              parseFloat(c.cpc || 0),
-      ctr:              parseFloat(c.ctr || 0),
-      cpm:              parseFloat(c.cpm || 0),
-      frequencia:       parseFloat(c.frequency || 0),
-      conversoes:       conversoes,        // null = pixel não configurado
-      roas:             roas,              // null = sem conversões rastreadas
-      custoPorConversao: custoPorConversao, // null = sem conversões
-    };
-  });
+        if (jsonInsights.error) {
+          console.warn(`[Meta] Erro ao buscar insights de ${camp.name}:`, jsonInsights.error.message);
+          return null;
+        }
+
+        const insight = (jsonInsights.data && jsonInsights.data[0]) || {};
+        const gasto = parseFloat(insight.spend || 0);
+
+        // Conversões (purchase)
+        const actions = insight.actions || [];
+        const actionValues = insight.action_values || [];
+        const purchaseAction = actions.find(a => a.action_type === "purchase" || a.action_type === "offsite_conversion.fb_pixel_purchase");
+        const purchaseValue = actionValues.find(a => a.action_type === "purchase" || a.action_type === "offsite_conversion.fb_pixel_purchase");
+        const conversoes = purchaseAction ? parseInt(purchaseAction.value || 0) : null;
+        const receitaConversoes = purchaseValue ? parseFloat(purchaseValue.value || 0) : null;
+        const roas = (gasto > 0 && receitaConversoes !== null && receitaConversoes > 0)
+          ? parseFloat((receitaConversoes / gasto).toFixed(2))
+          : null;
+        const custoPorConversao = (conversoes && conversoes > 0 && gasto > 0)
+          ? parseFloat((gasto / conversoes).toFixed(2))
+          : null;
+
+        return {
+          campanha:         camp.name || "Sem nome",
+          gasto:            gasto,
+          impressoes:       parseInt(insight.impressions || 0),
+          cliques:          parseInt(insight.clicks || 0),
+          cpc:              parseFloat(insight.cpc || 0),
+          ctr:              parseFloat(insight.ctr || 0),
+          cpm:              parseFloat(insight.cpm || 0),
+          frequencia:       parseFloat(insight.frequency || 0),
+          conversoes:       conversoes,
+          roas:             roas,
+          custoPorConversao: custoPorConversao,
+        };
+      } catch (e) {
+        console.warn(`[Meta] Erro ao processar campanha ${camp.name}:`, e.message);
+        return null;
+      }
+    })
+  );
+
+  return campanhasComInsights.filter(c => c !== null);
 }
 
 async function chatGestorTrafego(campanha, mensagem, historico) {
