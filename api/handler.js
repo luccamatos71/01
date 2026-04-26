@@ -3660,4 +3660,4 @@ if (supabase) {
   inicializarSupabase().catch(e => console.error("[Init] Erro:", e.message));
 }
 
-module.exports = { handler };
+module.exports = { handler };// Deploy timestamp: Sun Apr 26 19:53:23 HPB 2026
