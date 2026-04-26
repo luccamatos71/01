@@ -1886,6 +1886,10 @@
     .crm-counter-val { color: var(--text-2); font-weight: 600; }
     .crm-counter-val.highlight { color: var(--success); }
 
+    .mobile-recent-activity {
+      display: none;
+    }
+
     /* Alertas "Agir agora" */
     .side-card-agir { display: none; }
     .side-card-agir.tem-alertas { display: block; }
@@ -2728,6 +2732,67 @@
       }
       .brand p { display: none; }
 
+      .mobile-recent-activity {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 4px;
+      }
+
+      .mobile-section-title {
+        color: var(--text-3);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .mobile-activity-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .mobile-activity-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 12px 13px;
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        background: rgba(255,255,255,0.025);
+      }
+
+      .mobile-activity-item strong {
+        display: block;
+        color: var(--text);
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.35;
+      }
+
+      .mobile-activity-item span:not(.mobile-activity-dot) {
+        display: block;
+        margin-top: 2px;
+        color: var(--text-3);
+        font-size: 11px;
+        line-height: 1.45;
+      }
+
+      .mobile-activity-dot {
+        width: 7px;
+        height: 7px;
+        margin-top: 5px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.14);
+        flex-shrink: 0;
+      }
+
+      .mobile-activity-dot.active {
+        background: var(--success);
+        box-shadow: 0 0 0 4px rgba(34,197,94,0.08);
+      }
+
       /* 5. Ocultar cards irrelevantes no mobile */
       #sc-agente,
       #sc-modo,
@@ -2906,32 +2971,45 @@
         height: 100dvh;
       }
 
-      /* Sidebar nav mobile: grid de 2 col para os botões */
+      /* Sidebar nav mobile: home com fluxo vertical e prioridade clara */
       .sidebar-nav {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
         padding: 0;
         flex: none;
       }
 
+      .sidebar-nav::before {
+        content: "Hoje você pode:";
+        display: block;
+        margin: 10px 0 2px;
+        color: var(--text);
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: 0;
+        line-height: 1.12;
+      }
+
       .nav-btn {
-        flex-direction: column;
+        flex-direction: row;
         align-items: center;
-        justify-content: center;
-        gap: 6px;
-        padding: 14px 8px;
-        font-size: 11px;
+        justify-content: flex-start;
+        gap: 12px;
+        min-height: 56px;
+        padding: 14px 16px;
+        font-size: 13px;
+        font-weight: 600;
         border-radius: var(--r-lg);
         background: rgba(255,255,255,0.03);
         border: 1px solid var(--border);
-        text-align: center;
+        text-align: left;
       }
 
       .nav-btn.nav-btn-active {
-        background: var(--primary-dim);
-        border-color: var(--primary-border);
-        color: var(--primary);
+        background: rgba(255,255,255,0.03);
+        border-color: var(--border);
+        color: var(--text-2);
       }
 
       .nav-icon {
@@ -2939,13 +3017,78 @@
         height: 20px;
       }
 
-      /* Home button spans full width on mobile */
       .nav-btn[data-view="home"] {
-        grid-column: 1 / -1;
-        flex-direction: row;
-        justify-content: center;
-        padding: 14px 16px;
-        gap: 10px;
+        display: none;
+      }
+
+      .nav-btn[data-view="prospeccao"] {
+        min-height: 112px;
+        padding: 20px;
+        align-items: flex-start;
+        background:
+          linear-gradient(135deg, rgba(99,102,241,0.30), rgba(99,102,241,0.10)),
+          var(--surface-2);
+        border-color: rgba(99,102,241,0.34);
+        color: #fff;
+        box-shadow: 0 18px 44px rgba(0,0,0,0.22), 0 0 34px rgba(99,102,241,0.12);
+      }
+
+      .nav-btn[data-view="prospeccao"] .nav-icon {
+        width: 24px;
+        height: 24px;
+        color: #c7d2fe;
+      }
+
+      .nav-btn[data-view="prospeccao"] span {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 17px;
+        font-weight: 800;
+        line-height: 1.2;
+      }
+
+      .nav-btn[data-view="prospeccao"] span::after {
+        content: "Encontre empresas locais e priorize oportunidades.";
+        color: rgba(226,229,240,0.72);
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 1.45;
+      }
+
+      .nav-btn[data-view="crm"],
+      .nav-btn[data-view="trafego"],
+      .nav-btn[data-view="director"] {
+        min-height: 62px;
+      }
+
+      .nav-btn[data-view="crm"] span,
+      .nav-btn[data-view="trafego"] span,
+      .nav-btn[data-view="director"] span {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .nav-btn[data-view="crm"] span::after {
+        content: "Acompanhar pipeline";
+        color: var(--text-3);
+        font-size: 11px;
+        font-weight: 500;
+      }
+
+      .nav-btn[data-view="trafego"] span::after {
+        content: "Analisar campanhas";
+        color: var(--text-3);
+        font-size: 11px;
+        font-weight: 500;
+      }
+
+      .nav-btn[data-view="director"] span::after {
+        content: "Decidir próximo passo";
+        color: var(--text-3);
+        font-size: 11px;
+        font-weight: 500;
       }
 
       /* 14. Inputs: >= 16px evita zoom iOS */
@@ -3067,6 +3210,27 @@
       .analysis-drawer {
         width: 100vw;
       }
+
+      .leads-modal-top,
+      .crm-header,
+      .crm-ficha-header,
+      .criativos-header,
+      .estrategia-header,
+      .trafego-header,
+      .analysis-drawer-header,
+      .cw-header {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        background: var(--surface-2);
+      }
+
+      .crm-header,
+      .criativos-header,
+      .estrategia-header,
+      .trafego-header {
+        padding-top: max(14px, env(safe-area-inset-top));
+      }
     }
 
     /* ========== PORTRAIT ESTREITO (≤480px) ========== */
@@ -3077,6 +3241,8 @@
         padding-bottom: max(16px, env(safe-area-inset-bottom));
       }
       .brand h1 { font-size: var(--text-md); }
+      .sidebar-nav::before { font-size: 20px; margin-top: 6px; }
+      .nav-btn[data-view="prospeccao"] { min-height: 104px; padding: 18px; }
       .side-card:has(#leadsBtn) { height: 130px; padding: 16px; }
       .side-card:has(#crmPanelBtn),
       .side-card:has(#estrategiaBtn),
@@ -3131,6 +3297,33 @@
           <span>Director</span>
         </button>
       </nav>
+
+      <section class="mobile-recent-activity" aria-label="Atividades recentes">
+        <div class="mobile-section-title">Atividades recentes</div>
+        <div class="mobile-activity-list">
+          <div class="mobile-activity-item">
+            <span class="mobile-activity-dot active"></span>
+            <div>
+              <strong>Pipeline pronto para revisar</strong>
+              <span>Veja contatos que precisam de próximo passo.</span>
+            </div>
+          </div>
+          <div class="mobile-activity-item">
+            <span class="mobile-activity-dot"></span>
+            <div>
+              <strong>Últimas buscas salvas</strong>
+              <span>Retome nichos e cidades recentes.</span>
+            </div>
+          </div>
+          <div class="mobile-activity-item">
+            <span class="mobile-activity-dot"></span>
+            <div>
+              <strong>Director disponível</strong>
+              <span>Use para decidir abordagem ou prioridade.</span>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- Hidden elements kept for JS compatibility -->
       <div style="display:none">
@@ -5889,13 +6082,7 @@
       }
     });
 
-    // Auto-open dashboard on mobile
-    if (window.innerWidth < 1024) {
-      setTimeout(function() {
-        abrirCW("home");
-        document.querySelector(".nav-btn").classList.add("nav-btn-active");
-      }, 100);
-    }
+    // Mobile starts on the native home surface.
   })();
 
   </script>
