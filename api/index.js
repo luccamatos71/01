@@ -19,7 +19,7 @@ module.exports = async (req, res) => {
     }
 
     // Importar handler principal (quando pronto)
-    if (req.url.startsWith("/api/")) {
+    if (req.url.startsWith("/api/") || req.url.startsWith("/ads/")) {
       const { handler } = require("./handler.js");
       return handler(req, res);
     }
