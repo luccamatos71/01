@@ -1421,44 +1421,106 @@ async function editarImagemGemini(base64Input, mimeType, promptEdicao) {
 
 async function buscarInsightsMeta() {
   if (!META_ACCESS_TOKEN || !META_AD_ACCOUNT_ID) {
-    throw new Error("META_ACCESS_TOKEN ou META_AD_ACCOUNT_ID não definidos no .env");
+    const err = new Error("API Meta não configurada. Adicione META_ACCESS_TOKEN e META_AD_ACCOUNT_ID nas variáveis de ambiente.");
+    err.tipo = "config";
+    throw err;
   }
 
-  const fields = "campaign_name,spend,impressions,clicks,cpc,ctr";
+  const fields = "campaign_name,spend,impressions,clicks,cpc,ctr,cpm,frequency,actions,action_values";
   const url = `https://graph.facebook.com/v19.0/act_${META_AD_ACCOUNT_ID}/insights?fields=${fields}&date_preset=last_30d&level=campaign&access_token=${META_ACCESS_TOKEN}`;
 
-  const resp = await fetch(url);
+  let resp;
+  try {
+    resp = await fetch(url);
+  } catch (e) {
+    const err = new Error("Sem conexão com a API do Meta. Verifique sua internet.");
+    err.tipo = "rede";
+    throw err;
+  }
+
   const json = await resp.json();
 
-  if (json.error) throw new Error(json.error.message);
+  if (json.error) {
+    const codigo = json.error.code;
+    let msg = json.error.message;
+    if (codigo === 190) msg = "Token Meta expirado ou inválido. Gere um novo em developers.facebook.com.";
+    else if (codigo === 100) msg = "ID da conta de anúncios inválido. Verifique META_AD_ACCOUNT_ID.";
+    else if (codigo === 10 || codigo === 200) msg = "Permissões insuficientes. O token precisa de ads_read.";
+    const err = new Error(msg);
+    err.tipo = "api";
+    err.codigo = codigo;
+    throw err;
+  }
 
-  return (json.data || []).map((c) => ({
-    campanha: c.campaign_name || "Sem nome",
-    gasto: parseFloat(c.spend || 0),
-    impressoes: parseInt(c.impressions || 0),
-    cliques: parseInt(c.clicks || 0),
-    cpc: parseFloat(c.cpc || 0),
-    ctr: parseFloat(c.ctr || 0),
-  }));
+  return (json.data || []).map((c) => {
+    const gasto = parseFloat(c.spend || 0);
+
+    // Conversões (purchase) — pode não existir se pixel não configurado
+    const actions = c.actions || [];
+    const actionValues = c.action_values || [];
+    const purchaseAction = actions.find(a => a.action_type === "purchase" || a.action_type === "offsite_conversion.fb_pixel_purchase");
+    const purchaseValue = actionValues.find(a => a.action_type === "purchase" || a.action_type === "offsite_conversion.fb_pixel_purchase");
+    const conversoes = purchaseAction ? parseInt(purchaseAction.value || 0) : null;
+    const receitaConversoes = purchaseValue ? parseFloat(purchaseValue.value || 0) : null;
+    const roas = (gasto > 0 && receitaConversoes !== null && receitaConversoes > 0)
+      ? parseFloat((receitaConversoes / gasto).toFixed(2))
+      : null;
+    const custoPorConversao = (conversoes && conversoes > 0 && gasto > 0)
+      ? parseFloat((gasto / conversoes).toFixed(2))
+      : null;
+
+    return {
+      campanha:         c.campaign_name || "Sem nome",
+      gasto:            gasto,
+      impressoes:       parseInt(c.impressions || 0),
+      cliques:          parseInt(c.clicks || 0),
+      cpc:              parseFloat(c.cpc || 0),
+      ctr:              parseFloat(c.ctr || 0),
+      cpm:              parseFloat(c.cpm || 0),
+      frequencia:       parseFloat(c.frequency || 0),
+      conversoes:       conversoes,        // null = pixel não configurado
+      roas:             roas,              // null = sem conversões rastreadas
+      custoPorConversao: custoPorConversao, // null = sem conversões
+    };
+  });
 }
 
 async function chatGestorTrafego(campanha, mensagem, historico) {
-  const sistema = `Você é um gestor de tráfego pago experiente. Responde de forma direta e prática, sem teoria longa. Sempre termina com uma ação concreta. Máximo 4 parágrafos curtos por resposta.
+  // Montar bloco de métricas com campos opcionais
+  const metricas = [
+    `Nome: ${campanha.campanha}`,
+    `Gasto 30d: R$ ${campanha.gasto.toFixed(2)}`,
+    `Impressões: ${campanha.impressoes.toLocaleString("pt-BR")} | Cliques: ${campanha.cliques.toLocaleString("pt-BR")}`,
+    `CTR: ${campanha.ctr.toFixed(2)}% | CPC: R$ ${campanha.cpc.toFixed(2)} | CPM: R$ ${(campanha.cpm || 0).toFixed(2)}`,
+    `Frequência: ${(campanha.frequencia || 0).toFixed(1)}x`,
+    campanha.conversoes !== null && campanha.conversoes !== undefined
+      ? `Conversões: ${campanha.conversoes} | Custo/conv.: R$ ${campanha.custoPorConversao ?? "—"}`
+      : "Conversões: sem rastreamento de pixel",
+    campanha.roas !== null && campanha.roas !== undefined
+      ? `ROAS: ${campanha.roas}x`
+      : "ROAS: sem dados",
+  ].join("\n");
 
-Dados da campanha em foco:
-Nome: ${campanha.campanha}
-Gasto (30d): R$ ${campanha.gasto.toFixed(2)}
-Impressões: ${campanha.impressoes.toLocaleString("pt-BR")}
-Cliques: ${campanha.cliques.toLocaleString("pt-BR")}
-CTR: ${campanha.ctr.toFixed(2)}%
-CPC: R$ ${campanha.cpc.toFixed(2)}
+  const sistema = `Você é gestor de tráfego pago. Toma decisões operacionais com base em dados. Sem teoria. Resposta em até 4 linhas.
 
-Regras de diagnóstico:
-- CTR < 1% → criativo fraco, trocar ângulo ou formato
-- CPC > R$ 5 → público ruim ou leilão competitivo
-- Gasto alto com cliques = 0 → problema de entrega ou pixel mal configurado
-- Impressões altas e cliques baixos → criativo não chama atenção
-- Tudo baixo (gasto < R$5, impressões < 100) → campanha não está entregando, revisar orçamento e status`;
+CAMPANHA ATIVA:
+${metricas}
+
+CRITÉRIOS DE DECISÃO:
+- CTR < 1% + impressões > 500 → criativo fraco → subir criativo novo no mesmo conjunto
+- CPC > R$5 para negócio local → público ruim → criar conjunto novo com segmentação diferente
+- gasto > R$100 e cliques = 0 → problema de entrega → pausar e revisar status/orçamento
+- frequência > 3 → público esgotado → duplicar campanha com público novo
+- ROAS > 3 + CTR ok → campanha saudável → aumentar orçamento 20%
+- ROAS entre 1–3 + CTR ok → testar criativo novo no mesmo conjunto
+- campanha nova (gasto < R$30) → fase de aprendizado → manter sem mexer
+- custo/conversão aceitável mas volume baixo → escalar com conjunto duplicado
+
+FORMATO OBRIGATÓRIO DA RESPOSTA:
+1. O que está acontecendo (1 linha com os dados que embasam)
+2. Por quê isso está acontecendo
+3. AÇÃO RECOMENDADA: [subir criativo | criar conjunto | duplicar campanha | pausar | aumentar orçamento | manter]
+4. Como executar na prática (1 linha)`;
 
   const msgs = [
     { role: "system", content: sistema },
@@ -1469,39 +1531,52 @@ Regras de diagnóstico:
   const resp = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     messages: msgs,
-    max_tokens: 350,
-    temperature: 0.3,
+    max_tokens: 450,
+    temperature: 0.2,
   });
 
   return resp.choices[0].message.content.trim();
 }
 
 async function analisarCampanhas(campanhas) {
-  const prompt = `
-Você é um especialista em tráfego pago. Analise as campanhas abaixo e retorne um diagnóstico direto.
+  // Formatar resumo legível para o modelo
+  const resumoCampanhas = campanhas.map(c => {
+    const linhas = [
+      `Campanha: ${c.campanha}`,
+      `Gasto: R$${c.gasto.toFixed(2)} | Impressões: ${c.impressoes} | Cliques: ${c.cliques}`,
+      `CTR: ${c.ctr.toFixed(2)}% | CPC: R$${c.cpc.toFixed(2)} | CPM: R$${c.cpm.toFixed(2)}`,
+      `Frequência: ${c.frequencia.toFixed(1)}x`,
+    ];
+    if (c.conversoes !== null) linhas.push(`Conversões: ${c.conversoes} | Custo/conv.: R$${c.custoPorConversao ?? "—"}`);
+    if (c.roas !== null) linhas.push(`ROAS: ${c.roas}x`);
+    return linhas.join("\n");
+  }).join("\n\n");
 
-Campanhas:
-${JSON.stringify(campanhas, null, 2)}
+  const prompt = `Você é especialista em tráfego pago. Analise as campanhas e retorne diagnóstico direto.
 
-Regras de análise:
-- gasto > 100 e cliques = 0 → problema grave de entrega ou segmentação
-- ctr < 1% → criativo fraco
-- cpc alto (> R$5 para negócio local) → público ruim ou leilão competitivo
-- impressões altas e cliques baixos → criativo não chama atenção
-- tudo baixo (gasto < 5, impressões < 100) → campanha não está entregando
+${resumoCampanhas}
 
-Retorne SOMENTE um JSON válido neste formato, sem texto adicional:
+Critérios:
+- CTR < 1% + impressões > 500 → criativo fraco
+- CPC > R$5 para negócio local → público ruim
+- gasto > R$100 e cliques = 0 → problema de entrega
+- frequência > 3 → público esgotado
+- ROAS > 3 → campanha saudável
+- ROAS < 1 → prejuízo nas conversões
+- tudo baixo (gasto < R$5, impressões < 100) → campanha não entregando
+
+Retorne JSON válido:
 {
-  "resumo": "frase curta e direta sobre o estado geral das campanhas",
-  "problemas": ["problema 1", "problema 2"],
+  "resumo": "1 frase sobre estado geral",
+  "problemas": ["problema específico por campanha"],
   "acoes": ["ação 1", "ação 2", "ação 3"]
-}
-`.trim();
+}`;
 
   const resp = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
+    temperature: 0.2,
   });
 
   return JSON.parse(resp.choices[0].message.content);
@@ -2213,12 +2288,19 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const campanhas = await buscarInsightsMeta();
-      const analise = await analisarCampanhas(campanhas);
-      console.log("[OK] Insights Meta carregados.");
+      // Só analisa se houver campanhas
+      const analise = campanhas.length > 0 ? await analisarCampanhas(campanhas) : null;
+      console.log(`[OK] Insights Meta: ${campanhas.length} campanha(s).`);
       return enviarJson(res, 200, { campanhas, analise });
     } catch (err) {
       console.error("ERRO Meta:", err.message);
-      return enviarJson(res, 500, { erro: err.message });
+      // Retorna 200 com erro descritivo — frontend exibe mensagem útil, não crash
+      return enviarJson(res, 200, {
+        campanhas: [],
+        analise: null,
+        erro: err.message,
+        tipo_erro: err.tipo || "desconhecido",
+      });
     }
   }
 
