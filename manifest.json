@@ -1,12 +1,13 @@
 {
-  "name": "Lumyn — Prospecção com IA",
+  "name": "Lumyn - Prospecção com IA",
   "short_name": "Lumyn",
   "description": "Plataforma de inteligência comercial para prospecção B2C/B2B local",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#07080f",
-  "theme_color": "#ffffff",
-  "scope": "/",
+  "theme_color": "#07080f",
+  "orientation": "portrait-primary",
   "icons": [
     {
       "src": "/icon-192.png",
@@ -33,14 +34,5 @@
       "purpose": "maskable"
     }
   ],
-  "screenshots": [
-    {
-      "src": "/screenshot-1.png",
-      "sizes": "540x720",
-      "type": "image/png",
-      "form_factor": "narrow"
-    }
-  ],
-  "categories": ["business", "productivity"],
-  "orientation": "portrait-primary"
+  "categories": ["business", "productivity"]
 }

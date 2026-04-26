@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Lumyn — Prospecção com IA</title>
-  <meta name="theme-color" content="#ffffff">
+  <meta name="theme-color" content="#07080f">
   <meta name="description" content="Plataforma de inteligência comercial para prospecção B2C/B2B local">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -3541,6 +3541,237 @@
       .send-btn {
         box-shadow: 0 12px 30px rgba(79,70,229,0.28);
       }
+
+      /* App shell mobile / iPhone safe area */
+      html,
+      body {
+        width: 100%;
+        height: 100vh;
+        height: 100dvh;
+        min-height: 100dvh;
+        overflow: hidden;
+        overscroll-behavior: none;
+      }
+
+      .app {
+        height: 100vh;
+        height: 100dvh;
+        min-height: 100dvh;
+        overflow: hidden;
+      }
+
+      .sidebar {
+        height: 100vh;
+        height: 100dvh;
+        min-height: 100dvh;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        padding-bottom: calc(24px + env(safe-area-inset-bottom));
+      }
+
+      .mobile-recent-activity {
+        padding-bottom: calc(10px + env(safe-area-inset-bottom));
+      }
+
+      .main,
+      body.mobile-chat-open .main {
+        height: 100vh;
+        height: 100dvh;
+        min-height: 100dvh;
+        overflow: hidden;
+      }
+
+      body.mobile-chat-open .sidebar {
+        display: none;
+      }
+
+      body.mobile-chat-open .main {
+        width: 100%;
+      }
+
+      .main-header {
+        position: sticky;
+        top: 0;
+        z-index: 8;
+        padding-top: max(13px, env(safe-area-inset-top));
+        background: rgba(16,18,38,0.92);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+      }
+
+      .chat {
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: calc(28px + env(safe-area-inset-bottom));
+      }
+
+      .composer {
+        position: sticky;
+        bottom: 0;
+        z-index: 9;
+        padding-bottom: calc(14px + env(safe-area-inset-bottom));
+        background: rgba(16,18,38,0.96);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+      }
+
+      .leads-overlay,
+      .crm-overlay,
+      .criativos-overlay,
+      .estrategia-overlay,
+      .trafego-overlay,
+      .analysis-drawer,
+      .central-window {
+        height: 100vh;
+        height: 100dvh;
+        max-height: 100dvh;
+        overflow: hidden;
+      }
+
+      .leads-modal,
+      .crm-panel,
+      .crm-ficha,
+      .criativos-panel,
+      .estrategia-panel,
+      .trafego-panel,
+      .central-window {
+        height: 100vh;
+        height: 100dvh;
+        max-height: 100dvh;
+        overflow: hidden;
+      }
+
+      .leads-modal {
+        padding-bottom: calc(24px + env(safe-area-inset-bottom));
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+      }
+
+      .leads-modal-footer {
+        position: sticky;
+        bottom: 0;
+        padding-top: 12px;
+        padding-bottom: env(safe-area-inset-bottom);
+        background: linear-gradient(180deg, transparent, rgba(16,18,38,0.98) 32%);
+      }
+
+      .leads-search-btn {
+        min-height: 48px;
+        position: relative;
+        z-index: 2;
+      }
+
+      .crm-columns,
+      .crm-ficha-body,
+      .criativos-body,
+      .estrategia-chat,
+      .trafego-body,
+      .analysis-drawer-body,
+      .cw-body {
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        padding-bottom: calc(28px + env(safe-area-inset-bottom));
+      }
+
+      .crm-ficha-body {
+        padding-bottom: calc(140px + env(safe-area-inset-bottom));
+      }
+
+      .ficha-bloco:has(.ficha-acoes) {
+        position: sticky;
+        bottom: calc(10px + env(safe-area-inset-bottom));
+        z-index: 6;
+        margin: 4px -2px 0;
+        padding: 10px;
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: var(--r-lg);
+        background: rgba(16,18,38,0.96);
+        box-shadow: 0 -18px 36px rgba(0,0,0,0.28);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+      }
+
+      .ficha-acoes-row {
+        flex-wrap: wrap;
+      }
+
+      .ficha-btn,
+      .analysis-whatsapp-btn,
+      .analysis-copy-btn,
+      .analysis-crm-btn,
+      .analysis-next-btn,
+      .analysis-close-btn {
+        min-height: 40px;
+        touch-action: manipulation;
+      }
+
+      .analysis-drawer {
+        z-index: 280;
+      }
+
+      .analysis-drawer-footer {
+        position: sticky;
+        bottom: 0;
+        z-index: 7;
+        align-items: stretch;
+        padding-bottom: calc(14px + env(safe-area-inset-bottom));
+        background: rgba(16,18,38,0.97);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+      }
+
+      .analysis-drawer-footer,
+      .analysis-drawer-footer-actions {
+        flex-wrap: wrap;
+      }
+
+      .analysis-whatsapp-btn {
+        position: relative;
+        z-index: 8;
+        pointer-events: auto;
+      }
+
+      .estrategia-composer,
+      .trafego-chat-composer {
+        position: sticky;
+        bottom: 0;
+        z-index: 8;
+        padding-bottom: calc(12px + env(safe-area-inset-bottom));
+        background: rgba(16,18,38,0.97);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+      }
+
+      .trafego-chat-col.aberta {
+        min-height: 0;
+        height: 56vh;
+      }
+
+      .trafego-chat-msgs {
+        min-height: 0;
+        overflow-y: auto;
+        padding-bottom: calc(24px + env(safe-area-inset-bottom));
+      }
+
+      .criativos-col {
+        min-height: 0;
+        padding-bottom: calc(28px + env(safe-area-inset-bottom));
+      }
+
+      .cw-footer {
+        position: sticky;
+        bottom: 0;
+        padding-bottom: calc(16px + env(safe-area-inset-bottom));
+        background: rgba(16,18,38,0.97);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+      }
     }
 
     /* ========== PORTRAIT ESTREITO (≤480px) ========== */
@@ -3548,7 +3779,7 @@
       .sidebar {
         padding: 12px;
         padding-top: max(12px, env(safe-area-inset-top));
-        padding-bottom: max(16px, env(safe-area-inset-bottom));
+        padding-bottom: calc(24px + env(safe-area-inset-bottom));
       }
       .brand h1 { font-size: var(--text-md); }
       .sidebar-nav::before { font-size: 20px; margin-top: 6px; }
@@ -4658,7 +4889,7 @@
     function montarLinkWhatsApp(telefone, mensagem) {
       const digits = (telefone || "").replace(/\D/g, "");
       const number = digits.startsWith("55") ? digits : "55" + digits;
-      return "https://web.whatsapp.com/send?phone=" + number + (mensagem ? "&text=" + encodeURIComponent(mensagem) : "");
+      return "https://wa.me/" + number + (mensagem ? "?text=" + encodeURIComponent(mensagem) : "");
     }
 
     function marcarContatado(lead) {
@@ -5175,7 +5406,7 @@
         <div class="ficha-bloco">
           <div class="ficha-bloco-titulo">Contato</div>
           <a class="ficha-btn primary" id="btnWhatsApp"
-             href="https://wa.me/${(lead.telefone || "").replace(/\D/g, "")}"
+             href="${montarLinkWhatsApp(lead.telefone, "")}"
              target="_blank" rel="noopener">
             WhatsApp — ${escapeHtml(lead.telefone)}
           </a>
@@ -5527,7 +5758,7 @@
         btnWa.className = "director-acao-btn";
         btnWa.textContent = "Abrir WhatsApp";
         btnWa.addEventListener("click", () => {
-          const link = "https://web.whatsapp.com/send?text=" + encodeURIComponent(resposta);
+          const link = "https://wa.me/?text=" + encodeURIComponent(resposta);
           window.open(link, "_blank");
         });
         acoes.appendChild(btnWa);
