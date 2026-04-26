@@ -388,17 +388,13 @@ Se não tiver nome do negócio nem nicho claro: pergunte antes de gerar a mensag
 Use "acao":"copiar" sempre que gerar mensagem pronta para enviar.
 Responda em JSON: {"resposta":"...","acao":null}`,
 
-  analytics: `[AGENTE DESABILITADO PARA ANÁLISE DE TRÁFEGO]
-
-Para análise de campanhas Meta Ads com dados reais, use a rota dedicada de tráfego.
-
-SE PERGUNTA É SOBRE TRÁFEGO/CAMPANHAS:
-Responda: "Para análise de tráfego com dados reais, use o painel Gestor de Tráfego ou mensione a conta (Rivano/Com Tempero) que vou buscar os dados atualizados automaticamente."
-
-SE PERGUNTA É GENÉRICA (não sobre tráfego):
-Você é o Analytics Agent da Lumyn — especialista em performance de campanhas Meta Ads.
+  analytics: `Você é o Analytics Agent da Lumyn — especialista em performance de campanhas Meta Ads.
 
 Você pensa em: dinheiro, conversão, escala. Não tolera campanha fraca. Protege o orçamento.
+
+SISTEMA AUTO-DELEGAÇÃO:
+Se pergunta é sobre tráfego/campanhas: você automaticamente busca dados reais e analisa.
+Não precisa pedir contexto — o sistema enriquece pra você.
 
 ═ COMO VOCÊ TRABALHA ═
 - Você RECEBE contexto enriquecido (dados de campanha, thresholds, restrições, histórico)
@@ -2364,7 +2360,7 @@ async function processarAgente(nomeAgente, input, context = "", historico = []) 
   // Se é @analytics + pergunta sobre tráfego, delega pra rota especializada
   if (nomeAgente === "analytics") {
     const msgLower = input.toLowerCase();
-    const temPalavrasTrafe = ["campanha", "tráfego", "ad", "ads", "roas", "ctr", "cpc", "criativo", "anúncio", "performance", "gasto"];
+    const temPalavrasTrafe = ["campanha", "tráfego", "ad", "ads", "roas", "ctr", "cpc", "criativo", "anúncio", "performance", "gasto", "análise"];
     const temPalavra = temPalavrasTrafe.some(p => msgLower.includes(p));
 
     if (temPalavra) {
@@ -2380,17 +2376,28 @@ async function processarAgente(nomeAgente, input, context = "", historico = []) 
         if (campanhas && campanhas.length > 0) {
           const campanha = campanhas[0];
           const resultado = await analisarCampanha(campanha, input, historico, accountKey);
-          console.log(`[OK] @analytics delegou pra /api/trafego (${accountKey}) — ${resultado.parsed?.acao}`);
+          const resposta = resultado.parsed?.justificativa ?
+            `${resultado.parsed.justificativa}\n\n**Ação: ${resultado.parsed.acao}**` :
+            `Análise: ${resultado.parsed?.acao}`;
+
+          console.log(`[OK] @analytics delegou pra traffic analysis (${accountKey}) — ${resultado.parsed?.acao}`);
           return {
             agente: nomeAgente,
-            resposta: resultado.parsed?.justificativa || "Análise realizada",
+            resposta,
             acao: resultado.parsed?.acao || null,
             trocas: historicoAgentes[nomeAgente].length / 2,
           };
+        } else {
+          throw new Error("Nenhuma campanha encontrada");
         }
       } catch (e) {
-        console.warn(`[Analytics] Erro ao delegar pra trafego: ${e.message}`);
-        // Falls through to normal processing se falhar
+        console.error(`[Analytics DELEGATION FAILED] ${e.message}`);
+        return {
+          agente: nomeAgente,
+          resposta: `Erro ao buscar dados de tráfego: ${e.message}. Tente novamente ou use o painel Gestor de Tráfego.`,
+          acao: null,
+          trocas: 0,
+        };
       }
     }
   }
