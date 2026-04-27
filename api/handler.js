@@ -873,7 +873,7 @@ async function buscarDetalhes(placeId) {
       "Content-Type": "application/json",
       "X-Goog-Api-Key": GOOGLE_API_KEY,
       "X-Goog-FieldMask":
-        "displayName,formattedAddress,rating,userRatingCount,websiteUri,nationalPhoneNumber,googleMapsUri,primaryTypeDisplayName",
+        "displayName,formattedAddress,rating,userRatingCount,websiteUri,nationalPhoneNumber,googleMapsUri,primaryTypeDisplayName,businessStatus",
     },
   });
 
@@ -889,7 +889,7 @@ async function buscarLugaresLeads(query) {
       "Content-Type": "application/json",
       "X-Goog-Api-Key": GOOGLE_API_KEY,
       "X-Goog-FieldMask":
-        "places.id,places.displayName,places.rating,places.userRatingCount,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.primaryTypeDisplayName",
+        "places.id,places.displayName,places.rating,places.userRatingCount,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.primaryTypeDisplayName,places.googleMapsUri,places.businessStatus",
     },
     body: JSON.stringify({
       textQuery: query,
@@ -914,6 +914,181 @@ function classificarLead(nota, avaliacoes, temSite) {
 
 function removerAcentos(texto) {
   return String(texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function contemTermo(texto, termos) {
+  return termos.some((termo) => texto.includes(termo));
+}
+
+function limitarNumero(valor, min, max) {
+  return Math.max(min, Math.min(max, valor));
+}
+
+function scoreLeadV2(lead = {}) {
+  const texto = removerAcentos([
+    lead.nome,
+    lead.categoria,
+    lead.endereco,
+  ].filter(Boolean).join(" ")).toLowerCase();
+
+  const nota = Number(lead.nota) || 0;
+  const avaliacoes = Number(lead.avaliacoes) || 0;
+  const temTelefone = Boolean(lead.telefone);
+  const temSite = Boolean(lead.site);
+  const prioridadeBase = normalizarPrioridadeAnalise(lead.prioridade)
+    || classificarLead(nota, avaliacoes, temSite);
+
+  const sinaisFortes = [];
+  const sinaisFracos = [];
+
+  const nichosFortes = [
+    "clinica", "estetica", "odont", "dentista", "barbear", "salao",
+    "academia", "fitness", "pilates", "pizzaria", "restaurante",
+    "hamburg", "delivery", "pet shop", "veterin", "escola", "curso",
+  ];
+  const nichosMedios = [
+    "loja", "spa", "massagem", "nutri", "fisioterapia", "psicologia",
+    "imobiliaria", "arquitetura",
+  ];
+  const nichosProfissionais = [
+    "advogado", "advocacia", "contabilidade", "contador", "consultoria",
+  ];
+  const marcasConsolidadas = [
+    "smart fit", "bodytech", "mc donald", "mcdonald", "burger king",
+    "subway", "boticario", "cacau show", "magazine luiza", "casas bahia",
+    "renner", "riachuelo", "americanas", "drogasil", "pague menos",
+  ];
+
+  const nichoForte = contemTermo(texto, nichosFortes);
+  const nichoMedio = contemTermo(texto, nichosMedios);
+  const nichoProfissional = contemTermo(texto, nichosProfissionais);
+  const marcaConsolidada = contemTermo(texto, marcasConsolidadas);
+  const consolidadoForte = avaliacoes >= 400 && nota >= 4.4 && temSite;
+  const statusInativo = lead.businessStatus && lead.businessStatus !== "OPERATIONAL";
+
+  let nicho = 10;
+  if (marcaConsolidada) {
+    nicho = 2;
+    sinaisFracos.push("marca/franquia com baixa chance de decisão rápida");
+  } else if (nichoForte) {
+    nicho = 20;
+    sinaisFortes.push("nicho local com ciclo curto e boa abordagem por WhatsApp");
+  } else if (nichoMedio) {
+    nicho = 15;
+    sinaisFortes.push("nicho local com potencial comercial razoável");
+  } else if (nichoProfissional) {
+    nicho = 10;
+    sinaisFracos.push("nicho profissional tende a ter ciclo de decisão mais lento");
+  }
+
+  let contato = temTelefone ? 25 : 0;
+  if (temTelefone) {
+    sinaisFortes.push("telefone disponível para contato direto");
+  } else {
+    sinaisFracos.push("sem telefone no Google, exige busca manual de canal");
+  }
+
+  let tracao = 3;
+  if (avaliacoes <= 0) {
+    sinaisFracos.push("sem avaliações suficientes para validar tração local");
+  } else if (avaliacoes < 20) {
+    tracao = 10;
+    sinaisFortes.push(`${avaliacoes} avaliações: negócio pequeno, ainda fácil de disputar atenção`);
+  } else if (avaliacoes <= 80) {
+    tracao = 15;
+    sinaisFortes.push(`${avaliacoes} avaliações: tração local inicial com espaço para crescer`);
+  } else if (avaliacoes <= 150) {
+    tracao = 13;
+    sinaisFortes.push(`${avaliacoes} avaliações: já existe demanda, sem parecer consolidado demais`);
+  } else if (avaliacoes <= 300) {
+    tracao = 8;
+    sinaisFracos.push(`${avaliacoes} avaliações: negócio mais maduro, menor urgência comercial`);
+  } else {
+    tracao = 4;
+    sinaisFracos.push(`${avaliacoes} avaliações: negócio muito consolidado para prospecção fria`);
+  }
+
+  let oportunidade = 8;
+  if (avaliacoes > 0 && avaliacoes < 20) {
+    oportunidade = 25;
+  } else if (avaliacoes <= 150 && nota >= 3.0 && nota <= 4.3) {
+    oportunidade = 24;
+    sinaisFortes.push(`nota ${nota}: existe espaço claro para melhorar percepção local`);
+  } else if (avaliacoes <= 150 && nota > 4.3) {
+    oportunidade = temSite ? 16 : 20;
+  } else if (avaliacoes > 0 && avaliacoes <= 300 && nota > 0 && nota < 4.4) {
+    oportunidade = 14;
+  } else if (avaliacoes > 300 && nota < 4.0) {
+    oportunidade = 10;
+    sinaisFortes.push(`nota ${nota}: volume alto com reputação abaixo do ideal`);
+  } else if (avaliacoes > 300) {
+    oportunidade = 3;
+  }
+
+  let maturidade = 7;
+  if (!temSite) {
+    maturidade += 8;
+    sinaisFortes.push("sem site próprio, presença digital parece menos madura");
+  } else {
+    sinaisFracos.push("tem site próprio, sinal de presença digital mais estruturada");
+  }
+  if (avaliacoes > 300 && temSite) maturidade = 2;
+  maturidade = limitarNumero(maturidade, 0, 15);
+
+  if (consolidadoForte) {
+    sinaisFracos.push("400+ avaliações, nota alta e site: presença forte demais para prioridade alta");
+  }
+  if (statusInativo) {
+    sinaisFracos.push("status do negócio no Google não está operacional");
+  }
+
+  const scoreBreakdown = {
+    nicho,
+    tracao,
+    contato,
+    oportunidade,
+    maturidade,
+  };
+
+  let score = Object.values(scoreBreakdown).reduce((total, valor) => total + valor, 0);
+
+  if (!temTelefone) score = Math.min(score, 55);
+  if (marcaConsolidada) score = Math.min(score, 35);
+  if (consolidadoForte) score = Math.min(score, 32);
+  if (prioridadeBase === "DESCARTE") score = Math.min(score, 25);
+  if (statusInativo) score = Math.min(score, 20);
+
+  score = limitarNumero(Math.round(score), 0, 100);
+
+  let proximoPasso = "Salvar no CRM e validar canal antes de abordar.";
+  if (!temTelefone) {
+    proximoPasso = "Buscar Instagram ou outro canal antes de tentar abordagem.";
+  } else if (prioridadeBase === "DESCARTE" || consolidadoForte || marcaConsolidada) {
+    proximoPasso = "Não priorizar agora; usar apenas se sobrar tempo ou houver motivo específico.";
+  } else if (score >= 75) {
+    proximoPasso = "Priorizar hoje: abrir o lead, gerar mensagem no Outreacher e abordar por WhatsApp.";
+  } else if (score >= 55) {
+    proximoPasso = "Abordar depois dos leads quentes, validando contexto antes do contato.";
+  }
+
+  let anguloAbordagem = "";
+  if (contemTermo(texto, ["pizzaria", "restaurante", "hamburg", "delivery"])) {
+    anguloAbordagem = "pedidos diretos e recorrência pelo WhatsApp";
+  } else if (contemTermo(texto, ["barbear", "salao", "estetica", "clinica", "odont", "academia", "fitness", "pilates"])) {
+    anguloAbordagem = "agenda, recorrência e captação local";
+  } else if (nichoProfissional) {
+    anguloAbordagem = "autoridade local e captação consultiva";
+  }
+
+  return {
+    scoreVersion: "v2",
+    score,
+    scoreBreakdown,
+    sinaisFortes: sinaisFortes.slice(0, 4),
+    sinaisFracos: sinaisFracos.slice(0, 4),
+    proximoPasso,
+    anguloAbordagem,
+  };
 }
 
 function normalizarPrioridadeAnalise(valor) {
@@ -1183,63 +1358,17 @@ Como abordar (1 linha):
 
 Canal sugerido: WhatsApp / Instagram / Outro
 
-Mensagem pronta:
-[Gere EXATAMENTE 3 mensagens para WhatsApp — uma de cada estilo. Objetivo único de toda mensagem: abrir conversa e marcar call de 15-20 min.
+Próximo passo:
+[1 linha operacional. Não escreva mensagem de contato.]
 
-FORMATO OBRIGATÓRIO — copie esses marcadores exatos:
-
-[LEVE]
-<mensagem leve, máximo 3 linhas>
-
-[DIRETA]
-<mensagem direta, máximo 3 linhas>
-
-[AGRESSIVA]
-<mensagem agressiva, máximo 3 linhas>
-
-Quando usar: <1 linha explicando o cenário ideal para leve, direta e agressiva no caso desse lead>
-
----
-
-REGRAS DE TOM (escolha o vocabulário pelo tipo de negócio):
-
-INFORMAL (restaurante, lanchonete, pizzaria, hamburgueria, barbearia, salão, pet shop, mercado, academia, loja):
-- Abertura leve: "Fala, tudo certo?" / "Oi, tudo bem?"
-- Linguagem direta, sem formalidade, sem gíria excessiva
-
-EQUILIBRADO (clínica, estética, psicologia, nutrição, fisioterapia, odontologia, escola, curso, coaching):
-- Abertura: "Olá, tudo bem?"
-- Acessível, mas profissional
-
-PROFISSIONAL (advocacia, contabilidade, arquitetura, consultoria, imobiliária, engenharia):
-- Abertura: "Olá, bom dia." / sem abertura
-- Consultivo, sem gíria
-
-REGRAS DOS 3 ESTILOS (aplicar dentro do tom do nicho):
-
-LEVE: mais suave, mais aberta, menos pressão. Abre porta pra conversa sem apontar problema.
-Exemplo informal: "Fala, tudo certo? Vi a barbearia de vocês aqui. Posso te mandar uma ideia rápida de como trazer mais agendamento? 15 min de papo."
-
-DIRETA: objetiva, clara, sem rodeio. Diz o que faz e pede o tempo.
-Exemplo informal: "Fala, trabalho trazendo mais agendamento pra barbearia. Consegue 15 min essa semana pra eu te mostrar como?"
-
-AGRESSIVA: aponta dor genérica do nicho direto, gera leve desconforto. Nunca ofende, nunca cita dado técnico, nunca insulta.
-Exemplo informal: "Fala, passei no perfil. Barbearia do tamanho do seu tá deixando agendamento na mesa por não aparecer bem no Google. 15 min e te mostro."
-
-REGRAS UNIVERSAIS (valem para os 3 estilos):
-- Máximo 3 linhas por mensagem
-- Sempre termina com pedido explícito de 15-20 min
-- Nunca cita avaliações, nota, estrelas, número de avaliações, site
-- Nunca: "faço parte do time", "identificamos oportunidade", "sou especialista em"
-- Nunca soa robótico, nunca soa anúncio, nunca soa consultor falando em PowerPoint
-- Linguagem humana de WhatsApp
-- Proibido "talvez", "pode ser que", "acredito que"]
+Ângulo de abordagem:
+[opcional. Apenas tema comercial, nunca mensagem pronta.]
 
 ---
 
 Regras finais:
 - Nunca invente dado ausente. Se faltar algo relevante, escreva: "dado ausente".
-- Os 3 estilos nunca citam avaliações, nota ou número diretamente.
+- Não gere mensagem pronta. Mensagens pertencem somente ao Outreacher.
 - Sem frases de consultoria. Sem obviedades.
 `;
 
@@ -1341,30 +1470,11 @@ Como abordar (1 linha):
 
 Canal sugerido: WhatsApp / Instagram / Outro
 
-Mensagem pronta:
-[Gere EXATAMENTE 3 mensagens — uma de cada estilo. WhatsApp humano, gancho + benefício implícito + convite 15-20 min. Nunca técnico, nunca diagnóstico.
+Próximo passo:
+[1 linha operacional. Não escreva mensagem de contato.]
 
-FORMATO OBRIGATÓRIO:
-
-[LEVE]
-<mensagem leve, máximo 3 linhas — abre porta sem pressão>
-
-[DIRETA]
-<mensagem direta, máximo 3 linhas — objetiva, clara, sem rodeio>
-
-[AGRESSIVA]
-<mensagem agressiva, máximo 3 linhas — aponta dor do nicho, gera leve desconforto, nunca ofende>
-
-Quando usar: <1 linha sobre quando cada estilo faz sentido nesse caso>
-
-REGRAS UNIVERSAIS:
-- 3 linhas no máximo por mensagem
-- Sempre pede 15-20 min explicitamente
-- Nunca cita dado técnico, avaliação, nota
-- Nunca "identificamos oportunidade", "faço parte do time"
-- Nunca soa robótico, anúncio ou consultor
-- Linguagem humana de WhatsApp
-- Tom adaptado pelo nicho (informal / equilibrado / profissional)]
+Ângulo de abordagem:
+[opcional. Apenas tema comercial, nunca mensagem pronta.]
 
 ---
 
@@ -1465,27 +1575,17 @@ Como abordar (1 linha):
 
 Canal sugerido: WhatsApp / Instagram / Outro
 
-Mensagem pronta:
-[Gere EXATAMENTE 3 mensagens — formato obrigatório:
+Próximo passo:
+[1 linha operacional. Não escreva mensagem de contato.]
 
-[LEVE]
-<mensagem leve, máximo 3 linhas>
-
-[DIRETA]
-<mensagem direta, máximo 3 linhas>
-
-[AGRESSIVA]
-<mensagem agressiva, máximo 3 linhas>
-
-Quando usar: <1 linha>
-
-REGRAS: WhatsApp humano, 15-20 min no fim, sem dado técnico, sem "faço parte do time", sem soar robótico/anúncio/consultor. Tom adaptado pelo nicho.]
+Ângulo de abordagem:
+[opcional. Apenas tema comercial, nunca mensagem pronta.]
 
 ---
 
 Regras finais:
 - Nunca inventar dado não descrito
-- Mensagem pronta: nunca técnica, nunca diagnóstico
+- Não gere mensagem pronta. Mensagens pertencem somente ao Outreacher.
 - Sem frases de consultoria
 `;
   return chamarTextoAnaliseSDR(prompt, "refinamento manual");
@@ -2923,10 +3023,17 @@ async function handler(req, res) {
           avaliacoes: detalhes.userRatingCount,
           telefone: detalhes.nationalPhoneNumber,
           site: detalhes.websiteUri,
+          mapsUrl: detalhes.googleMapsUri,
+          businessStatus: detalhes.businessStatus,
           endereco: detalhes.formattedAddress,
         };
 
         const prioridadeOficial = classificarLead(dados.nota, dados.avaliacoes, !!dados.site);
+        Object.assign(dados, {
+          prioridade: prioridadeOficial,
+          origemBusca: input || placeId,
+          ...scoreLeadV2({ ...dados, prioridade: prioridadeOficial, origemBusca: input || placeId }),
+        });
         let resposta;
         let analiseEstruturada;
 
@@ -2947,7 +3054,7 @@ async function handler(req, res) {
         console.log("[OK] Análise Google concluída.");
         return enviarJson(res, 200, {
           modo: "analise",
-          dados: { ...dados, prioridade: prioridadeOficial },
+          dados,
           resposta,
           analiseEstruturada,
         });
@@ -2962,17 +3069,24 @@ async function handler(req, res) {
           return enviarJson(res, 200, { erro: "Nenhum resultado encontrado para essa busca." });
         }
 
-        const classificados = lugares.map((l) => ({
-          id: l.id,
-          nome: l.displayName?.text || "Sem nome",
-          nota: l.rating || null,
-          avaliacoes: l.userRatingCount || null,
-          telefone: l.nationalPhoneNumber || null,
-          site: l.websiteUri || null,
-          endereco: l.formattedAddress || null,
-          categoria: l.primaryTypeDisplayName?.text || null,
-          prioridade: classificarLead(l.rating, l.userRatingCount, !!l.websiteUri),
-        }));
+        const classificados = lugares.map((l) => {
+          const prioridade = classificarLead(l.rating, l.userRatingCount, !!l.websiteUri);
+          const lead = {
+            id: l.id,
+            nome: l.displayName?.text || "Sem nome",
+            nota: l.rating || null,
+            avaliacoes: l.userRatingCount || null,
+            telefone: l.nationalPhoneNumber || null,
+            site: l.websiteUri || null,
+            mapsUrl: l.googleMapsUri || null,
+            businessStatus: l.businessStatus || null,
+            endereco: l.formattedAddress || null,
+            categoria: l.primaryTypeDisplayName?.text || null,
+            prioridade,
+            origemBusca: busca,
+          };
+          return { ...lead, ...scoreLeadV2(lead) };
+        });
 
         classificados.forEach((lead) => {
           lead.analiseEstruturada = criarFallbackGoogleEstruturado(lead.prioridade);
@@ -2985,6 +3099,8 @@ async function handler(req, res) {
         leads.sort((a, b) => {
           const diff = ordemPrioridade[a.prioridade] - ordemPrioridade[b.prioridade];
           if (diff !== 0) return diff;
+          const scoreDiff = (b.score || 0) - (a.score || 0);
+          if (scoreDiff !== 0) return scoreDiff;
           return (a.telefone ? 0 : 1) - (b.telefone ? 0 : 1);
         });
 
@@ -3067,9 +3183,20 @@ async function handler(req, res) {
           telefone: lead.telefone || null,
           categoria: lead.categoria || null,
           endereco: lead.endereco || null,
+          site: lead.site || null,
+          mapsUrl: lead.mapsUrl || null,
+          businessStatus: lead.businessStatus || null,
           nota: lead.nota || null,
           avaliacoes: lead.avaliacoes || null,
           prioridade: lead.prioridade || "BAIXA",
+          scoreVersion: lead.scoreVersion || null,
+          score: Number.isFinite(Number(lead.score)) ? Number(lead.score) : null,
+          scoreBreakdown: lead.scoreBreakdown || null,
+          sinaisFortes: Array.isArray(lead.sinaisFortes) ? lead.sinaisFortes : [],
+          sinaisFracos: Array.isArray(lead.sinaisFracos) ? lead.sinaisFracos : [],
+          proximoPasso: lead.proximoPasso || "",
+          anguloAbordagem: lead.anguloAbordagem || "",
+          origemBusca: lead.origemBusca || null,
           status: "novo",
           ultimoMovimento: null,
           statusConversa: null,
@@ -3092,6 +3219,9 @@ async function handler(req, res) {
         const CAMPOS_PERMITIDOS = [
           "status", "ultimoMovimento", "statusConversa", "ultimaInteracaoEm",
           "mensagemInicial", "followUp", "notas",
+          "site", "mapsUrl", "businessStatus",
+          "scoreVersion", "score", "scoreBreakdown", "sinaisFortes", "sinaisFracos",
+          "proximoPasso", "anguloAbordagem", "origemBusca",
         ];
         CAMPOS_PERMITIDOS.forEach(c => {
           if (body[c] !== undefined) crm.leads[idx][c] = body[c];
