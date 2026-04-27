@@ -1253,7 +1253,7 @@ function scoreLeadV2Legacy(lead = {}) {
   };
 }
 
-function scoreLeadV2(lead = {}) {
+function scoreLeadV21Legacy(lead = {}) {
   const texto = removerAcentos([
     lead.nome,
     lead.categoria,
@@ -1476,6 +1476,373 @@ function scoreLeadV2(lead = {}) {
 
   return {
     scoreVersion: "v2.1",
+    score,
+    scoreConfianca,
+    scoreBreakdown,
+    sinaisFortes: sinaisFortes.slice(0, 5),
+    sinaisFracos: sinaisFracos.slice(0, 5),
+    proximoPasso,
+    anguloAbordagem,
+  };
+}
+
+function scoreLeadV2(lead = {}) {
+  const texto = removerAcentos([
+    lead.nome,
+    lead.categoria,
+    lead.endereco,
+  ].filter(Boolean).join(" ")).toLowerCase();
+
+  const notaRaw = Number(lead.nota);
+  const avaliacoesRaw = Number(lead.avaliacoes);
+  const nota = Number.isFinite(notaRaw) ? notaRaw : 0;
+  const avaliacoes = Number.isFinite(avaliacoesRaw) ? avaliacoesRaw : 0;
+  const temNota = nota > 0;
+  const temAvaliacoes = avaliacoes > 0;
+  const temTelefone = Boolean(String(lead.telefone || "").trim());
+  const temSite = Boolean(lead.site);
+  const prioridadeBase = normalizarPrioridadeAnalise(lead.prioridade)
+    || classificarLead(nota, avaliacoes, temSite);
+
+  const sinaisFortes = [];
+  const sinaisFracos = [];
+  const adicionarSinal = (lista, sinal) => {
+    if (sinal && !lista.includes(sinal)) lista.push(sinal);
+  };
+
+  const termoRegex = (termo) => {
+    const escaped = String(termo).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+    return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
+  };
+  const temTermo = (termos) => termos.some((termo) => termoRegex(removerAcentos(termo).toLowerCase()).test(texto));
+  const temFragmento = (termos) => termos.some((termo) => texto.includes(removerAcentos(termo).toLowerCase()));
+
+  const marcasConsolidadas = [
+    "smart fit", "bodytech", "mcdonald", "mc donald", "burger king",
+    "subway", "boticario", "cacau show", "magazine luiza", "casas bahia",
+    "renner", "riachuelo", "americanas", "drogasil", "pague menos",
+  ];
+
+  const taxonomias = [
+    {
+      id: "estetica_automotiva",
+      label: "estetica automotiva",
+      peso: 14,
+      termos: ["estetica automotiva", "detailing", "detail", "lava rapido", "higienizacao automotiva", "polimento", "vitrificacao", "martelinho"],
+      angulos: ["servicos de alto valor e recorrencia local", "orcamentos de servicos pelo WhatsApp", "confianca local para cuidados automotivos"],
+    },
+    {
+      id: "odonto",
+      label: "clinica odontologica",
+      peso: 16,
+      termos: ["odont", "dentista", "dental", "ortodont", "implante", "clareamento", "sorriso"],
+      fragmentos: ["odont", "ortodont"],
+      angulos: ["confianca local para novos pacientes", "orcamentos pelo WhatsApp", "primeira consulta e agenda qualificada", "autoridade local em tratamentos de maior valor"],
+    },
+    {
+      id: "clinica_estetica",
+      label: "clinica estetica",
+      peso: 16,
+      termos: ["clinica estetica", "estetica", "harmonizacao", "botox", "depilacao", "laser", "sobrancelha", "spa"],
+      angulos: ["agenda, retorno e procedimentos recorrentes", "agendamentos pelo WhatsApp", "confianca local para procedimentos esteticos", "diferenciacao em bairro competitivo"],
+    },
+    {
+      id: "barbearia",
+      label: "barbearia",
+      peso: 17,
+      termos: ["barbearia", "barber", "barbeiro"],
+      angulos: ["agenda, retorno e horarios preenchidos", "agendamento direto pelo WhatsApp", "retorno de clientes do bairro"],
+    },
+    {
+      id: "restaurante",
+      label: "restaurante e delivery",
+      peso: 17,
+      termos: ["pizzaria", "restaurante", "hamburgueria", "hamburg", "delivery", "lanchonete", "marmit", "comida", "bar"],
+      fragmentos: ["hamburg", "marmit"],
+      angulos: ["pedidos diretos e recorrencia pelo WhatsApp", "movimento local em dias fracos", "recorrencia sem depender so de aplicativo"],
+    },
+    {
+      id: "academia",
+      label: "academia e fitness",
+      peso: 15,
+      termos: ["academia", "fitness", "pilates", "crossfit", "personal"],
+      angulos: ["recorrencia, matriculas e retencao local", "primeiras matriculas do bairro", "retorno de alunos e frequencia semanal"],
+    },
+    {
+      id: "pet",
+      label: "pet e veterinaria",
+      peso: 15,
+      termos: ["pet shop", "veterinaria", "veterinario", "banho e tosa"],
+      fragmentos: ["veterin"],
+      angulos: ["recorrencia de cuidados e relacionamento local", "agenda de banho e tosa pelo WhatsApp", "confianca local para tutores"],
+    },
+    {
+      id: "loja",
+      label: "loja local",
+      peso: 12,
+      termos: ["loja", "boutique", "moda", "roupa", "calcado", "moveis", "otica"],
+      angulos: ["movimento local e conversas pelo WhatsApp", "vitrine local e atendimento direto", "retorno de clientes do bairro"],
+    },
+    {
+      id: "educacao",
+      label: "educacao local",
+      peso: 13,
+      termos: ["escola", "curso", "idioma", "reforco", "aula"],
+      angulos: ["matriculas e recorrencia local", "confianca dos pais e demanda do bairro", "turmas abertas e conversa pelo WhatsApp"],
+    },
+    {
+      id: "advocacia",
+      label: "advocacia",
+      peso: 9,
+      termos: ["advocacia", "advogado", "advogada", "juridico"],
+      angulos: ["autoridade local e demanda consultiva", "primeira conversa e triagem consultiva", "posicionamento local em area especifica"],
+    },
+    {
+      id: "contabilidade",
+      label: "contabilidade",
+      peso: 9,
+      termos: ["contabilidade", "contador", "contabil"],
+      fragmentos: ["contabil"],
+      angulos: ["autoridade local e demanda consultiva", "organizacao financeira para negocios locais", "primeira conversa consultiva"],
+    },
+    {
+      id: "profissional",
+      label: "servico profissional",
+      peso: 8,
+      termos: ["consultoria", "imobiliaria", "arquitetura"],
+      angulos: ["autoridade local e captacao consultiva", "prova de confianca no bairro", "primeira conversa consultiva"],
+    },
+  ];
+
+  const marcaConsolidada = temFragmento(marcasConsolidadas);
+  const taxonomia = taxonomias.find((item) => temTermo(item.termos) || (item.fragmentos && temFragmento(item.fragmentos))) || {
+    id: "generico",
+    label: "nicho pouco claro",
+    peso: 7,
+    termos: [],
+    angulos: ["validacao manual do contexto antes da abordagem"],
+  };
+  const nichoConhecido = taxonomia.id !== "generico";
+  const subnichoConsultivo = ["advocacia", "contabilidade", "profissional"].includes(taxonomia.id);
+  const consolidadoForte = avaliacoes >= 400 && nota >= 4.4 && temSite;
+  const statusInativo = lead.businessStatus && lead.businessStatus !== "OPERATIONAL";
+
+  const faixaAvaliacoes = !temAvaliacoes ? "sem_dados"
+    : avaliacoes < 20 ? "pequeno"
+    : avaliacoes <= 80 ? "tracao_inicial"
+    : avaliacoes <= 150 ? "medio"
+    : avaliacoes <= 300 ? "maduro"
+    : "consolidado";
+
+  const escolherPorNome = (opcoes) => {
+    const base = removerAcentos(String(lead.nome || lead.categoria || taxonomia.id || "")).toLowerCase();
+    const soma = base.split("").reduce((total, char) => total + char.charCodeAt(0), 0);
+    return opcoes[soma % opcoes.length] || opcoes[0];
+  };
+
+  let anguloAbordagem = escolherPorNome(taxonomia.angulos);
+  if (!temTelefone) {
+    anguloAbordagem = taxonomia.id === "generico"
+      ? "validacao de canal antes da abordagem"
+      : `validacao de canal para ${taxonomia.label}`;
+  } else if (consolidadoForte || faixaAvaliacoes === "consolidado") {
+    anguloAbordagem = "diferenciacao local em mercado maduro";
+  } else if (!temSite && ["odonto", "clinica_estetica", "estetica_automotiva", "barbearia", "restaurante", "loja", "pet"].includes(taxonomia.id)) {
+    const porWhatsApp = {
+      odonto: "orcamentos pelo WhatsApp",
+      clinica_estetica: "agendamentos pelo WhatsApp",
+      estetica_automotiva: "orcamentos de servicos pelo WhatsApp",
+      barbearia: "agendamento direto pelo WhatsApp",
+      restaurante: "pedidos diretos e recorrencia pelo WhatsApp",
+      loja: "movimento local e conversas pelo WhatsApp",
+      pet: "agenda de banho e tosa pelo WhatsApp",
+    };
+    anguloAbordagem = porWhatsApp[taxonomia.id] || anguloAbordagem;
+  } else if (faixaAvaliacoes === "pequeno") {
+    const iniciais = {
+      odonto: "confianca local para novos pacientes",
+      clinica_estetica: "confianca local para procedimentos esteticos",
+      estetica_automotiva: "confianca local para cuidados automotivos",
+      academia: "primeiras matriculas do bairro",
+      restaurante: "movimento local em dias fracos",
+      barbearia: "retorno de clientes do bairro",
+    };
+    anguloAbordagem = iniciais[taxonomia.id] || anguloAbordagem;
+  } else if (temNota && nota <= 4.3 && ["odonto", "clinica_estetica", "loja", "pet"].includes(taxonomia.id)) {
+    anguloAbordagem = taxonomia.id === "odonto"
+      ? "reputacao e seguranca para novos pacientes"
+      : "confianca local e percepcao de valor";
+  }
+  const anguloClaro = taxonomia.id !== "generico";
+
+  let nicho = marcaConsolidada ? 1 : taxonomia.peso;
+  if (marcaConsolidada) {
+    adicionarSinal(sinaisFracos, "marca/franquia com baixa chance de decisao local");
+  } else if (nichoConhecido) {
+    adicionarSinal(sinaisFortes, `${taxonomia.label}: contexto com gancho comercial claro`);
+  } else {
+    adicionarSinal(sinaisFracos, "nicho pouco claro, exige validacao antes de priorizar");
+  }
+
+  const contato = temTelefone ? 16 : 0;
+  if (temTelefone) {
+    adicionarSinal(sinaisFortes, "telefone disponivel para abordagem direta");
+  } else {
+    adicionarSinal(sinaisFracos, "sem telefone, exige busca manual antes da abordagem");
+  }
+
+  let tracao = 3;
+  if (!temAvaliacoes) {
+    adicionarSinal(sinaisFracos, "dados insuficientes para validar tracao local");
+  } else if (avaliacoes < 20) {
+    tracao = 10;
+    adicionarSinal(sinaisFortes, `${avaliacoes} avaliacoes: negocio pequeno com espaco para disputar atencao`);
+  } else if (avaliacoes <= 80) {
+    tracao = 14;
+    adicionarSinal(sinaisFortes, `${avaliacoes} avaliacoes: tracao local inicial com espaco para crescer`);
+  } else if (avaliacoes <= 150) {
+    tracao = 13;
+    adicionarSinal(sinaisFortes, `${avaliacoes} avaliacoes: demanda validada sem parecer consolidado demais`);
+  } else if (avaliacoes <= 300) {
+    tracao = 7;
+    adicionarSinal(sinaisFracos, `${avaliacoes} avaliacoes: negocio mais maduro, menor urgencia comercial`);
+  } else {
+    tracao = 2;
+    adicionarSinal(sinaisFracos, `${avaliacoes} avaliacoes: negocio muito consolidado para prospeccao fria`);
+  }
+
+  let oportunidade = 6;
+  if (!temNota || !temAvaliacoes) {
+    oportunidade = 4;
+    adicionarSinal(sinaisFracos, "dados insuficientes para medir oportunidade com confianca");
+  } else if (avaliacoes < 20) {
+    oportunidade = nota >= 4.6 ? 12 : 14;
+  } else if (avaliacoes <= 150 && nota >= 3.0 && nota <= 4.3) {
+    oportunidade = 18;
+    adicionarSinal(sinaisFortes, `nota ${nota}: reputacao com margem clara de melhoria`);
+  } else if (avaliacoes <= 150 && nota > 4.3) {
+    oportunidade = temSite ? 11 : 14;
+  } else if (avaliacoes <= 300 && nota < 4.4) {
+    oportunidade = 10;
+  } else if (avaliacoes > 300 && nota < 4.0) {
+    oportunidade = 8;
+    adicionarSinal(sinaisFortes, `nota ${nota}: volume alto com reputacao abaixo do ideal`);
+  } else if (avaliacoes > 300) {
+    oportunidade = 2;
+  }
+
+  let maturidade = temSite ? 3 : 8;
+  if (!temSite) {
+    adicionarSinal(sinaisFortes, "presenca digital menos madura, possivel abertura comercial");
+  } else {
+    adicionarSinal(sinaisFracos, "tem site proprio, sinal de presenca digital mais estruturada");
+  }
+  if (avaliacoes > 300 && temSite) maturidade = 0;
+
+  let riscoConsolidacao = 0;
+  if (avaliacoes > 150) riscoConsolidacao -= 5;
+  if (avaliacoes > 300) riscoConsolidacao -= 10;
+  if (temSite && nota >= 4.4 && avaliacoes >= 150) {
+    riscoConsolidacao -= 7;
+    adicionarSinal(sinaisFracos, "site e reputacao fortes reduzem urgencia comercial");
+  }
+  if (consolidadoForte) {
+    riscoConsolidacao -= 16;
+    adicionarSinal(sinaisFracos, "400+ avaliacoes, nota alta e site: negocio muito consolidado para prospeccao fria");
+  }
+  if (marcaConsolidada) riscoConsolidacao -= 28;
+  if (statusInativo) {
+    riscoConsolidacao -= 35;
+    adicionarSinal(sinaisFracos, "status do negocio no Google nao esta operacional");
+  }
+  riscoConsolidacao = limitarNumero(riscoConsolidacao, -38, 0);
+
+  let clarezaAbordagem = 0;
+  if (temTelefone) clarezaAbordagem += 4;
+  if (nichoConhecido) clarezaAbordagem += 4;
+  if (anguloClaro) clarezaAbordagem += 3;
+  if (lead.categoria) clarezaAbordagem += 1;
+  if (!temTelefone) clarezaAbordagem -= 3;
+  clarezaAbordagem = limitarNumero(clarezaAbordagem, 0, 12);
+
+  if (subnichoConsultivo) {
+    adicionarSinal(sinaisFracos, "ciclo consultivo exige abordagem mais cuidadosa");
+  }
+
+  const scoreBreakdown = {
+    nicho,
+    tracao,
+    contato,
+    oportunidade,
+    maturidade,
+    riscoConsolidacao,
+    clarezaAbordagem,
+  };
+
+  const rawScore = Object.values(scoreBreakdown).reduce((total, valor) => total + valor, 0);
+  let score = rawScore;
+  const caps = [];
+
+  const aplicarCap = (limite, motivo) => {
+    if (score > limite) {
+      score = limite;
+      caps.push(motivo);
+    }
+  };
+
+  if (!temTelefone) aplicarCap(52, "sem telefone limita prioridade pratica");
+  if (!temTelefone && (!temNota || !temAvaliacoes)) aplicarCap(42, "sem canal e dados incompletos");
+  if (!temAvaliacoes || !temNota) aplicarCap(68, "dados incompletos impedem leitura quente");
+  if (faixaAvaliacoes === "pequeno") aplicarCap(88, "pouco historico impede score maximo");
+  if (faixaAvaliacoes === "tracao_inicial" && !temSite) aplicarCap(89, "lead promissor, mas ainda precisa validacao");
+  if (faixaAvaliacoes === "medio" && !temSite) aplicarCap(87, "lead medio bom, nao excepcional automaticamente");
+  if (faixaAvaliacoes === "medio" && temSite) aplicarCap(80, "site reduz urgencia comercial");
+  if (faixaAvaliacoes === "maduro" && !temSite) aplicarCap(74, "negocio maduro exige cuidado");
+  if (faixaAvaliacoes === "maduro" && temSite) aplicarCap(68, "negocio maduro com site tem menor urgencia");
+  if (faixaAvaliacoes === "consolidado") aplicarCap(48, "negocio consolidado perde prioridade");
+  if (subnichoConsultivo) aplicarCap(82, "ciclo consultivo raramente e abordagem quente imediata");
+  if (marcaConsolidada) aplicarCap(30, "marca/franquia reduz chance de decisao local");
+  if (consolidadoForte) aplicarCap(28, "presenca forte demais para prospeccao fria");
+  if (prioridadeBase === "DESCARTE") aplicarCap(25, "classificacao antiga marcou descarte");
+  if (statusInativo) aplicarCap(18, "negocio nao operacional");
+
+  score = limitarNumero(Math.round(score), 0, 100);
+
+  if (caps.length) {
+    adicionarSinal(sinaisFracos, `nao chegou ao topo: ${caps[0]}`);
+  } else if (score >= 85) {
+    adicionarSinal(sinaisFortes, "combina canal direto, nicho claro e oportunidade comercial");
+  }
+
+  let scoreConfianca = 32;
+  if (temTelefone) scoreConfianca += 14; else scoreConfianca -= 18;
+  if (nichoConhecido) scoreConfianca += 14; else scoreConfianca -= 8;
+  if (temAvaliacoes) scoreConfianca += avaliacoes >= 10 ? 12 : 8; else scoreConfianca -= 10;
+  if (temNota) scoreConfianca += 10; else scoreConfianca -= 10;
+  if (anguloClaro) scoreConfianca += 8; else scoreConfianca -= 6;
+  if (lead.categoria) scoreConfianca += 4;
+  if (statusInativo) scoreConfianca -= 25;
+  scoreConfianca = limitarNumero(Math.round(scoreConfianca), 0, 94);
+
+  let proximoPasso = "Salvar no CRM e validar contexto antes de abordar.";
+  if (statusInativo) {
+    proximoPasso = "Descartar por enquanto; o negocio nao aparece como operacional no Google.";
+  } else if (!temTelefone) {
+    proximoPasso = "Buscar Instagram ou outro canal antes de tentar abordagem.";
+  } else if (prioridadeBase === "DESCARTE" || consolidadoForte || marcaConsolidada) {
+    proximoPasso = "Nao priorizar agora; usar apenas se sobrar tempo ou houver motivo especifico.";
+  } else if (score < 55 || scoreConfianca < 55) {
+    proximoPasso = "Enriquecer o lead antes de abordar.";
+  } else if (score >= 85) {
+    proximoPasso = "Priorizar hoje: abrir o lead, gerar mensagem no Outreacher e abordar por WhatsApp.";
+  } else if (score >= 70) {
+    proximoPasso = "Abordar depois dos leads mais quentes, mantendo a mensagem bem contextual.";
+  } else {
+    proximoPasso = "Salvar e abordar somente se o contexto do bairro reforcar a oportunidade.";
+  }
+
+  return {
+    scoreVersion: "v2.2",
     score,
     scoreConfianca,
     scoreBreakdown,
@@ -3586,6 +3953,7 @@ async function handler(req, res) {
           prioridade: lead.prioridade || "BAIXA",
           scoreVersion: lead.scoreVersion || null,
           score: Number.isFinite(Number(lead.score)) ? Number(lead.score) : null,
+          scoreConfianca: Number.isFinite(Number(lead.scoreConfianca)) ? Number(lead.scoreConfianca) : null,
           scoreBreakdown: lead.scoreBreakdown || null,
           sinaisFortes: Array.isArray(lead.sinaisFortes) ? lead.sinaisFortes : [],
           sinaisFracos: Array.isArray(lead.sinaisFracos) ? lead.sinaisFracos : [],
@@ -3615,7 +3983,7 @@ async function handler(req, res) {
           "status", "ultimoMovimento", "statusConversa", "ultimaInteracaoEm",
           "mensagemInicial", "followUp", "notas",
           "site", "mapsUrl", "businessStatus",
-          "scoreVersion", "score", "scoreBreakdown", "sinaisFortes", "sinaisFracos",
+          "scoreVersion", "score", "scoreConfianca", "scoreBreakdown", "sinaisFortes", "sinaisFracos",
           "proximoPasso", "anguloAbordagem", "origemBusca",
         ];
         CAMPOS_PERMITIDOS.forEach(c => {
