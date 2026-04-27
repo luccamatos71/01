@@ -6094,14 +6094,40 @@
     function outreachCacheKey(lead) {
       return `outreach_v2_${lead?.id || lead?.nome || "?"}`;
     }
+    function outreachFastCacheKey(lead) {
+      return `outreach_fast_v1_${lead?.id || lead?.nome || "?"}`;
+    }
     function getOutreachCache(lead) {
       try { return JSON.parse(localStorage.getItem(outreachCacheKey(lead)) || "null"); } catch { return null; }
     }
     function setOutreachCache(lead, variacoes) {
       localStorage.setItem(outreachCacheKey(lead), JSON.stringify(variacoes));
     }
+    function clearOutreachVariacoesCache(lead) {
+      localStorage.removeItem(outreachCacheKey(lead));
+    }
     function clearOutreachCache(lead) {
       localStorage.removeItem(outreachCacheKey(lead));
+      localStorage.removeItem(outreachFastCacheKey(lead));
+    }
+    function getOutreachFastCache(lead) {
+      try { return localStorage.getItem(outreachFastCacheKey(lead)) || ""; } catch { return ""; }
+    }
+    function setOutreachFastCache(lead, mensagem) {
+      if (!mensagem) return;
+      localStorage.setItem(outreachFastCacheKey(lead), mensagem);
+    }
+    const outreachFastInFlight = new Map();
+
+    function primeiraMensagemVariacoes(variacoes) {
+      if (!variacoes) return "";
+      return ["direta", "leve", "provocativa", "followup", "reuniao"]
+        .map(key => String(variacoes[key] || "").trim())
+        .find(Boolean) || "";
+    }
+
+    function variacoesTemMensagem(variacoes) {
+      return !!primeiraMensagemVariacoes(variacoes);
     }
 
     // Fila de navegação entre leads
@@ -6214,22 +6240,110 @@
       renderVariacoesSection(currentLead);
     }
 
+    function leadCacheId(lead) {
+      return String(lead?.id || lead?.nome || "?");
+    }
+
+    async function buscarMensagemPrincipalLead(lead, force = false) {
+      if (!lead) return "";
+      const key = leadCacheId(lead);
+      const cached = force ? "" : getOutreachFastCache(lead);
+      if (cached) return cached;
+      if (!force && outreachFastInFlight.has(key)) return outreachFastInFlight.get(key);
+
+      const promise = fetch("/api/gerar-variacoes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lead, modo: "principal" })
+      })
+        .then(r => r.json())
+        .then(data => {
+          const mensagem = String(data.mensagem || "").trim();
+          if (!mensagem) throw new Error(data.erro || "Mensagem vazia.");
+          setOutreachFastCache(lead, mensagem);
+          return mensagem;
+        })
+        .finally(() => outreachFastInFlight.delete(key));
+
+      outreachFastInFlight.set(key, promise);
+      return promise;
+    }
+
+    function renderMensagemPrincipalHTML(container, mensagem, lead, estado = "") {
+      currentMsgText = mensagem || "";
+      const status = estado ? `<div class="analysis-score-muted" style="margin-bottom:8px;">${escapeHtml(estado)}</div>` : "";
+      container.innerHTML = `
+        <div class="mensagem-wrap">
+          <div class="mensagem-titulo">Mensagem de abordagem</div>
+          ${status}
+          <div class="mensagem-box" id="mensagemBox">${escapeHtml(mensagem || "")}</div>
+          <button class="outreach-regenerar-btn" id="btnGerarVariacoes" type="button">Gerar variações</button>
+        </div>`;
+      container.querySelector("#btnGerarVariacoes")?.addEventListener("click", async () => {
+        await gerarEExibirVariacoes(lead, container);
+      });
+    }
+
+    async function gerarMensagemPrincipalEExibir(lead, section, force = false) {
+      if (!section) section = document.getElementById("variacoesSection");
+      if (!section || !lead) return;
+      section.innerHTML = `<div class="mensagem-wrap"><div class="loading"><span class="spinner"></span><span>Preparando mensagem...</span></div></div>`;
+      try {
+        const mensagem = await buscarMensagemPrincipalLead(lead, force);
+        renderMensagemPrincipalHTML(section, mensagem, lead, "Pronta para WhatsApp. As variações ficam como extra.");
+      } catch {
+        currentMsgText = "";
+        section.innerHTML = `
+          <div class="mensagem-wrap">
+            <div class="mensagem-titulo">Mensagem de abordagem</div>
+            <div class="error-box">Não consegui preparar a mensagem agora.</div>
+            <button class="outreach-gerar-btn" id="btnGerarVariacoes" type="button">Tentar novamente</button>
+          </div>`;
+        section.querySelector("#btnGerarVariacoes")?.addEventListener("click", async () => {
+          await gerarMensagemPrincipalEExibir(lead, section, true);
+        });
+      }
+    }
+
     // Renderiza a seção de variações de mensagem no drawer (cache ou botão Gerar)
     function renderVariacoesSection(lead) {
       const section = document.getElementById("variacoesSection");
       if (!section || !lead) return;
 
       const cached = getOutreachCache(lead);
-      if (cached) {
+      if (cached && variacoesTemMensagem(cached)) {
         renderVariacoesHTML(section, cached, lead);
+      } else if (getOutreachFastCache(lead)) {
+        if (cached && !variacoesTemMensagem(cached)) clearOutreachVariacoesCache(lead);
+        renderMensagemPrincipalHTML(section, getOutreachFastCache(lead), lead, "Mensagem rápida preparada em segundo plano.");
+      } else if (outreachFastInFlight.has(leadCacheId(lead))) {
+        if (cached && !variacoesTemMensagem(cached)) clearOutreachVariacoesCache(lead);
+        section.innerHTML = `<div class="mensagem-wrap"><div class="loading"><span class="spinner"></span><span>Preparando mensagem...</span></div></div>`;
+        outreachFastInFlight.get(leadCacheId(lead))
+          .then((mensagem) => {
+            if (leadCacheId(currentLead) === leadCacheId(lead)) renderMensagemPrincipalHTML(section, mensagem, lead, "Mensagem rápida preparada em segundo plano.");
+          })
+          .catch(() => {
+            if (leadCacheId(currentLead) === leadCacheId(lead)) {
+              section.innerHTML = `
+                <div class="mensagem-wrap">
+                  <div class="mensagem-titulo">Mensagem de abordagem</div>
+                  <button class="outreach-gerar-btn" id="btnGerarVariacoes" type="button">Gerar mensagem</button>
+                </div>`;
+              section.querySelector("#btnGerarVariacoes")?.addEventListener("click", async () => {
+                await gerarMensagemPrincipalEExibir(lead, section, true);
+              });
+            }
+          });
       } else {
+        if (cached && !variacoesTemMensagem(cached)) clearOutreachVariacoesCache(lead);
         section.innerHTML = `
           <div class="mensagem-wrap">
             <div class="mensagem-titulo">Mensagem de abordagem</div>
             <button class="outreach-gerar-btn" id="btnGerarVariacoes" type="button">Gerar mensagem</button>
           </div>`;
         document.getElementById("btnGerarVariacoes")?.addEventListener("click", async () => {
-          await gerarEExibirVariacoes(lead, section);
+          await gerarMensagemPrincipalEExibir(lead, section);
         });
       }
     }
@@ -6248,6 +6362,8 @@
         const data = await r.json();
         if (data.variacoes) {
           setOutreachCache(lead, data.variacoes);
+          const primeira = primeiraMensagemVariacoes(data.variacoes);
+          if (primeira) setOutreachFastCache(lead, primeira);
           renderVariacoesHTML(section, data.variacoes, lead);
         } else {
           section.innerHTML = `<div class="mensagem-wrap"><div class="error-box">${escapeHtml(data.erro || "Erro ao gerar.")}</div></div>`;
@@ -6272,7 +6388,7 @@
           <span class="estilo-desc">${t.desc}</span>
         </button>`).join("");
 
-      const inicial = variacoes.direta || variacoes.leve || "";
+      const inicial = primeiraMensagemVariacoes(variacoes);
       currentMsgText = inicial;
 
       container.innerHTML = `
@@ -6433,7 +6549,7 @@
           waBtn.addEventListener("click", (e) => {
             e.stopPropagation();
             const cached = getOutreachCache(lead);
-            const msg = cached ? (cached.direta || cached.leve || "") : "";
+            const msg = variacoesTemMensagem(cached) ? primeiraMensagemVariacoes(cached) : (getOutreachFastCache(lead) || "");
             window.open(montarLinkWhatsApp(lead.telefone, msg), "_blank");
             marcarContatado(lead);
           });
@@ -6462,6 +6578,45 @@
       }
 
       return card;
+    }
+
+    function prioridadePesoOutreach(prioridade) {
+      const p = String(prioridade || "").toUpperCase();
+      if (p === "ALTA") return 3;
+      if (p === "MEDIA") return 2;
+      if (p === "BAIXA") return 1;
+      return 0;
+    }
+
+    function selecionarLeadsPrefetchOutreach(leads) {
+      return (leads || [])
+        .filter(lead => lead && lead.prioridade !== "DESCARTE")
+        .slice()
+        .sort((a, b) => {
+          const telefone = (b.telefone ? 1 : 0) - (a.telefone ? 1 : 0);
+          if (telefone) return telefone;
+          const prioridade = prioridadePesoOutreach(b.prioridade) - prioridadePesoOutreach(a.prioridade);
+          if (prioridade) return prioridade;
+          return (Number(b.score) || 0) - (Number(a.score) || 0);
+        })
+        .slice(0, 8);
+    }
+
+    function prefetchMensagensTopLeads(leads) {
+      const fila = selecionarLeadsPrefetchOutreach(leads)
+        .filter(lead => !getOutreachFastCache(lead) && !variacoesTemMensagem(getOutreachCache(lead)) && !outreachFastInFlight.has(leadCacheId(lead)));
+      if (!fila.length) return;
+
+      let index = 0;
+      const worker = async () => {
+        while (index < fila.length) {
+          const lead = fila[index++];
+          try { await buscarMensagemPrincipalLead(lead); } catch { /* prefetch silencioso */ }
+        }
+      };
+
+      const concorrencia = Math.min(2, fila.length);
+      for (let i = 0; i < concorrencia; i++) worker();
     }
 
     function createLeadsBubble(data) {
@@ -6521,6 +6676,7 @@
       row.appendChild(bubble);
       getChatTarget().appendChild(row);
       scrollToBottom();
+      prefetchMensagensTopLeads(leadsQueue);
     }
     // ===================== CRM =====================
     const CRM_ROUTE = "/api/crm";

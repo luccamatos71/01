@@ -516,6 +516,92 @@ Regras inegociaveis:
 Retorne APENAS JSON com as chaves leve, direta, provocativa, followup e reuniao.`;
 }
 
+function resumirAnguloOutreach(contexto = {}) {
+  const fonte = normalizarTextoOutreach([contexto.anguloAbordagem, contexto.categoria].filter(Boolean).join(" "));
+  if (/whatsapp|pedido|orcamento|direto|delivery|pizz/.test(fonte)) return "pedidos e conversas pelo WhatsApp";
+  if (/agenda|horario|retorno|barbear|salao|estetic/.test(fonte)) return "agenda e retorno de clientes";
+  if (/odont|saude|clinica|paciente|captacao/.test(fonte)) return "entrada de novos clientes da regiao";
+  if (/advoc|jurid|consultiv|contabil/.test(fonte)) return "demanda consultiva da regiao";
+  if (/automot|carro|polimento|veiculo/.test(fonte)) return "orcamentos de servicos automotivos";
+  if (/academ|pilates|fitness|matricula|retencao/.test(fonte)) return "matriculas e frequencia local";
+  if (/reputacao|confianca|autoridade/.test(fonte)) return "confianca local antes do contato";
+  return "novos contatos pelo WhatsApp";
+}
+
+function gerarFallbackMensagemOutreach(contexto = {}, tipo = "direta") {
+  const nome = String(contexto.nome || "seu negocio").trim();
+  const tema = resumirAnguloOutreach(contexto);
+  const fonte = normalizarTextoOutreach([contexto.anguloAbordagem, contexto.categoria].filter(Boolean).join(" "));
+
+  if (tipo === "followup") {
+    return `Passando rapido por aqui, ${nome}: faz sentido eu te mandar uma ideia simples sobre ${tema}, ou melhor deixar para outro momento?`;
+  }
+  if (tipo === "reuniao") {
+    return `Se fizer sentido, ${nome}, posso te explicar em poucas linhas como pensei em ${tema}; prefere que eu mande por aqui?`;
+  }
+  if (tipo === "provocativa") {
+    return `${nome}, quando tudo depende so de indicacao, alguns contatos bons acabam escapando. Isso acontece por ai tambem?`;
+  }
+  if (/advoc|jurid|consultiv|contabil/.test(fonte)) {
+    return `Ola, ${nome}. A demanda ai chega mais por indicacao ou por pessoas da regiao pesquisando antes de chamar?`;
+  }
+  if (/automot|carro|polimento|veiculo/.test(fonte)) {
+    return `Fala, ${nome}. Os servicos de maior valor ai chegam mais por indicacao ou por orcamento direto no WhatsApp?`;
+  }
+  if (/restaurante|pizz|delivery|pedido/.test(fonte)) {
+    return `Fala, ${nome}. Os pedidos ai entram mais por app e indicacao ou voces puxam bastante direto pelo WhatsApp?`;
+  }
+  if (/agenda|horario|retorno|barbear|salao|estetic/.test(fonte)) {
+    return `Ola, ${nome}. O movimento ai costuma depender mais de retorno de clientes ou de horarios livres na semana?`;
+  }
+  return `Ola, ${nome}. O contato de novos clientes ai costuma vir mais por indicacao ou por conversa direta no WhatsApp?`;
+}
+
+function mensagemSeguraOutreach(texto, contexto, tipo = "direta") {
+  const tentativa = String(texto || "").trim();
+  if (validarMensagemOutreach(tentativa, contexto).ok) return tentativa;
+  const fallback = gerarFallbackMensagemOutreach(contexto, tipo);
+  if (validarMensagemOutreach(fallback, contexto).ok) return fallback;
+  return `Ola, ${contexto.nome || "tudo bem"}. Faz sentido falar rapidinho por aqui sobre ${resumirAnguloOutreach(contexto)}?`;
+}
+
+function preencherVariacoesFallbackOutreach(variacoes, contexto) {
+  return CHAVES_VARIACOES_OUTREACH.reduce((acc, key) => {
+    acc[key] = mensagemSeguraOutreach(variacoes?.[key], contexto, key);
+    return acc;
+  }, {});
+}
+
+async function gerarMensagemPrincipalOutreach(lead) {
+  const contextoOutreach = montarContextoOutreachLead(lead);
+  const systemPrompt = `Voce escreve uma unica primeira mensagem de WhatsApp para prospeccao local.
+Objetivo: puxar conversa, nao vender.
+Use o angulo principal como foco.
+Maximo 2 frases, ate 38 palavras, sempre com pergunta leve.
+Nao cite score, prioridade, sinais, confianca, SDR, analise, nota, avaliacoes, reuniao, call ou termos tecnicos.
+Retorne APENAS JSON: {"mensagem":"..."}`;
+
+  const userMsg = montarUserMsgOutreach(contextoOutreach);
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMsg }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.45,
+      max_tokens: 180
+    });
+    const raw = completion.choices[0].message.content || "{}";
+    const parsed = JSON.parse(raw);
+    return mensagemSeguraOutreach(parsed.mensagem, contextoOutreach, "direta");
+  } catch {
+    return mensagemSeguraOutreach("", contextoOutreach, "direta");
+  }
+}
+
 // Gera 5 variacoes de mensagem guiadas pelo contexto do SDR.
 async function gerarVariacoesOutreach(lead) {
   const contextoOutreach = montarContextoOutreachLead(lead);
@@ -614,14 +700,14 @@ Retorne APENAS JSON (sem markdown, sem texto extra):
 
   const primeira = await chamarModelo(mensagensBase);
   const validacaoInicial = validarVariacoesOutreach(primeira, contextoOutreach);
-  if (!validacaoInicial.invalidas.length) return validacaoInicial.variacoes;
+  if (!validacaoInicial.invalidas.length) return preencherVariacoesFallbackOutreach(validacaoInicial.variacoes, contextoOutreach);
 
   const segunda = await chamarModelo([
     ...mensagensBase,
     { role: "assistant", content: JSON.stringify(primeira) },
     { role: "user", content: montarPromptCorrecaoOutreach(contextoOutreach, validacaoInicial.invalidas) },
   ]);
-  return validarVariacoesOutreach(segunda, contextoOutreach).variacoes;
+  return preencherVariacoesFallbackOutreach(validarVariacoesOutreach(segunda, contextoOutreach).variacoes, contextoOutreach);
 }
 
 const PROMPTS_AGENTES = {
@@ -4563,8 +4649,14 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
   if (req.method === "POST" && pathname === "/api/crm/mensagem") {
     try {
       const body = await lerBody(req);
-      const { lead } = body;
+      const { lead, modo } = body;
       if (!lead || !lead.nome) return enviarJson(res, 400, { erro: "lead com nome é obrigatório." });
+
+      if (modo === "principal") {
+        const mensagem = await gerarMensagemPrincipalOutreach(lead);
+        console.log(`[CRM] Mensagem principal gerada via Outreach: ${lead.nome}`);
+        return enviarJson(res, 200, { mensagem });
+      }
 
       const variacoes = await gerarVariacoesOutreach(lead);
       console.log(`[CRM] Variações geradas via Outreach: ${lead.nome}`);
@@ -4580,8 +4672,14 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
   if (req.method === "POST" && pathname === "/api/gerar-variacoes") {
     try {
       const body = await lerBody(req);
-      const { lead } = body;
+      const { lead, modo } = body;
       if (!lead || !lead.nome) return enviarJson(res, 400, { erro: "lead com nome é obrigatório." });
+
+      if (modo === "principal") {
+        const mensagem = await gerarMensagemPrincipalOutreach(lead);
+        console.log(`[OK] Mensagem principal gerada: ${lead.nome}`);
+        return enviarJson(res, 200, { mensagem });
+      }
 
       const variacoes = await gerarVariacoesOutreach(lead);
       console.log(`[OK] Variações geradas: ${lead.nome}`);
