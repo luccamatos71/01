@@ -6839,6 +6839,12 @@
       renderizarCRM();
     }
 
+    function podeGerarContinuidadeCRM(lead) {
+      if (!lead) return false;
+      return lead.statusConversa === "aguardando_resposta" ||
+        lead.ultimoMovimento === "lead";
+    }
+
     function abrirFicha(lead) {
       if (!fichaBody || !fichaLeadNome || !fichaLeadMeta) return; // Guard: CRM elements don't exist
       fichaLeadAtivo = lead;
@@ -6913,6 +6919,15 @@
           </div>
         </div>
 
+        ${podeGerarContinuidadeCRM(lead) ? `
+        <div class="ficha-bloco" id="fichaSecaoContinuidade">
+          <div class="ficha-bloco-titulo">Continuidade pós-resposta</div>
+          <textarea class="ficha-notas" id="fichaRespostaLead" placeholder="Cole aqui a resposta do lead, se quiser contextualizar melhor..."></textarea>
+          <div id="fichaContinuidadeContent">
+            <button class="outreach-gerar-btn" id="btnGerarContinuidadeCRM" type="button">Gerar continuidade</button>
+          </div>
+        </div>` : ""}
+
         <div class="ficha-bloco">
           <div class="ficha-bloco-titulo">Ações</div>
           <div class="ficha-acoes">
@@ -6966,6 +6981,9 @@
       // Mensagens via Outreach — cache localStorage por lead.id
       const fichaMsgContainer = fichaBody.querySelector("#fichaMensagensContent");
       const cacheKey = `outreach_crm_v2_${lead.id}`;
+      const continuidadeContainer = fichaBody.querySelector("#fichaContinuidadeContent");
+      const respostaLeadInput = fichaBody.querySelector("#fichaRespostaLead");
+      const continuidadeCacheKey = `outreach_continuity_v1_${lead.id}`;
 
       function renderFichaMsgCRM(variacoes) {
         const tipos = [
@@ -7051,6 +7069,81 @@
         }
       } catch {
         // Se localStorage falhar, apenas mostra o botão padrão
+      }
+
+      function renderContinuidadeCRM(mensagem) {
+        if (!continuidadeContainer) return;
+        let textoAtivo = mensagem || "";
+        continuidadeContainer.innerHTML = `
+          <div class="ficha-bloco-val textarea-like" id="fichaContinuidadeTexto">${escapeHtml(textoAtivo)}</div>
+          <div class="ficha-acoes-row" style="gap:6px; flex-wrap:wrap;">
+            <button class="ficha-btn" id="btnCopiarContinuidadeCRM">Copiar</button>
+            ${lead.telefone ? `<button class="ficha-btn primary" id="btnWaContinuidadeCRM">WhatsApp</button>` : ""}
+            <button class="ficha-btn" id="btnRegerarContinuidadeCRM">Gerar nova</button>
+          </div>`;
+
+        continuidadeContainer.querySelector("#btnCopiarContinuidadeCRM")?.addEventListener("click", () => {
+          navigator.clipboard.writeText(textoAtivo).then(() => {
+            const btn = continuidadeContainer.querySelector("#btnCopiarContinuidadeCRM");
+            if (btn) btn.textContent = "Copiado!";
+            setTimeout(() => {
+              const b = continuidadeContainer.querySelector("#btnCopiarContinuidadeCRM");
+              if (b) b.textContent = "Copiar";
+            }, 1400);
+          });
+        });
+
+        continuidadeContainer.querySelector("#btnWaContinuidadeCRM")?.addEventListener("click", () => {
+          window.open(montarLinkWhatsApp(lead.telefone, textoAtivo), "_blank");
+        });
+
+        continuidadeContainer.querySelector("#btnRegerarContinuidadeCRM")?.addEventListener("click", async () => {
+          localStorage.removeItem(continuidadeCacheKey);
+          await gerarContinuidadeCRM();
+        });
+      }
+
+      async function gerarContinuidadeCRM() {
+        if (!continuidadeContainer) return;
+        continuidadeContainer.innerHTML = `<div class="loading"><span class="spinner"></span><span>Gerando continuidade...</span></div>`;
+        try {
+          const r = await fetch("/api/crm/mensagem", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              lead,
+              modo: "continuidade",
+              respostaLead: respostaLeadInput ? respostaLeadInput.value.trim() : "",
+            }),
+          });
+          const data = await r.json();
+          const mensagem = String(data.mensagem || "").trim();
+          if (mensagem) {
+            localStorage.setItem(continuidadeCacheKey, mensagem);
+            renderContinuidadeCRM(mensagem);
+          } else {
+            continuidadeContainer.innerHTML = `<div class="error-box">${escapeHtml(data.erro || "Erro ao gerar continuidade.")}</div>`;
+          }
+        } catch {
+          continuidadeContainer.innerHTML = `<div class="error-box">Erro de conexão.</div>`;
+        }
+      }
+
+      if (continuidadeContainer) {
+        try {
+          const cachedContinuidade = localStorage.getItem(continuidadeCacheKey) || "";
+          if (cachedContinuidade) {
+            renderContinuidadeCRM(cachedContinuidade);
+          } else {
+            continuidadeContainer.querySelector("#btnGerarContinuidadeCRM")?.addEventListener("click", async () => {
+              await gerarContinuidadeCRM();
+            });
+          }
+        } catch {
+          continuidadeContainer.querySelector("#btnGerarContinuidadeCRM")?.addEventListener("click", async () => {
+            await gerarContinuidadeCRM();
+          });
+        }
       }
 
       const agora = new Date().toISOString();

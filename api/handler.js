@@ -332,6 +332,9 @@ function montarContextoOutreachLead(lead = {}) {
     sinaisFracos: normalizarListaOutreach(lead.sinaisFracos),
     proximoPasso: lead.proximoPasso || "",
     anguloAbordagem: lead.anguloAbordagem || "validacao manual do contexto antes da abordagem",
+    contextoAbordagem: lead.contextoAbordagem || "",
+    gatilhoConversacional: lead.gatilhoConversacional || "",
+    riscoTom: lead.riscoTom || intensidade,
     intensidade,
     objetivoMensagem: definirObjetivoOutreach(lead, intensidade),
   };
@@ -379,13 +382,16 @@ Prioridade interna: ${contexto.prioridade}
 Score interno: ${score}
 Confianca interna: ${scoreConfianca}
 Angulo principal: ${contexto.anguloAbordagem}
+Contexto do angulo: ${contexto.contextoAbordagem || "nao informado"}
+Gatilho conversacional: ${contexto.gatilhoConversacional || "nao informado"}
+Risco de tom: ${contexto.riscoTom || contexto.intensidade || "normal"}
 Sinais fortes: ${fortes}
 Sinais fracos: ${fracos}
 Proximo passo interno: ${contexto.proximoPasso || "nao informado"}
 Intensidade sugerida: ${contexto.intensidade || "normal"}
 Objetivo da mensagem: ${contexto.objetivoMensagem || "abrir porta"}
 
-Use o angulo como direcao da conversa. Use sinais fortes para personalizar. Use sinais fracos para deixar a abordagem mais leve quando necessario.
+Use o angulo e o gatilho conversacional como direcao da conversa. Use sinais fortes para personalizar. Use sinais fracos e risco de tom para deixar a abordagem mais leve quando necessario.
 Nao cite nenhum dado interno, score, confianca, prioridade, sinais, intensidade, objetivo, nota, numero de avaliacoes ou analise SDR.`;
 }
 
@@ -425,13 +431,13 @@ function palavrasDeAnguloOutreach(contexto = {}) {
   if (/automot|carro|servico/.test(fonte)) {
     ["carro", "servico", "automotivo", "polimento", "orcamento"].forEach(p => base.add(p));
   }
-  if (/advoc|consultiv|jurid/.test(fonte)) {
+  if (/advoc|advog|consultiv|jurid/.test(fonte)) {
     ["consultivo", "triagem", "caso", "juridico", "bairro"].forEach(p => base.add(p));
   }
   return Array.from(base);
 }
 
-function validarMensagemOutreach(texto, contexto = {}) {
+function validarMensagemAberturaOutreach(texto, contexto = {}) {
   const original = String(texto || "").trim();
   const t = normalizarTextoOutreach(original);
   const motivos = [];
@@ -449,6 +455,7 @@ function validarMensagemOutreach(texto, contexto = {}) {
     ["nota/avaliacao", /\bnota\b|avaliac|estrelas/],
     ["identifiquei", /identifiquei|identificamos/],
     ["estrategia de marketing", /estrategia de marketing|marketing digital|trafego pago/],
+    ["diagnostico/insight no primeiro contato", /diagnostico|insight/],
     ["reuniao direta", /reuniao|call|chamada|videochamada|15\s?min|20\s?min|agendar|marcar|agenda[rm]\s+(uma\s+)?(call|reuniao|conversa)/],
     ["pitch generico", /aumentar visibilidade|atrair mais clientes|crescer seu negocio|temos uma solucao|poderia te ajudar|oportunidade de crescimento/],
     ["google/avaliacoes", /vi suas avaliacoes|google maps|maps/],
@@ -466,6 +473,52 @@ function validarMensagemOutreach(texto, contexto = {}) {
     "ajudamos empresas",
   ];
   if (genericos.some(g => t.includes(g))) motivos.push("abertura generica ou institucional");
+
+  const palavrasAngulo = palavrasDeAnguloOutreach(contexto);
+  const temRelacaoComAngulo = palavrasAngulo.length === 0 || palavrasAngulo.some(p => t.includes(p));
+  const nomeTokens = normalizarTextoOutreach(contexto.nome || "").split(/[^a-z0-9]+/).filter(p => p.length >= 4);
+  const citaNome = nomeTokens.length > 0 && nomeTokens.some(p => t.includes(p));
+  if (!temRelacaoComAngulo && !citaNome) motivos.push("sem relacao clara com o angulo");
+
+  return { ok: motivos.length === 0, motivos };
+}
+
+function validarMensagemOutreach(texto, contexto = {}) {
+  return validarMensagemAberturaOutreach(texto, contexto);
+}
+
+function validarMensagemContinuidadeOutreach(texto, contexto = {}) {
+  const original = String(texto || "").trim();
+  const t = normalizarTextoOutreach(original);
+  const motivos = [];
+
+  if (!original) motivos.push("mensagem vazia");
+  if (original.length > 360 || original.split(/\s+/).filter(Boolean).length > 68) motivos.push("mensagem longa demais");
+  if ((original.match(/[.!?]+/g) || []).length > 5) motivos.push("frases demais para WhatsApp");
+  if (!original.includes("?")) motivos.push("nao fecha com pergunta natural");
+
+  const proibidos = [
+    ["score", /\bscore\b|pontuacao/],
+    ["prioridade", /\bprioridade\b/],
+    ["confianca interna", /confianca interna|score de confianca|nivel de confianca/],
+    ["analise interna", /analise|analisei|sdr|sinais?/],
+    ["nota/avaliacao", /\bnota\b|avaliac|estrelas/],
+    ["identifiquei", /identifiquei|identificamos/],
+    ["estrategia", /estrategia/],
+    ["pitch generico", /aumentar visibilidade|atrair mais clientes|crescer seu negocio|temos uma solucao|poderia te ajudar|oportunidade de crescimento/],
+    ["tom de agencia", /sou da|trabalho com marketing|marketing digital|trafego pago|nossa agencia/],
+    ["convite duro", /agendar call|marcar call|marcar reuniao|agendar reuniao|vamos marcar|podemos agendar|calendly/],
+  ];
+  proibidos.forEach(([motivo, regex]) => {
+    if (regex.test(t)) motivos.push(motivo);
+  });
+
+  if (!/sem compromisso|sem pressao|rapidinho|rapido|15\s?min|quinze/.test(t)) {
+    motivos.push("nao deixa a conversa leve");
+  }
+  if (!/diagnostico|insight|ponto|olhada|ideia/.test(t)) {
+    motivos.push("nao menciona diagnostico ou insight leve");
+  }
 
   const palavrasAngulo = palavrasDeAnguloOutreach(contexto);
   const temRelacaoComAngulo = palavrasAngulo.length === 0 || palavrasAngulo.some(p => t.includes(p));
@@ -521,7 +574,7 @@ function resumirAnguloOutreach(contexto = {}) {
   if (/whatsapp|pedido|orcamento|direto|delivery|pizz/.test(fonte)) return "pedidos e conversas pelo WhatsApp";
   if (/agenda|horario|retorno|barbear|salao|estetic/.test(fonte)) return "agenda e retorno de clientes";
   if (/odont|saude|clinica|paciente|captacao/.test(fonte)) return "entrada de novos clientes da regiao";
-  if (/advoc|jurid|consultiv|contabil/.test(fonte)) return "demanda consultiva da regiao";
+  if (/advoc|advog|jurid|consultiv|contabil/.test(fonte)) return "demanda consultiva da regiao";
   if (/automot|carro|polimento|veiculo/.test(fonte)) return "orcamentos de servicos automotivos";
   if (/academ|pilates|fitness|matricula|retencao/.test(fonte)) return "matriculas e frequencia local";
   if (/reputacao|confianca|autoridade/.test(fonte)) return "confianca local antes do contato";
@@ -534,35 +587,35 @@ function gerarFallbackMensagemOutreach(contexto = {}, tipo = "direta") {
   const fonte = normalizarTextoOutreach([contexto.anguloAbordagem, contexto.categoria].filter(Boolean).join(" "));
 
   if (tipo === "followup") {
-    return `Passando rapido por aqui, ${nome}: faz sentido eu te mandar uma ideia simples sobre ${tema}, ou melhor deixar para outro momento?`;
+    return `Passando rápido por aqui, ${nome}: faz sentido eu te mandar uma ideia simples sobre ${tema}, ou melhor deixar para outro momento?`;
   }
   if (tipo === "reuniao") {
     return `Se fizer sentido, ${nome}, posso te explicar em poucas linhas como pensei em ${tema}; prefere que eu mande por aqui?`;
   }
   if (tipo === "provocativa") {
-    return `${nome}, quando tudo depende so de indicacao, alguns contatos bons acabam escapando. Isso acontece por ai tambem?`;
+    return `${nome}, quando tudo depende só de indicação, alguns contatos bons acabam escapando. Isso acontece por aí também?`;
   }
-  if (/advoc|jurid|consultiv|contabil/.test(fonte)) {
-    return `Ola, ${nome}. A demanda ai chega mais por indicacao ou por pessoas da regiao pesquisando antes de chamar?`;
+  if (/advoc|advog|jurid|consultiv|contabil/.test(fonte)) {
+    return `Olá, ${nome}. A demanda aí chega mais por indicação ou por pessoas da região pesquisando antes de chamar?`;
   }
   if (/automot|carro|polimento|veiculo/.test(fonte)) {
-    return `Fala, ${nome}. Os servicos de maior valor ai chegam mais por indicacao ou por orcamento direto no WhatsApp?`;
+    return `Fala, ${nome}. Os serviços de maior valor aí chegam mais por indicação ou por orçamento direto no WhatsApp?`;
   }
   if (/restaurante|pizz|delivery|pedido/.test(fonte)) {
-    return `Fala, ${nome}. Os pedidos ai entram mais por app e indicacao ou voces puxam bastante direto pelo WhatsApp?`;
+    return `Fala, ${nome}. Os pedidos aí entram mais por app e indicação ou vocês puxam bastante direto pelo WhatsApp?`;
   }
   if (/agenda|horario|retorno|barbear|salao|estetic/.test(fonte)) {
-    return `Ola, ${nome}. O movimento ai costuma depender mais de retorno de clientes ou de horarios livres na semana?`;
+    return `Olá, ${nome}. O movimento aí costuma depender mais de retorno de clientes ou de horários livres na semana?`;
   }
-  return `Ola, ${nome}. O contato de novos clientes ai costuma vir mais por indicacao ou por conversa direta no WhatsApp?`;
+  return `Olá, ${nome}. O contato de novos clientes aí costuma vir mais por indicação ou por conversa direta no WhatsApp?`;
 }
 
 function mensagemSeguraOutreach(texto, contexto, tipo = "direta") {
   const tentativa = String(texto || "").trim();
-  if (validarMensagemOutreach(tentativa, contexto).ok) return tentativa;
+  if (validarMensagemAberturaOutreach(tentativa, contexto).ok) return tentativa;
   const fallback = gerarFallbackMensagemOutreach(contexto, tipo);
-  if (validarMensagemOutreach(fallback, contexto).ok) return fallback;
-  return `Ola, ${contexto.nome || "tudo bem"}. Faz sentido falar rapidinho por aqui sobre ${resumirAnguloOutreach(contexto)}?`;
+  if (validarMensagemAberturaOutreach(fallback, contexto).ok) return fallback;
+  return `Olá, ${contexto.nome || "tudo bem"}. Faz sentido falar rapidinho por aqui sobre ${resumirAnguloOutreach(contexto)}?`;
 }
 
 function preencherVariacoesFallbackOutreach(variacoes, contexto) {
@@ -572,13 +625,34 @@ function preencherVariacoesFallbackOutreach(variacoes, contexto) {
   }, {});
 }
 
+function gerarFallbackContinuidadeOutreach(contexto = {}, respostaLead = "") {
+  const nome = String(contexto.nome || "por ai").trim();
+  const tema = resumirAnguloOutreach(contexto);
+  const respondeu = String(respostaLead || "").trim();
+  const ganchoResposta = respondeu
+    ? `Boa, ${nome}, entendi.`
+    : `Boa, ${nome}, obrigado por responder.`;
+  return `${ganchoResposta} Tem um ponto simples sobre ${tema} que talvez valha uma olhada sem compromisso; te mando um diagnóstico rápido em 15 min por aqui mesmo?`;
+}
+
+function mensagemContinuidadeSeguraOutreach(texto, contexto, respostaLead = "") {
+  const tentativa = String(texto || "").trim();
+  if (validarMensagemContinuidadeOutreach(tentativa, contexto).ok) return tentativa;
+  const fallback = gerarFallbackContinuidadeOutreach(contexto, respostaLead);
+  if (validarMensagemContinuidadeOutreach(fallback, contexto).ok) return fallback;
+  return `Boa, ${contexto.nome || "tudo bem"}, obrigado por responder. Tenho um insight rápido sobre ${resumirAnguloOutreach(contexto)}, sem compromisso; faz sentido eu te mandar em 15 min por aqui?`;
+}
+
 async function gerarMensagemPrincipalOutreach(lead) {
   const contextoOutreach = montarContextoOutreachLead(lead);
   const systemPrompt = `Voce escreve uma unica primeira mensagem de WhatsApp para prospeccao local.
-Objetivo: puxar conversa, nao vender.
-Use o angulo principal como foco.
+Objetivo: gerar resposta, nao vender.
+Estilo: contextual discreto, humano, sem parecer agencia.
+Use nome, nicho, localizacao, sinais e angulo principal sem parecer que voce analisou o negocio.
+Use o gatilho conversacional se existir.
 Maximo 2 frases, ate 38 palavras, sempre com pergunta leve.
-Nao cite score, prioridade, sinais, confianca, SDR, analise, nota, avaliacoes, reuniao, call ou termos tecnicos.
+Nao cite score, prioridade, sinais, confianca, SDR, analise, nota, avaliacoes, reuniao, call, 15min, diagnostico, insight ou termos tecnicos.
+Evite "acredito", "estrategia", "identifiquei", "aumentar visibilidade", "atrair clientes" e frases prontas.
 Retorne APENAS JSON: {"mensagem":"..."}`;
 
   const userMsg = montarUserMsgOutreach(contextoOutreach);
@@ -599,6 +673,43 @@ Retorne APENAS JSON: {"mensagem":"..."}`;
     return mensagemSeguraOutreach(parsed.mensagem, contextoOutreach, "direta");
   } catch {
     return mensagemSeguraOutreach("", contextoOutreach, "direta");
+  }
+}
+
+async function gerarMensagemContinuidadeOutreach(lead, respostaLead = "") {
+  const contextoOutreach = montarContextoOutreachLead(lead);
+  const systemPrompt = `Voce escreve a segunda mensagem de WhatsApp depois que o lead respondeu.
+Objetivo: continuar a conversa naturalmente e puxar para uma conversa rapida, sem parecer pitch.
+Use o angulo principal e o gatilho conversacional como centro.
+Pode mencionar diagnostico rapido ou insight.
+Precisa mencionar "sem compromisso".
+Pode falar em 15min, mas sem convite duro, sem "agendar call" e sem "marcar reuniao".
+Maximo 3 linhas, linguagem simples, nada formal.
+Nao cite score, prioridade, sinais, confianca, SDR, analise, nota, avaliacoes, estrategia ou termos tecnicos.
+Retorne APENAS JSON: {"mensagem":"..."}`;
+
+  const userMsg = `${montarUserMsgOutreach(contextoOutreach)}
+
+Possivel resposta do lead: ${respostaLead || "nao informada"}
+
+Crie uma continuidade que reaja de forma natural.`;
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMsg }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.5,
+      max_tokens: 220
+    });
+    const raw = completion.choices[0].message.content || "{}";
+    const parsed = JSON.parse(raw);
+    return mensagemContinuidadeSeguraOutreach(parsed.mensagem, contextoOutreach, respostaLead);
+  } catch {
+    return mensagemContinuidadeSeguraOutreach("", contextoOutreach, respostaLead);
   }
 }
 
@@ -2163,6 +2274,34 @@ function scoreLeadV2(lead = {}) {
     proximoPasso = "Salvar e abordar somente se o contexto do bairro reforcar a oportunidade.";
   }
 
+  let riscoTom = "normal";
+  if (!temTelefone || score < 60 || scoreConfianca < 55 || consolidadoForte || marcaConsolidada || subnichoConsultivo) {
+    riscoTom = "leve";
+  } else if (score >= 85 && scoreConfianca >= 70 && prioridadeBase === "ALTA") {
+    riscoTom = "direto";
+  }
+
+  const contextoAbordagem = [
+    taxonomia.label,
+    faixaAvaliacoes === "pequeno" ? "negocio pequeno, abordagem deve soar proxima" : "",
+    faixaAvaliacoes === "medio" ? "demanda local validada, ainda com espaco para conversa" : "",
+    faixaAvaliacoes === "maduro" || faixaAvaliacoes === "consolidado" ? "negocio mais maduro, tom precisa ser cuidadoso" : "",
+    !temSite ? "presenca digital menos estruturada pode abrir conversa" : "",
+    !temTelefone ? "canal precisa ser validado antes de abordar" : "",
+  ].filter(Boolean).join("; ");
+
+  const gatilhoFonte = removerAcentos(anguloAbordagem).toLowerCase();
+  let gatilhoConversacional = "perguntar se novos clientes chegam mais por indicacao ou conversa direta";
+  if (/whatsapp|orcamento|pedido|direto/.test(gatilhoFonte)) {
+    gatilhoConversacional = "puxar assunto sobre contatos, pedidos ou orcamentos pelo WhatsApp";
+  } else if (/agenda|horario|retorno/.test(gatilhoFonte)) {
+    gatilhoConversacional = "puxar assunto sobre agenda, horarios livres e retorno de clientes";
+  } else if (/confianca|reputacao|seguranca|autoridade/.test(gatilhoFonte)) {
+    gatilhoConversacional = "puxar assunto sobre confianca antes do primeiro contato";
+  } else if (/matricula|recorrencia|retencao/.test(gatilhoFonte)) {
+    gatilhoConversacional = "puxar assunto sobre recorrencia e frequencia de clientes";
+  }
+
   return {
     scoreVersion: "v2.2",
     score,
@@ -2172,6 +2311,9 @@ function scoreLeadV2(lead = {}) {
     sinaisFracos: sinaisFracos.slice(0, 5),
     proximoPasso,
     anguloAbordagem,
+    contextoAbordagem,
+    gatilhoConversacional,
+    riscoTom,
   };
 }
 
@@ -4281,6 +4423,9 @@ async function handler(req, res) {
           sinaisFracos: Array.isArray(lead.sinaisFracos) ? lead.sinaisFracos : [],
           proximoPasso: lead.proximoPasso || "",
           anguloAbordagem: lead.anguloAbordagem || "",
+          contextoAbordagem: lead.contextoAbordagem || "",
+          gatilhoConversacional: lead.gatilhoConversacional || "",
+          riscoTom: lead.riscoTom || "",
           origemBusca: lead.origemBusca || null,
           status: "novo",
           ultimoMovimento: null,
@@ -4306,7 +4451,7 @@ async function handler(req, res) {
           "mensagemInicial", "followUp", "notas",
           "site", "mapsUrl", "businessStatus",
           "scoreVersion", "score", "scoreConfianca", "scoreBreakdown", "sinaisFortes", "sinaisFracos",
-          "proximoPasso", "anguloAbordagem", "origemBusca",
+          "proximoPasso", "anguloAbordagem", "contextoAbordagem", "gatilhoConversacional", "riscoTom", "origemBusca",
         ];
         CAMPOS_PERMITIDOS.forEach(c => {
           if (body[c] !== undefined) crm.leads[idx][c] = body[c];
@@ -4655,6 +4800,12 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
       if (modo === "principal") {
         const mensagem = await gerarMensagemPrincipalOutreach(lead);
         console.log(`[CRM] Mensagem principal gerada via Outreach: ${lead.nome}`);
+        return enviarJson(res, 200, { mensagem });
+      }
+
+      if (modo === "continuidade") {
+        const mensagem = await gerarMensagemContinuidadeOutreach(lead, body.respostaLead || "");
+        console.log(`[CRM] Continuidade gerada via Outreach: ${lead.nome}`);
         return enviarJson(res, 200, { mensagem });
       }
 
