@@ -5747,7 +5747,7 @@
 
     // ── OUTREACH CACHE (localStorage) ────────────────────────────────────────
     function outreachCacheKey(lead) {
-      return `outreach_v_${lead?.id || lead?.nome || "?"}`;
+      return `outreach_v2_${lead?.id || lead?.nome || "?"}`;
     }
     function getOutreachCache(lead) {
       try { return JSON.parse(localStorage.getItem(outreachCacheKey(lead)) || "null"); } catch { return null; }
@@ -6461,7 +6461,7 @@
 
       // Mensagens via Outreach — cache localStorage por lead.id
       const fichaMsgContainer = fichaBody.querySelector("#fichaMensagensContent");
-      const cacheKey = `outreach_crm_${lead.id}`;
+      const cacheKey = `outreach_crm_v2_${lead.id}`;
 
       function renderFichaMsgCRM(variacoes) {
         const tipos = [

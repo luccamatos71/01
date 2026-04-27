@@ -181,7 +181,29 @@ async function chamarOutreachInterno(input, context) {
   const rawText = completion.choices[0].message.content;
   let parsed;
   try { parsed = JSON.parse(rawText); } catch { parsed = { resposta: rawText }; }
-  return parsed.resposta || "";
+  const resposta = parsed.resposta || "";
+  const contextoValidacao = { nome: input, categoria: context || input, anguloAbordagem: context || input };
+  const validacao = validarMensagemOutreach(resposta, contextoValidacao);
+  if (validacao.ok) return resposta;
+
+  const retry = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      ...messages,
+      { role: "assistant", content: rawText },
+      {
+        role: "user",
+        content: `Reescreva a mensagem. Falhas: ${validacao.motivos.join(", ")}. Maximo 2 frases, com pergunta leve, sem pedir reuniao/call/15 minutos e sem termos internos.`
+      }
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0.35,
+    max_tokens: 400
+  });
+  let reparsed;
+  try { reparsed = JSON.parse(retry.choices[0].message.content); } catch { reparsed = { resposta: "" }; }
+  const corrigida = reparsed.resposta || "";
+  return validarMensagemOutreach(corrigida, contextoValidacao).ok ? corrigida : "";
 }
 
 // Gera 5 variações de mensagem para um lead (chamada manual pelo usuário)
@@ -271,7 +293,34 @@ function normalizarListaOutreach(valor) {
   return [String(valor)];
 }
 
+function calcularIntensidadeOutreach(lead = {}) {
+  const score = Number.isFinite(Number(lead.score)) ? Number(lead.score) : 0;
+  const confianca = Number.isFinite(Number(lead.scoreConfianca)) ? Number(lead.scoreConfianca) : 0;
+  const prioridade = normalizarPrioridadeAnalise(lead.prioridade);
+  const sinaisFracos = normalizarListaOutreach(lead.sinaisFracos).join(" ").toLowerCase();
+  const semTelefone = !String(lead.telefone || "").trim() || sinaisFracos.includes("sem telefone");
+  const riscoForte = /consolidado|franquia|marca|descarte|dados insuficientes/.test(removerAcentos(sinaisFracos));
+
+  if (semTelefone || prioridade === "BAIXA" || prioridade === "DESCARTE" || score < 60 || confianca < 55 || riscoForte) {
+    return "leve";
+  }
+  if (score >= 82 && confianca >= 70 && prioridade === "ALTA") {
+    return "direta";
+  }
+  return "normal";
+}
+
+function definirObjetivoOutreach(lead = {}, intensidade = "normal") {
+  const score = Number.isFinite(Number(lead.score)) ? Number(lead.score) : 0;
+  const confianca = Number.isFinite(Number(lead.scoreConfianca)) ? Number(lead.scoreConfianca) : 0;
+  if (!String(lead.telefone || "").trim()) return "validar canal";
+  if (score < 60 || confianca < 55) return "testar interesse";
+  if (intensidade === "direta") return "puxar conversa";
+  return "abrir porta";
+}
+
 function montarContextoOutreachLead(lead = {}) {
+  const intensidade = calcularIntensidadeOutreach(lead);
   return {
     nome: lead.nome || "negocio",
     categoria: lead.categoria || "negocio local",
@@ -283,6 +332,8 @@ function montarContextoOutreachLead(lead = {}) {
     sinaisFracos: normalizarListaOutreach(lead.sinaisFracos),
     proximoPasso: lead.proximoPasso || "",
     anguloAbordagem: lead.anguloAbordagem || "validacao manual do contexto antes da abordagem",
+    intensidade,
+    objetivoMensagem: definirObjetivoOutreach(lead, intensidade),
   };
 }
 
@@ -331,9 +382,138 @@ Angulo principal: ${contexto.anguloAbordagem}
 Sinais fortes: ${fortes}
 Sinais fracos: ${fracos}
 Proximo passo interno: ${contexto.proximoPasso || "nao informado"}
+Intensidade sugerida: ${contexto.intensidade || "normal"}
+Objetivo da mensagem: ${contexto.objetivoMensagem || "abrir porta"}
 
 Use o angulo como direcao da conversa. Use sinais fortes para personalizar. Use sinais fracos para deixar a abordagem mais leve quando necessario.
-Nao cite nenhum dado interno, score, confianca, prioridade, sinais, nota, numero de avaliacoes ou analise SDR.`;
+Nao cite nenhum dado interno, score, confianca, prioridade, sinais, intensidade, objetivo, nota, numero de avaliacoes ou analise SDR.`;
+}
+
+const CHAVES_VARIACOES_OUTREACH = ["leve", "direta", "provocativa", "followup", "reuniao"];
+
+function normalizarTextoOutreach(texto) {
+  return removerAcentos(String(texto || "").toLowerCase());
+}
+
+function palavrasDeAnguloOutreach(contexto = {}) {
+  const fonte = normalizarTextoOutreach([
+    contexto.anguloAbordagem,
+    contexto.categoria,
+    contexto.nome,
+  ].filter(Boolean).join(" "));
+  const palavras = fonte
+    .split(/[^a-z0-9]+/)
+    .filter(p => p.length >= 5)
+    .filter(p => !["local", "negocio", "validacao", "contexto", "antes", "abordagem"].includes(p));
+
+  const base = new Set(palavras);
+  if (/whatsapp|orcamento|pedido|direto/.test(fonte)) {
+    ["whatsapp", "pedido", "orcamento", "direto", "mensagem"].forEach(p => base.add(p));
+  }
+  if (/agenda|horario|retorno/.test(fonte)) {
+    ["agenda", "horario", "retorno", "fluxo", "agendamento"].forEach(p => base.add(p));
+  }
+  if (/confianca|reputacao|autoridade/.test(fonte)) {
+    ["confianca", "bairro", "regiao", "seguranca", "autoridade"].forEach(p => base.add(p));
+  }
+  if (/estetic|procedimento|clinica/.test(fonte)) {
+    ["procedimento", "duvida", "seguranca", "primeira", "agenda", "whatsapp"].forEach(p => base.add(p));
+  }
+  if (/recorrencia|matricula|retencao|cuidados/.test(fonte)) {
+    ["recorrencia", "matricula", "retorno", "frequencia", "cuidados"].forEach(p => base.add(p));
+  }
+  if (/automot|carro|servico/.test(fonte)) {
+    ["carro", "servico", "automotivo", "polimento", "orcamento"].forEach(p => base.add(p));
+  }
+  if (/advoc|consultiv|jurid/.test(fonte)) {
+    ["consultivo", "triagem", "caso", "juridico", "bairro"].forEach(p => base.add(p));
+  }
+  return Array.from(base);
+}
+
+function validarMensagemOutreach(texto, contexto = {}) {
+  const original = String(texto || "").trim();
+  const t = normalizarTextoOutreach(original);
+  const motivos = [];
+
+  if (!original) motivos.push("mensagem vazia");
+  if (original.length > 230 || original.split(/\s+/).filter(Boolean).length > 42) motivos.push("mensagem longa demais");
+  if ((original.match(/[.!?]+/g) || []).length > 3) motivos.push("mais de duas frases reais");
+  if (!original.includes("?")) motivos.push("nao faz pergunta leve");
+
+  const proibidos = [
+    ["score", /\bscore\b|pontuacao/],
+    ["prioridade", /\bprioridade\b/],
+    ["confianca interna", /confianca interna|score de confianca|confianca do score|nivel de confianca/],
+    ["analise interna", /analise|analisei|sdr|sinais?/],
+    ["nota/avaliacao", /\bnota\b|avaliac|estrelas/],
+    ["identifiquei", /identifiquei|identificamos/],
+    ["estrategia de marketing", /estrategia de marketing|marketing digital|trafego pago/],
+    ["reuniao direta", /reuniao|call|chamada|videochamada|15\s?min|20\s?min|agendar|marcar|agenda[rm]\s+(uma\s+)?(call|reuniao|conversa)/],
+    ["pitch generico", /aumentar visibilidade|atrair mais clientes|crescer seu negocio|temos uma solucao|poderia te ajudar|oportunidade de crescimento/],
+    ["google/avaliacoes", /vi suas avaliacoes|google maps|maps/],
+  ];
+  proibidos.forEach(([motivo, regex]) => {
+    if (regex.test(t)) motivos.push(motivo);
+  });
+
+  const genericos = [
+    "ola, tudo bem?",
+    "gostaria de apresentar",
+    "me chamo",
+    "sou da",
+    "trabalho com marketing",
+    "ajudamos empresas",
+  ];
+  if (genericos.some(g => t.includes(g))) motivos.push("abertura generica ou institucional");
+
+  const palavrasAngulo = palavrasDeAnguloOutreach(contexto);
+  const temRelacaoComAngulo = palavrasAngulo.length === 0 || palavrasAngulo.some(p => t.includes(p));
+  const nomeTokens = normalizarTextoOutreach(contexto.nome || "").split(/[^a-z0-9]+/).filter(p => p.length >= 4);
+  const citaNome = nomeTokens.length > 0 && nomeTokens.some(p => t.includes(p));
+  if (!temRelacaoComAngulo && !citaNome) motivos.push("sem relacao clara com o angulo");
+
+  return { ok: motivos.length === 0, motivos };
+}
+
+function normalizarVariacoesOutreach(parsed = {}) {
+  return CHAVES_VARIACOES_OUTREACH.reduce((acc, key) => {
+    acc[key] = String(parsed?.[key] || "").trim();
+    return acc;
+  }, {});
+}
+
+function validarVariacoesOutreach(variacoes, contexto) {
+  const resultado = {};
+  const invalidas = [];
+  CHAVES_VARIACOES_OUTREACH.forEach((key) => {
+    const validacao = validarMensagemOutreach(variacoes[key], contexto);
+    resultado[key] = validacao.ok ? variacoes[key] : "";
+    if (!validacao.ok) {
+      invalidas.push({ key, texto: variacoes[key] || "", motivos: validacao.motivos });
+    }
+  });
+  return { variacoes: resultado, invalidas };
+}
+
+function montarPromptCorrecaoOutreach(contexto, invalidas) {
+  const falhas = invalidas
+    .map(item => `- ${item.key}: ${item.motivos.join(", ")}`)
+    .join("\n");
+  return `Algumas variacoes falharam no controle de qualidade:
+${falhas}
+
+Reescreva TODAS as 5 variacoes em JSON.
+Regras inegociaveis:
+- maximo 2 frases por mensagem
+- precisa ter pergunta leve
+- nao pedir reuniao, call ou 15 minutos
+- nao citar dados internos, score, nota, avaliacoes, SDR ou analise
+- precisa se conectar ao angulo: ${contexto.anguloAbordagem}
+- objetivo: ${contexto.objetivoMensagem}
+- intensidade: ${contexto.intensidade}
+
+Retorne APENAS JSON com as chaves leve, direta, provocativa, followup e reuniao.`;
 }
 
 // Gera 5 variacoes de mensagem guiadas pelo contexto do SDR.
@@ -349,6 +529,14 @@ HIERARQUIA OBRIGATORIA:
 4. Nicho/categoria
 5. Tom humano
 
+PADRAO SNIPER:
+- observacao especifica sobre o lead
+- gancho ligado ao angulo principal
+- pergunta leve de permissao ou diagnostico
+- no maximo 2 frases
+- nunca vender na primeira mensagem
+- nunca soar como agencia, script ou consultor
+
 USO DO ANGULO:
 - agenda e recorrencia: fale de movimento, horarios, fluxo ou retorno de clientes
 - WhatsApp direto: puxe conversa simples e direta
@@ -362,7 +550,7 @@ REGRA DE TOM:
 - Advocacia, contabilidade, consultoria, imobiliaria: sem girias, direto e consultivo
 
 ESTRUTURA:
-- 1 a 3 linhas no maximo
+- 1 a 2 frases no maximo
 - estilo WhatsApp
 - puxa conversa, nao pede reuniao direto
 - sem emoji excessivo
@@ -388,6 +576,7 @@ PROIBIDO EM TODAS:
 - "temos uma solucao"
 - "poderia te ajudar a crescer"
 - "vi suas avaliacoes no Google"
+- "tenho uma ideia" sem contexto especifico
 - mensagem generica que funcionaria para qualquer negocio do mesmo nicho
 
 OBRIGATORIO:
@@ -395,36 +584,44 @@ OBRIGATORIO:
 - usar o angulo principal como foco real da conversa
 - adaptar a intensidade aos sinais fortes/fracos
 - soar como uma pessoa puxando assunto
+- terminar com pergunta leve
 
 Retorne APENAS JSON (sem markdown, sem texto extra):
 { "leve": "...", "direta": "...", "provocativa": "...", "followup": "...", "reuniao": "..." }`;
 
   const userMsg = montarUserMsgOutreach(contextoOutreach);
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userMsg }
-    ],
-    response_format: { type: "json_object" },
-    temperature: 0.65,
-    max_tokens: 700
-  });
+  const chamarModelo = async (messages) => {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages,
+      response_format: { type: "json_object" },
+      temperature: 0.62,
+      max_tokens: 700
+    });
 
-  const raw = completion.choices[0].message.content;
-  try {
-    const parsed = JSON.parse(raw);
-    return {
-      leve:        parsed.leve        || "",
-      direta:      parsed.direta      || "",
-      provocativa: parsed.provocativa || "",
-      followup:    parsed.followup    || "",
-      reuniao:     parsed.reuniao     || ""
-    };
-  } catch {
-    return { leve: "", direta: "", provocativa: "", followup: "", reuniao: "" };
-  }
+    try {
+      return normalizarVariacoesOutreach(JSON.parse(completion.choices[0].message.content));
+    } catch {
+      return normalizarVariacoesOutreach({});
+    }
+  };
+
+  const mensagensBase = [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userMsg }
+  ];
+
+  const primeira = await chamarModelo(mensagensBase);
+  const validacaoInicial = validarVariacoesOutreach(primeira, contextoOutreach);
+  if (!validacaoInicial.invalidas.length) return validacaoInicial.variacoes;
+
+  const segunda = await chamarModelo([
+    ...mensagensBase,
+    { role: "assistant", content: JSON.stringify(primeira) },
+    { role: "user", content: montarPromptCorrecaoOutreach(contextoOutreach, validacaoInicial.invalidas) },
+  ]);
+  return validarVariacoesOutreach(segunda, contextoOutreach).variacoes;
 }
 
 const PROMPTS_AGENTES = {
@@ -519,7 +716,7 @@ SAÍDA: {"resposta":"Ótimo sinal. Registre como 'respondeu' no CRM. Próximo pa
 
 Responda em JSON: {"resposta":"...","acao":null}`,
 
-  outreach: `Você é o especialista em Outreach da Lumyn. Gera mensagens de primeiro contato para prospecção local via WhatsApp.
+  outreach_legacy: `Você é o especialista em Outreach da Lumyn. Gera mensagens de primeiro contato para prospecção local via WhatsApp.
 
 REGRA DE TOM (obrigatória):
 - Barbearia, restaurante, loja, pizzaria, pet shop: abertura "Fala," — informal, sem formalidade
@@ -549,6 +746,45 @@ ERRADO:
 Se não tiver nome do negócio nem nicho claro: pergunte antes de gerar a mensagem.
 Use "acao":"copiar" sempre que gerar mensagem pronta para enviar.
 Responda em JSON: {"resposta":"...","acao":null}`,
+
+  outreach: `Voce e o especialista em Outreach da Lumyn. Escreve primeira mensagem de WhatsApp para prospeccao local.
+
+OBJETIVO:
+- abrir conversa
+- testar interesse
+- pedir permissao leve
+- nunca vender de cara
+- nunca pedir reuniao/call no primeiro contato
+
+PADRAO:
+- maximo 2 frases
+- observacao especifica sobre o negocio
+- gancho comercial ligado ao contexto recebido
+- pergunta leve no final
+- tom humano, sem cara de script
+
+TOM:
+- barbearia/restaurante/pizzaria/loja/pet: informal e direto
+- clinica/estetica/academia/escola: leve e proximo
+- advocacia/contabilidade/consultoria/imobiliaria: consultivo, sem giria
+
+PROIBIDO:
+- score, nota, avaliacoes, prioridade, SDR, analise interna
+- "identifiquei"
+- "analisei seu negocio"
+- "estrategia de marketing"
+- "aumentar visibilidade"
+- "atrair mais clientes"
+- "temos uma solucao"
+- "poderia te ajudar a crescer"
+- pedir reuniao, call, 15 minutos ou agenda direta
+- mensagem generica que serviria para qualquer negocio
+
+SE FALTAR CONTEXTO:
+- ainda gere uma mensagem curta, mas com pergunta de validacao.
+
+Use "acao":"copiar" sempre que gerar mensagem pronta para enviar.
+Responda em JSON: {"resposta":"...","acao":"copiar"}`,
 
   analytics: `Você é o Analytics Agent da Lumyn — especialista em performance de campanhas Meta Ads.
 
