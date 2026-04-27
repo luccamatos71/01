@@ -3060,7 +3060,7 @@ async function chamarDirectorIA(modo, systemPrompt, historico, pergunta, tempera
 async function montarSnapshotEstrategia() {
   const crm = await lerCRM();
   const leads = crm.leads || [];
-  const contagem = { novo: 0, abordado: 0, respondeu: 0, reuniao: 0, proposta: 0, fechado: 0, perdido: 0 };
+  const contagem = { novo: 0, abordado: 0, conversando: 0, respondeu: 0, reuniao: 0, proposta: 0, fechado: 0, perdido: 0 };
   let travados = 0;
   const TRAVADO_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
   const agora = Date.now();
@@ -3076,7 +3076,7 @@ async function montarSnapshotEstrategia() {
   const partesCrm = [
     `CRM: ${contagem.novo} novo${contagem.novo !== 1 ? "s" : ""}`,
     `${contagem.abordado} abordado${contagem.abordado !== 1 ? "s" : ""}`,
-    `${contagem.respondeu} respondeu`,
+    `${contagem.conversando + contagem.respondeu} conversando`,
     `${contagem.reuniao} em reunião`,
     `${contagem.proposta} proposta`,
     `${contagem.fechado} fechado${contagem.fechado !== 1 ? "s" : ""}`,
@@ -3871,7 +3871,7 @@ async function processarAgente(nomeAgente, input, context = "", historico = []) 
         const prospectadosHoje = leads.filter(l => l.atualizadoEm && l.atualizadoEm.startsWith(hoje)).length;
         const statusCount = {};
         leads.forEach(l => { statusCount[l.status] = (statusCount[l.status] || 0) + 1; });
-        const crmSummary = `[CRM] Total de leads: ${leads.length} | Prospectados hoje: ${prospectadosHoje} | Novos: ${statusCount.novo || 0} | Abordados: ${statusCount.abordado || 0} | Responderam: ${statusCount.respondeu || 0} | Reunião agendada: ${statusCount.reuniao || 0} | Fechados: ${statusCount.fechado || 0}`;
+        const crmSummary = `[CRM] Total de leads: ${leads.length} | Prospectados hoje: ${prospectadosHoje} | Novos: ${statusCount.novo || 0} | Abordados: ${statusCount.abordado || 0} | Conversando: ${(statusCount.conversando || 0) + (statusCount.respondeu || 0)} | Reunião agendada: ${statusCount.reuniao || 0} | Fechados: ${statusCount.fechado || 0}`;
         autoContext = crmSummary;
       } catch (e) { /* fail silently */ }
     }
@@ -4430,9 +4430,22 @@ async function handler(req, res) {
           status: "novo",
           ultimoMovimento: null,
           statusConversa: null,
+          needsFollowUp: false,
           ultimaInteracaoEm: null,
           mensagemInicial: lead.mensagemInicial || "",
+          tipoMensagemInicial: lead.tipoMensagemInicial || "",
+          mensagemFollowUp: lead.mensagemFollowUp || "",
           followUp: "",
+          respondeu: false,
+          usouFollowUp: false,
+          virouReuniao: false,
+          estagioFinal: "novo",
+          nicho: lead.nicho || lead.categoria || "",
+          primeiraMensagemEnviadaEm: null,
+          followUpEnviadoEm: null,
+          respondeuEm: null,
+          reuniaoEm: null,
+          perdidoEm: null,
           notas: "",
           criadoEm: agora,
           atualizadoEm: agora,
@@ -4448,7 +4461,9 @@ async function handler(req, res) {
         if (idx < 0) return enviarJson(res, 404, { erro: "Lead não encontrado" });
         const CAMPOS_PERMITIDOS = [
           "status", "ultimoMovimento", "statusConversa", "ultimaInteracaoEm",
-          "mensagemInicial", "followUp", "notas",
+          "needsFollowUp", "mensagemInicial", "tipoMensagemInicial", "mensagemFollowUp", "followUp", "notas",
+          "respondeu", "usouFollowUp", "virouReuniao", "estagioFinal", "nicho",
+          "primeiraMensagemEnviadaEm", "followUpEnviadoEm", "respondeuEm", "reuniaoEm", "perdidoEm",
           "site", "mapsUrl", "businessStatus",
           "scoreVersion", "score", "scoreConfianca", "scoreBreakdown", "sinaisFortes", "sinaisFracos",
           "proximoPasso", "anguloAbordagem", "contextoAbordagem", "gatilhoConversacional", "riscoTom", "origemBusca",

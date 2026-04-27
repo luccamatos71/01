@@ -1583,6 +1583,7 @@
     .ficha-status-badge.reuniao   { color: #4ade80; border-color: rgba(74,222,128,0.25); background: rgba(74,222,128,0.08); }
     .ficha-status-badge.proposta  { color: #fbbf24; border-color: rgba(251,191,36,0.25); background: rgba(251,191,36,0.08); }
     .ficha-status-badge.fechado   { color: #4ade80; border-color: rgba(74,222,128,0.25); background: rgba(74,222,128,0.08); }
+    .ficha-status-badge.perdido   { color: #94a3b8; border-color: rgba(148,163,184,0.22); background: rgba(148,163,184,0.06); }
 
     /* Movimento badge */
     .ficha-mov-eu   { color: #60a5fa; }
@@ -1591,6 +1592,11 @@
     /* crm-card clicável */
     .crm-card { cursor: pointer; }
     .crm-card:hover { background: rgba(255,255,255,0.025); }
+    .crm-card.needs-followup { border-color: rgba(249,115,22,0.42); background: rgba(249,115,22,0.045); }
+    .crm-card.awaiting-reply { border-color: rgba(96,165,250,0.22); }
+    .crm-card.must-reply { border-color: rgba(251,191,36,0.36); background: rgba(251,191,36,0.035); }
+    .crm-card.positive { border-color: rgba(74,222,128,0.28); background: rgba(74,222,128,0.035); }
+    .crm-card.lost { opacity: 0.58; filter: grayscale(0.35); }
 
     .crm-card-alerta {
       font-size: 10px;
@@ -1599,6 +1605,25 @@
       white-space: nowrap;
     }
     .crm-card-alerta.urgente { color: #fbbf24; }
+    .crm-card-alerta.followup { color: #f97316; }
+    .crm-card-actions {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    .crm-card-action-btn {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.035);
+      color: var(--text-2);
+      border-radius: 6px;
+      padding: 4px 7px;
+      font-size: 10px;
+      cursor: pointer;
+    }
+    .crm-card-action-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.18); }
+    .crm-card-action-btn.primary { color: #fff; border-color: #25d366; background: #25d366; }
+    .crm-card-action-btn.orange { color: #f97316; border-color: rgba(249,115,22,0.35); background: rgba(249,115,22,0.07); }
 
     /* ============================================================
        ANALYSIS DRAWER — painel lateral de análise
@@ -6085,9 +6110,14 @@
     let currentAnalysisText = "";
     let currentLead = null;
     let currentMsgText = ""; // Mensagem da aba selecionada no drawer
+    let currentMsgTipo = "direta";
 
     function mensagemAtual() {
       return currentMsgText;
+    }
+
+    function tipoMensagemAtual() {
+      return ["leve", "direta", "provocativa"].includes(currentMsgTipo) ? currentMsgTipo : "direta";
     }
 
     // ── OUTREACH CACHE (localStorage) ────────────────────────────────────────
@@ -6124,6 +6154,12 @@
       return ["direta", "leve", "provocativa", "followup", "reuniao"]
         .map(key => String(variacoes[key] || "").trim())
         .find(Boolean) || "";
+    }
+
+    function primeiraMensagemInicialComTipo(variacoes) {
+      if (!variacoes) return { mensagem: "", tipo: "direta" };
+      const tipo = ["direta", "leve", "provocativa"].find(key => String(variacoes[key] || "").trim()) || "direta";
+      return { mensagem: String(variacoes[tipo] || "").trim(), tipo };
     }
 
     function variacoesTemMensagem(variacoes) {
@@ -6167,6 +6203,7 @@
       currentAnalysisText = "";
       currentLead = null;
       currentMsgText = "";
+      currentMsgTipo = "direta";
       syncMobileOverlayState();
     }
 
@@ -6271,6 +6308,7 @@
 
     function renderMensagemPrincipalHTML(container, mensagem, lead, estado = "") {
       currentMsgText = mensagem || "";
+      currentMsgTipo = "direta";
       const status = estado ? `<div class="analysis-score-muted" style="margin-bottom:8px;">${escapeHtml(estado)}</div>` : "";
       container.innerHTML = `
         <div class="mensagem-wrap">
@@ -6362,7 +6400,7 @@
         const data = await r.json();
         if (data.variacoes) {
           setOutreachCache(lead, data.variacoes);
-          const primeira = primeiraMensagemVariacoes(data.variacoes);
+          const primeira = primeiraMensagemInicialComTipo(data.variacoes).mensagem || primeiraMensagemVariacoes(data.variacoes);
           if (primeira) setOutreachFastCache(lead, primeira);
           renderVariacoesHTML(section, data.variacoes, lead);
         } else {
@@ -6388,8 +6426,10 @@
           <span class="estilo-desc">${t.desc}</span>
         </button>`).join("");
 
-      const inicial = primeiraMensagemVariacoes(variacoes);
+      const inicialInfo = primeiraMensagemInicialComTipo(variacoes);
+      const inicial = inicialInfo.mensagem || primeiraMensagemVariacoes(variacoes);
       currentMsgText = inicial;
+      currentMsgTipo = inicialInfo.tipo;
 
       container.innerHTML = `
         <div class="mensagem-wrap">
@@ -6404,6 +6444,7 @@
           container.querySelectorAll(".estilo-tab").forEach(b => b.classList.toggle("ativo", b === btn));
           const tipo = btn.dataset.tipo;
           currentMsgText = variacoes[tipo] || "";
+          currentMsgTipo = ["leve", "direta", "provocativa"].includes(tipo) ? tipo : "direta";
           const box = container.querySelector("#mensagemBox");
           if (box) box.textContent = currentMsgText;
         });
@@ -6435,12 +6476,13 @@
       });
     });
 
-    if (analysisWhatsappBtn) analysisWhatsappBtn.addEventListener("click", () => {
+    if (analysisWhatsappBtn) analysisWhatsappBtn.addEventListener("click", async () => {
       if (!currentLead?.telefone) return;
       const msg = mensagemAtual();
       const link = montarLinkWhatsApp(currentLead.telefone, msg);
       window.open(link, "_blank");
       marcarContatado(currentLead);
+      if (msg) await registrarMensagemInicialEnviadaCRM(currentLead, msg, tipoMensagemAtual());
     });
 
     async function openAnalysisDrawer(lead) {
@@ -6546,12 +6588,15 @@
         // Botão WhatsApp direto
         const waBtn = card.querySelector("[data-wa]");
         if (waBtn) {
-          waBtn.addEventListener("click", (e) => {
+          waBtn.addEventListener("click", async (e) => {
             e.stopPropagation();
             const cached = getOutreachCache(lead);
-            const msg = variacoesTemMensagem(cached) ? primeiraMensagemVariacoes(cached) : (getOutreachFastCache(lead) || "");
+            const info = primeiraMensagemInicialComTipo(cached);
+            const msg = variacoesTemMensagem(cached) ? (info.mensagem || primeiraMensagemVariacoes(cached)) : (getOutreachFastCache(lead) || "");
+            const tipo = variacoesTemMensagem(cached) ? info.tipo : "direta";
             window.open(montarLinkWhatsApp(lead.telefone, msg), "_blank");
             marcarContatado(lead);
+            if (msg) await registrarMensagemInicialEnviadaCRM(lead, msg, tipo);
           });
         }
 
@@ -6681,13 +6726,13 @@
     // ===================== CRM =====================
     const CRM_ROUTE = "/api/crm";
     const CRM_STATUSES = [
-      { key: "novo",        label: "Novo" },
+      { key: "novo",        label: "Salvos" },
       { key: "abordado",    label: "Abordado" },
-      { key: "follow_up",   label: "1 Follow-up" },
       { key: "conversando", label: "Conversando" },
       { key: "reuniao",     label: "Reunião" },
       { key: "proposta",    label: "Proposta" },
       { key: "fechado",     label: "Fechado" },
+      { key: "perdido",     label: "Perdido" },
     ];
 
     const crmOverlay   = document.getElementById("crmOverlay");
@@ -6701,6 +6746,7 @@
     const analysisCrmBtn = document.getElementById("analysisCrmBtn");
 
     let crmData = { leads: [] };
+    const FOLLOWUP_PRAZO_HORAS = 24;
 
     async function crmFetch(payload) {
       const r = await fetch(CRM_ROUTE, {
@@ -6711,19 +6757,153 @@
       return r.json();
     }
 
+    function crmLeadAtivo(lead) {
+      return lead && !["fechado", "perdido"].includes(lead.status);
+    }
+
+    function horasDesde(iso) {
+      if (!iso) return 999;
+      const ts = new Date(iso).getTime();
+      if (!Number.isFinite(ts)) return 999;
+      return (Date.now() - ts) / 3600000;
+    }
+
+    function leadPrecisaFollowUp(lead) {
+      if (!crmLeadAtivo(lead)) return false;
+      if (["reuniao", "proposta"].includes(lead.status)) return false;
+      if (lead.statusConversa === "aguardando_resposta" || lead.ultimoMovimento === "lead") return false;
+      if (lead.status === "follow_up") return true;
+      if (lead.needsFollowUp) return true;
+      const ref = lead.ultimaInteracaoEm || lead.primeiraMensagemEnviadaEm || lead.atualizadoEm;
+      return lead.statusConversa === "aguardando_cliente" && horasDesde(ref) >= FOLLOWUP_PRAZO_HORAS;
+    }
+
+    function crmStatusVisual(lead) {
+      if (lead?.status === "follow_up") return "abordado";
+      return lead?.status || "novo";
+    }
+
+    function atualizarLeadLocalCRM(leadAtualizado) {
+      if (!leadAtualizado?.id) return;
+      const idx = (crmData.leads || []).findIndex(l => l.id === leadAtualizado.id);
+      if (idx >= 0) crmData.leads[idx] = { ...crmData.leads[idx], ...leadAtualizado };
+      else crmData.leads.unshift(leadAtualizado);
+    }
+
+    async function sincronizarFollowUpsPendentes() {
+      const leads = crmData.leads || [];
+      const pendentes = leads.filter(l => leadPrecisaFollowUp(l) && !l.needsFollowUp);
+      if (!pendentes.length) return;
+      await Promise.all(pendentes.map(async (lead) => {
+        lead.needsFollowUp = true;
+        try {
+          await crmFetch({ modo: "atualizar", id: lead.id, needsFollowUp: true });
+        } catch { /* sync silencioso */ }
+      }));
+    }
+
+    async function salvarAtualizacaoCRMLead(lead, campos = {}, { reload = true } = {}) {
+      if (!lead?.id) return null;
+      const salvo = await crmFetch({ modo: "salvar", lead });
+      const base = salvo.lead || lead;
+      const data = await crmFetch({ modo: "atualizar", id: base.id, ...campos });
+      if (data.ok && data.lead) {
+        Object.assign(lead, data.lead);
+        atualizarLeadLocalCRM(data.lead);
+      }
+      if (reload) {
+        await carregarCRM();
+        if (crmOverlay?.classList.contains("open")) renderizarCRM();
+      } else {
+        atualizarContadoresSidebar();
+      }
+      return data.lead || base;
+    }
+
+    function normalizarTipoMensagemInicial(tipo) {
+      return ["leve", "direta", "provocativa"].includes(tipo) ? tipo : "direta";
+    }
+
+    async function registrarMensagemInicialEnviadaCRM(lead, mensagem, tipo = "direta") {
+      const agora = new Date().toISOString();
+      return salvarAtualizacaoCRMLead(lead, {
+        status: "abordado",
+        ultimoMovimento: "eu",
+        statusConversa: "aguardando_cliente",
+        ultimaInteracaoEm: agora,
+        primeiraMensagemEnviadaEm: lead.primeiraMensagemEnviadaEm || agora,
+        mensagemInicial: mensagem || lead.mensagemInicial || "",
+        tipoMensagemInicial: normalizarTipoMensagemInicial(tipo),
+        needsFollowUp: false,
+        estagioFinal: "abordado",
+        nicho: lead.nicho || lead.categoria || "",
+      });
+    }
+
+    async function registrarFollowUpEnviadoCRM(lead, mensagem) {
+      const agora = new Date().toISOString();
+      const statusBase = ["novo", "follow_up"].includes(lead.status) ? "abordado" : (lead.status || "abordado");
+      return salvarAtualizacaoCRMLead(lead, {
+        status: statusBase,
+        ultimoMovimento: "eu",
+        statusConversa: "aguardando_cliente",
+        ultimaInteracaoEm: agora,
+        mensagemFollowUp: mensagem || lead.mensagemFollowUp || "",
+        followUp: mensagem || lead.followUp || "",
+        usouFollowUp: true,
+        needsFollowUp: false,
+        followUpEnviadoEm: agora,
+        estagioFinal: statusBase,
+      });
+    }
+
+    function followUpCacheKeyCRM(lead) {
+      return `outreach_followup_v1_${lead?.id || lead?.nome || "?"}`;
+    }
+
+    function getFollowUpCRM(lead) {
+      try { return localStorage.getItem(followUpCacheKeyCRM(lead)) || lead.mensagemFollowUp || lead.followUp || ""; }
+      catch { return lead.mensagemFollowUp || lead.followUp || ""; }
+    }
+
+    function setFollowUpCRM(lead, mensagem) {
+      if (!mensagem) return;
+      try { localStorage.setItem(followUpCacheKeyCRM(lead), mensagem); } catch { /* ignore */ }
+      lead.mensagemFollowUp = mensagem;
+      lead.followUp = mensagem;
+    }
+
+    async function gerarFollowUpCRMLead(lead, force = false) {
+      const cached = force ? "" : getFollowUpCRM(lead);
+      if (cached) return cached;
+      const r = await fetch("/api/crm/mensagem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lead }),
+      });
+      const data = await r.json();
+      const mensagem = String(data?.variacoes?.followup || data?.variacoes?.leve || data?.variacoes?.direta || "").trim();
+      if (!mensagem) throw new Error(data.erro || "Follow-up vazio.");
+      setFollowUpCRM(lead, mensagem);
+      await salvarAtualizacaoCRMLead(lead, { mensagemFollowUp: mensagem, followUp: mensagem }, { reload: false });
+      return mensagem;
+    }
+
     async function carregarCRM() {
       try {
         const data = await crmFetch({ modo: "listar" });
         crmData = data;
+        await sincronizarFollowUpsPendentes();
         atualizarContadoresSidebar();
       } catch { /* silencioso */ }
     }
 
     function atualizarContadoresSidebar() {
       const leads = crmData.leads || [];
-      const ativos = leads.filter(l => l.status !== "fechado" && l.status !== "perdido");
+      const ativos = leads.filter(crmLeadAtivo);
       const reunioes = leads.filter(l => l.status === "reuniao").length;
       const fechados = leads.filter(l => l.status === "fechado").length;
+      const followups = leads.filter(leadPrecisaFollowUp).length;
 
       if (!leads.length) {
         crmCounters.innerHTML = `<div class="crm-counter-row"><span class="crm-counter-label">Nenhum lead salvo</span></div>`;
@@ -6740,6 +6920,10 @@
           <span class="crm-counter-label">Reuniões</span>
           <span class="crm-counter-val highlight">${reunioes}</span>
         </div>` : ""}
+        ${followups ? `<div class="crm-counter-row">
+          <span class="crm-counter-label">Follow-ups</span>
+          <span class="crm-counter-val highlight">${followups}</span>
+        </div>` : ""}
         ${fechados ? `<div class="crm-counter-row">
           <span class="crm-counter-label">Fechados</span>
           <span class="crm-counter-val highlight">${fechados}</span>
@@ -6751,22 +6935,17 @@
       const alertas = [];
 
       leads.forEach(l => {
-        if (l.status === "fechado") return;
+        if (!crmLeadAtivo(l)) return;
         const ref = l.ultimaInteracaoEm || l.atualizadoEm;
-        const atualizado = ref ? new Date(ref).getTime() : 0;
-        const diffH = (agora - atualizado) / 3600000;
+        const diffH = ref ? (agora - new Date(ref).getTime()) / 3600000 : 999;
 
         // Lead aguardando minha resposta (urgente — ele falou por último)
         if (l.statusConversa === "aguardando_resposta" && diffH >= 2) {
           alertas.push({ lead: l, urgente: true, desc: `lead esperando — ${Math.floor(diffH)}h aguardando sua resposta` });
         }
         // Eu falei por último, lead não respondeu (follow-up)
-        else if (l.statusConversa === "aguardando_cliente" && diffH >= 24) {
+        else if (leadPrecisaFollowUp(l)) {
           alertas.push({ lead: l, urgente: false, desc: `follow-up — ${Math.floor(diffH)}h sem resposta do lead` });
-        }
-        // Fallback legado: abordado sem statusConversa definido
-        else if (!l.statusConversa && l.status === "abordado" && diffH >= 24) {
-          alertas.push({ lead: l, urgente: false, desc: `follow-up — ${Math.floor(diffH)}h sem resposta` });
         }
       });
 
@@ -6814,18 +6993,17 @@
 
     function proximaAcao(lead) {
       if (lead.statusConversa === "aguardando_resposta") return "⚡ Responder o lead agora";
-      const ref = lead.ultimaInteracaoEm || lead.atualizadoEm;
-      const diffH = ref ? (Date.now() - new Date(ref).getTime()) / 3600000 : 999;
-      if (lead.statusConversa === "aguardando_cliente" && diffH >= 24) return "📩 Enviar follow-up — mais de 24h sem resposta";
+      if (leadPrecisaFollowUp(lead)) return `📩 Gerar follow-up — mais de ${FOLLOWUP_PRAZO_HORAS}h sem resposta`;
       if (lead.statusConversa === "aguardando_cliente") return "⏳ Aguardar resposta do lead";
-      if (lead.status === "follow_up") return "📩 Aguardar resposta do follow-up";
       if (lead.status === "reuniao") return "📅 Confirmar reunião e preparar proposta";
       if (lead.status === "proposta") return "📋 Follow-up da proposta";
+      if (lead.status === "perdido") return "Arquivado como perdido";
       if (lead.status === "novo") return "📤 Iniciar contato";
       return "—";
     }
 
     function labelStatus(key) {
+      if (key === "follow_up") return "Abordado";
       return (CRM_STATUSES.find(s => s.key === key) || {}).label || key;
     }
 
@@ -6858,8 +7036,9 @@
         : lead.statusConversa === "aguardando_cliente"
         ? '<span style="color:var(--text-3)">⏳ Aguardando cliente</span>'
         : "—";
+      const needsFollowUp = leadPrecisaFollowUp(lead);
 
-      const followUpTexto = lead.followUp ||
+      const followUpTexto = getFollowUpCRM(lead) ||
         "Oi! Passei para ver se chegou minha mensagem. Teria 15 min essa semana?";
 
       fichaBody.innerHTML = `
@@ -6890,10 +7069,14 @@
           <button class="ficha-btn" id="btnCopiarMsg">Copiar mensagem</button>
         </div>
 
-        <div class="ficha-bloco">
-          <div class="ficha-bloco-titulo">Follow-up sugerido</div>
-          <div class="ficha-bloco-val textarea-like">${escapeHtml(followUpTexto)}</div>
-          <button class="ficha-btn" id="btnCopiarFollowUp">Copiar follow-up</button>
+        <div class="ficha-bloco" id="fichaSecaoFollowUp">
+          <div class="ficha-bloco-titulo">Follow-up assistido ${needsFollowUp ? '<span style="color:#f97316;">· pendente</span>' : ""}</div>
+          <div class="ficha-bloco-val textarea-like" id="fichaFollowUpTexto">${escapeHtml(followUpTexto)}</div>
+          <div class="ficha-acoes-row" style="gap:6px; flex-wrap:wrap;">
+            <button class="ficha-btn orange" id="btnGerarFollowUpCRM">Gerar follow-up</button>
+            <button class="ficha-btn" id="btnCopiarFollowUp">Copiar</button>
+            ${lead.telefone ? `<button class="ficha-btn primary" id="btnWaFollowUpCRM">WhatsApp</button>` : ""}
+          </div>
         </div>
 
         <div class="ficha-bloco">
@@ -6933,7 +7116,7 @@
           <div class="ficha-acoes">
             <div class="ficha-acoes-row">
               <button class="ficha-btn accent" id="btnAbordado">Eu abordei</button>
-              <button class="ficha-btn warn"   id="btnLeadRespondeu">Lead respondeu</button>
+              <button class="ficha-btn warn"   id="btnLeadRespondeu">Recebeu resposta</button>
               <button class="ficha-btn"        id="btnEuRespondi">Eu respondi</button>
               <button class="ficha-btn orange"  id="btnFollowUp">Follow-up enviado</button>
             </div>
@@ -6941,6 +7124,7 @@
               <button class="ficha-btn success" id="btnReuniao">Reunião</button>
               <button class="ficha-btn success" id="btnProposta">Proposta</button>
               <button class="ficha-btn success" id="btnFechado">Fechado</button>
+              <button class="ficha-btn danger" id="btnPerdido">Perdido</button>
             </div>
           </div>
         </div>
@@ -6961,10 +7145,32 @@
       // Copiar follow-up
       const btnCopiarFollowUp = fichaBody.querySelector("#btnCopiarFollowUp");
       if (btnCopiarFollowUp) btnCopiarFollowUp.addEventListener("click", () => {
-        navigator.clipboard.writeText(followUpTexto).then(() => {
+        const texto = fichaBody.querySelector("#fichaFollowUpTexto")?.textContent || followUpTexto;
+        navigator.clipboard.writeText(texto).then(() => {
           fichaBody.querySelector("#btnCopiarFollowUp").textContent = "Copiado!";
-          setTimeout(() => { if (fichaBody.querySelector("#btnCopiarFollowUp")) fichaBody.querySelector("#btnCopiarFollowUp").textContent = "Copiar follow-up"; }, 1400);
+          setTimeout(() => { if (fichaBody.querySelector("#btnCopiarFollowUp")) fichaBody.querySelector("#btnCopiarFollowUp").textContent = "Copiar"; }, 1400);
         });
+      });
+
+      const btnGerarFollowUpCRM = fichaBody.querySelector("#btnGerarFollowUpCRM");
+      if (btnGerarFollowUpCRM) btnGerarFollowUpCRM.addEventListener("click", async () => {
+        btnGerarFollowUpCRM.textContent = "Gerando...";
+        try {
+          const mensagem = await gerarFollowUpCRMLead(lead, true);
+          const box = fichaBody.querySelector("#fichaFollowUpTexto");
+          if (box) box.textContent = mensagem;
+          btnGerarFollowUpCRM.textContent = "Gerar novo";
+        } catch {
+          btnGerarFollowUpCRM.textContent = "Erro ao gerar";
+          setTimeout(() => { if (btnGerarFollowUpCRM) btnGerarFollowUpCRM.textContent = "Gerar follow-up"; }, 1400);
+        }
+      });
+
+      const btnWaFollowUpCRM = fichaBody.querySelector("#btnWaFollowUpCRM");
+      if (btnWaFollowUpCRM) btnWaFollowUpCRM.addEventListener("click", async () => {
+        const texto = fichaBody.querySelector("#fichaFollowUpTexto")?.textContent || getFollowUpCRM(lead) || "";
+        window.open(montarLinkWhatsApp(lead.telefone, texto), "_blank");
+        if (texto) await registrarFollowUpEnviadoCRM(lead, texto);
       });
 
       // Salvar observações
@@ -6976,6 +7182,13 @@
         fichaBody.querySelector("#btnSalvarNotas").textContent = "Salvo!";
         setTimeout(() => { if (fichaBody.querySelector("#btnSalvarNotas")) fichaBody.querySelector("#btnSalvarNotas").textContent = "Salvar observações"; }, 1400);
         await carregarCRM();
+      });
+
+      const btnWhatsAppCRM = fichaBody.querySelector("#btnWhatsApp");
+      if (btnWhatsAppCRM) btnWhatsAppCRM.addEventListener("click", async () => {
+        if ((lead.status || "novo") === "novo" && String(lead.mensagemInicial || "").trim()) {
+          await registrarMensagemInicialEnviadaCRM(lead, lead.mensagemInicial, lead.tipoMensagemInicial || "direta");
+        }
       });
 
       // Mensagens via Outreach — cache localStorage por lead.id
@@ -6998,7 +7211,8 @@
             ${t.label} <span style="opacity:.5; font-size:10px;">${t.desc}</span>
           </button>`).join("");
 
-        const inicial = variacoes.direta || variacoes.leve || "";
+        const inicialInfo = primeiraMensagemInicialComTipo(variacoes);
+        const inicial = inicialInfo.mensagem || variacoes.direta || variacoes.leve || "";
         fichaMsgContainer.innerHTML = `
           <div class="ficha-estilo-tabs" style="flex-wrap:wrap;">${tabsHtml}</div>
           <div class="ficha-bloco-val textarea-like" id="fichaMsgTexto">${escapeHtml(inicial)}</div>
@@ -7009,11 +7223,13 @@
           </div>`;
 
         let textoAtivo = inicial;
+        let textoAtivoTipo = inicialInfo.tipo;
         fichaMsgContainer.querySelectorAll(".ficha-estilo-tab").forEach(btn => {
           btn.addEventListener("click", () => {
             fichaMsgContainer.querySelectorAll(".ficha-estilo-tab").forEach(b => b.classList.remove("ativo"));
             btn.classList.add("ativo");
             textoAtivo = variacoes[btn.dataset.tipo] || "";
+            textoAtivoTipo = normalizarTipoMensagemInicial(btn.dataset.tipo);
             const box = fichaMsgContainer.querySelector("#fichaMsgTexto");
             if (box) box.textContent = textoAtivo;
           });
@@ -7026,8 +7242,9 @@
           });
         });
 
-        fichaMsgContainer.querySelector("#btnWaFichaMsgNova")?.addEventListener("click", () => {
+        fichaMsgContainer.querySelector("#btnWaFichaMsgNova")?.addEventListener("click", async () => {
           window.open(montarLinkWhatsApp(lead.telefone, textoAtivo), "_blank");
+          if (textoAtivo) await registrarMensagemInicialEnviadaCRM(lead, textoAtivo, textoAtivoTipo);
         });
 
         fichaMsgContainer.querySelector("#btnRegerarFichaMsgNova")?.addEventListener("click", async () => {
@@ -7093,8 +7310,17 @@
           });
         });
 
-        continuidadeContainer.querySelector("#btnWaContinuidadeCRM")?.addEventListener("click", () => {
+        continuidadeContainer.querySelector("#btnWaContinuidadeCRM")?.addEventListener("click", async () => {
           window.open(montarLinkWhatsApp(lead.telefone, textoAtivo), "_blank");
+          const agora = new Date().toISOString();
+          await salvarAtualizacaoCRMLead(lead, {
+            status: "conversando",
+            ultimoMovimento: "eu",
+            statusConversa: "aguardando_cliente",
+            ultimaInteracaoEm: agora,
+            needsFollowUp: false,
+            estagioFinal: "conversando",
+          });
         });
 
         continuidadeContainer.querySelector("#btnRegerarContinuidadeCRM")?.addEventListener("click", async () => {
@@ -7146,40 +7372,100 @@
         }
       }
 
-      const agora = new Date().toISOString();
+      const agoraISO = () => new Date().toISOString();
 
       // Eu abordei → abordado, eu falei, aguardando cliente
       const btnAbordado = fichaBody.querySelector("#btnAbordado");
       if (btnAbordado) btnAbordado.addEventListener("click", () =>
-        atualizarLead(lead.id, { status: "abordado", ultimoMovimento: "eu", statusConversa: "aguardando_cliente", ultimaInteracaoEm: agora }));
+        atualizarLead(lead.id, {
+          status: "abordado",
+          ultimoMovimento: "eu",
+          statusConversa: "aguardando_cliente",
+          ultimaInteracaoEm: agoraISO(),
+          needsFollowUp: false,
+          estagioFinal: "abordado",
+        }));
 
       // Lead respondeu → conversando, lead falou, aguardando minha resposta
       const btnLeadRespondeu = fichaBody.querySelector("#btnLeadRespondeu");
       if (btnLeadRespondeu) btnLeadRespondeu.addEventListener("click", () =>
-        atualizarLead(lead.id, { status: "conversando", ultimoMovimento: "lead", statusConversa: "aguardando_resposta", ultimaInteracaoEm: agora }));
+        atualizarLead(lead.id, {
+          status: "conversando",
+          ultimoMovimento: "lead",
+          statusConversa: "aguardando_resposta",
+          ultimaInteracaoEm: agoraISO(),
+          respondeu: true,
+          respondeuEm: agoraISO(),
+          needsFollowUp: false,
+          estagioFinal: "conversando",
+        }));
 
       // Eu respondi → conversando, eu falei, aguardando cliente
       const btnEuRespondi = fichaBody.querySelector("#btnEuRespondi");
       if (btnEuRespondi) btnEuRespondi.addEventListener("click", () =>
-        atualizarLead(lead.id, { status: "conversando", ultimoMovimento: "eu", statusConversa: "aguardando_cliente", ultimaInteracaoEm: agora }));
+        atualizarLead(lead.id, {
+          status: "conversando",
+          ultimoMovimento: "eu",
+          statusConversa: "aguardando_cliente",
+          ultimaInteracaoEm: agoraISO(),
+          needsFollowUp: false,
+          estagioFinal: "conversando",
+        }));
 
-      // Follow-up enviado → follow_up, eu falei, aguardando resposta do lead
+      // Follow-up enviado → mantém etapa principal e registra ação
       const btnFollowUp = fichaBody.querySelector("#btnFollowUp");
-      if (btnFollowUp) btnFollowUp.addEventListener("click", () =>
-        atualizarLead(lead.id, { status: "follow_up", ultimoMovimento: "eu", statusConversa: "aguardando_cliente", ultimaInteracaoEm: agora }));
+      if (btnFollowUp) btnFollowUp.addEventListener("click", async () => {
+        const texto = fichaBody.querySelector("#fichaFollowUpTexto")?.textContent || getFollowUpCRM(lead) || "";
+        await registrarFollowUpEnviadoCRM(lead, texto);
+      });
 
       // Mover etapas
       const btnReuniao = fichaBody.querySelector("#btnReuniao");
       if (btnReuniao) btnReuniao.addEventListener("click", () =>
-        atualizarLead(lead.id, { status: "reuniao", ultimoMovimento: "eu", statusConversa: "aguardando_cliente", ultimaInteracaoEm: agora }));
+        atualizarLead(lead.id, {
+          status: "reuniao",
+          ultimoMovimento: "eu",
+          statusConversa: "aguardando_cliente",
+          ultimaInteracaoEm: agoraISO(),
+          virouReuniao: true,
+          reuniaoEm: agoraISO(),
+          needsFollowUp: false,
+          estagioFinal: "reuniao",
+        }));
 
       const btnProposta = fichaBody.querySelector("#btnProposta");
       if (btnProposta) btnProposta.addEventListener("click", () =>
-        atualizarLead(lead.id, { status: "proposta", ultimoMovimento: "eu", statusConversa: "aguardando_cliente", ultimaInteracaoEm: agora }));
+        atualizarLead(lead.id, {
+          status: "proposta",
+          ultimoMovimento: "eu",
+          statusConversa: "aguardando_cliente",
+          ultimaInteracaoEm: agoraISO(),
+          needsFollowUp: false,
+          estagioFinal: "proposta",
+        }));
 
       const btnFechado = fichaBody.querySelector("#btnFechado");
       if (btnFechado) btnFechado.addEventListener("click", () =>
-        atualizarLead(lead.id, { status: "fechado", ultimoMovimento: null, statusConversa: null, ultimaInteracaoEm: agora }));
+        atualizarLead(lead.id, {
+          status: "fechado",
+          ultimoMovimento: null,
+          statusConversa: null,
+          ultimaInteracaoEm: agoraISO(),
+          needsFollowUp: false,
+          estagioFinal: "fechado",
+        }));
+
+      const btnPerdido = fichaBody.querySelector("#btnPerdido");
+      if (btnPerdido) btnPerdido.addEventListener("click", () =>
+        atualizarLead(lead.id, {
+          status: "perdido",
+          ultimoMovimento: null,
+          statusConversa: null,
+          ultimaInteracaoEm: agoraISO(),
+          needsFollowUp: false,
+          estagioFinal: "perdido",
+          perdidoEm: agoraISO(),
+        }));
 
       if (crmFicha) crmFicha.classList.add("open");
     }
@@ -7191,7 +7477,7 @@
       crmColumns.innerHTML = "";
 
       CRM_STATUSES.forEach(({ key, label }) => {
-        const grupo = leads.filter(l => l.status === key);
+        const grupo = leads.filter(l => crmStatusVisual(l) === key);
         const col = document.createElement("div");
         col.className = `crm-column crm-col-${key}`;
         col.innerHTML = `
@@ -7207,21 +7493,35 @@
         } else {
           grupo.forEach(lead => {
             const card = document.createElement("div");
-            card.className = "crm-card";
 
             // Indicador de urgência no card
             const urgente = lead.statusConversa === "aguardando_resposta";
-            const followupPendente = lead.statusConversa === "aguardando_cliente" &&
-              lead.ultimaInteracaoEm && (Date.now() - new Date(lead.ultimaInteracaoEm).getTime()) / 3600000 >= 24;
+            const followupPendente = leadPrecisaFollowUp(lead);
+            const positivo = ["reuniao", "proposta", "fechado"].includes(lead.status);
+            const classes = ["crm-card"];
+            if (followupPendente) classes.push("needs-followup");
+            else if (urgente) classes.push("must-reply");
+            else if (lead.statusConversa === "aguardando_cliente") classes.push("awaiting-reply");
+            if (positivo) classes.push("positive");
+            if (lead.status === "perdido") classes.push("lost");
+            card.className = classes.join(" ");
+            const followUpMsg = getFollowUpCRM(lead);
 
             card.innerHTML = `
               <div class="crm-card-name" title="${escapeHtml(lead.nome)}">${escapeHtml(lead.nome)}</div>
               <div class="crm-card-meta">${escapeHtml(lead.categoria || lead.endereco || "")}</div>
               <div class="crm-card-footer">
                 ${urgente ? '<span class="crm-card-alerta urgente">⚡ Responder</span>' : ""}
-                ${followupPendente ? '<span class="crm-card-alerta">📩 Follow-up</span>' : ""}
-                <button class="crm-remove-btn" title="Remover">&times;</button>
-              </div>`;
+                ${followupPendente ? '<span class="crm-card-alerta followup">📩 Follow-up</span>' : ""}
+                ${!urgente && !followupPendente ? '<span class="crm-card-alerta">·</span>' : ""}
+                <button class="crm-remove-btn" title="Marcar como perdido">&times;</button>
+              </div>
+              ${followupPendente ? `
+                <div class="crm-card-actions">
+                  <button class="crm-card-action-btn orange" data-card-followup type="button">${followUpMsg ? "Regerar follow-up" : "Gerar follow-up"}</button>
+                  ${followUpMsg ? `<button class="crm-card-action-btn" data-card-copy-followup type="button">Copiar</button>` : ""}
+                  ${followUpMsg && lead.telefone ? `<button class="crm-card-action-btn primary" data-card-wa-followup type="button">WhatsApp</button>` : ""}
+                </div>` : ""}`;
 
             card.addEventListener("click", (e) => {
               if (e.target.classList.contains("crm-remove-btn")) return;
@@ -7230,10 +7530,44 @@
 
             card.querySelector(".crm-remove-btn").addEventListener("click", async (e) => {
               e.stopPropagation();
-              await crmFetch({ modo: "remover", id: lead.id });
-              fecharFicha();
-              await carregarCRM();
-              renderizarCRM();
+              await atualizarLead(lead.id, {
+                status: "perdido",
+                ultimoMovimento: null,
+                statusConversa: null,
+                needsFollowUp: false,
+                estagioFinal: "perdido",
+                perdidoEm: new Date().toISOString(),
+              });
+            });
+
+            card.querySelector("[data-card-followup]")?.addEventListener("click", async (e) => {
+              e.stopPropagation();
+              const btn = e.currentTarget;
+              btn.textContent = "Gerando...";
+              try {
+                await gerarFollowUpCRMLead(lead, true);
+                await carregarCRM();
+                renderizarCRM();
+              } catch {
+                btn.textContent = "Erro";
+                setTimeout(() => { btn.textContent = "Gerar follow-up"; }, 1200);
+              }
+            });
+
+            card.querySelector("[data-card-copy-followup]")?.addEventListener("click", (e) => {
+              e.stopPropagation();
+              const msg = getFollowUpCRM(lead);
+              navigator.clipboard.writeText(msg).then(() => {
+                e.currentTarget.textContent = "Copiado!";
+                setTimeout(() => { e.currentTarget.textContent = "Copiar"; }, 1200);
+              });
+            });
+
+            card.querySelector("[data-card-wa-followup]")?.addEventListener("click", async (e) => {
+              e.stopPropagation();
+              const msg = getFollowUpCRM(lead);
+              window.open(montarLinkWhatsApp(lead.telefone, msg), "_blank");
+              if (msg) await registrarFollowUpEnviadoCRM(lead, msg);
             });
 
             body.appendChild(card);
@@ -7744,9 +8078,11 @@
           if (!drawerAberto && leadHovered?.telefone) {
             e.preventDefault();
             const cachedHov = getOutreachCache(leadHovered);
-            const msg = cachedHov ? (cachedHov.direta || cachedHov.leve || "") : "";
+            const info = primeiraMensagemInicialComTipo(cachedHov);
+            const msg = cachedHov ? (info.mensagem || "") : "";
             window.open(montarLinkWhatsApp(leadHovered.telefone, msg), "_blank");
             marcarContatado(leadHovered);
+            if (msg) registrarMensagemInicialEnviadaCRM(leadHovered, msg, cachedHov ? info.tipo : "direta").catch(() => {});
             return;
           }
         }
