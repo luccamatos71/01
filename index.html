@@ -1667,6 +1667,29 @@
       white-space: pre-wrap;
     }
 
+    .analysis-decision {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      background: var(--surface-3);
+      color: var(--text);
+      font-size: var(--text-base);
+      font-weight: 700;
+    }
+
+    .analysis-decision-meta {
+      color: var(--text-3);
+      font-size: var(--text-xs);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+
     .analysis-score-panel {
       margin: 14px 0 0;
       padding: 12px;
@@ -5812,12 +5835,32 @@
         </div>`;
     }
 
+    function renderDecisaoRapidaLead(lead, analise) {
+      const prioridade = (lead?.prioridade || "").toUpperCase();
+      const normalizada = (analise || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+      const naoVale = prioridade === "DESCARTE" || /VALE ABORDAR\?\s*NAO/.test(normalizada);
+
+      let texto = "⚪ Baixa prioridade";
+      if (naoVale) {
+        texto = "❌ Não priorizar agora";
+      } else if (prioridade === "ALTA") {
+        texto = "🔥 Priorizar agora";
+      } else if (prioridade === "MEDIA") {
+        texto = "🟡 Avaliar com cuidado";
+      }
+
+      const meta = prioridade === "MEDIA" ? "MÉDIA" : (prioridade || "BAIXA");
+      return `
+        <div class="analysis-decision">
+          <span>${escapeHtml(texto)}</span>
+          <span class="analysis-decision-meta">${escapeHtml(meta)}</span>
+        </div>`;
+    }
+
     function renderAnaliseNoDrawer(texto) {
       currentAnalysisText = texto || "";
-      // Remove o bloco "Mensagem pronta: ..." da análise para exibir limpo
-      const analiseSemMsg = currentAnalysisText.replace(/Mensagem pronta:[\s\S]*$/i, "").trim();
       analysisDrawerBody.innerHTML = `
-        <div class="analysis-text">${formatTextToHtml(analiseSemMsg)}</div>
+        ${renderDecisaoRapidaLead(currentLead, currentAnalysisText)}
         ${renderLeadScoreResumo(currentLead)}
         <div id="variacoesSection"></div>
       `;
