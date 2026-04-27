@@ -44,7 +44,7 @@ const openai = new OpenAI({
 });
 
 let historico = [];
-let estadoManual = null; // { cenarioOriginal, analiseAtual }
+let estadoManual = null; // { cenarioOriginal, analiseAtual, analiseEstruturada }
 
 // ── GESTOR DE TRÁFEGO — CONFIGURAÇÃO POR CONTA ───────────────────────────────
 // Todos os thresholds vivem aqui. Nunca usar valores fixos no código ou prompt.
@@ -912,6 +912,196 @@ function classificarLead(nota, avaliacoes, temSite) {
   return "MEDIA";
 }
 
+function removerAcentos(texto) {
+  return String(texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function normalizarPrioridadeAnalise(valor) {
+  const base = removerAcentos(String(valor || "").trim().toUpperCase());
+  if (!base) return "";
+  if (base === "ALTA" || base === "BAIXA" || base === "MEDIA" || base === "DESCARTE") {
+    return base;
+  }
+  if (base.includes("MEDIA")) return "MEDIA";
+  if (base.includes("DESCARTE")) return "DESCARTE";
+  if (base.includes("ALTA")) return "ALTA";
+  if (base.includes("BAIXA")) return "BAIXA";
+  return "";
+}
+
+function normalizarValeAbordar(valor) {
+  const base = removerAcentos(String(valor || "").trim().toUpperCase());
+  if (!base) return "";
+  if (base.startsWith("SIM")) return "SIM";
+  if (base.startsWith("NAO")) return "NAO";
+  return "";
+}
+
+function criarAnaliseEstruturada(prioridade = "BAIXA", overrides = {}) {
+  const prioridadeNormalizada = normalizarPrioridadeAnalise(prioridade) || "BAIXA";
+  const motivos = Array.isArray(overrides.motivos)
+    ? overrides.motivos.map(m => String(m || "").trim()).filter(Boolean)
+    : [];
+
+  return {
+    valeAbordar: normalizarValeAbordar(overrides.valeAbordar) || (prioridadeNormalizada === "DESCARTE" ? "NAO" : "SIM"),
+    prioridade: prioridadeNormalizada,
+    motivos,
+    problemaProvavel: String(overrides.problemaProvavel || "").trim(),
+    comoAbordar: String(overrides.comoAbordar || "").trim(),
+    canalSugerido: String(overrides.canalSugerido || "").trim(),
+  };
+}
+
+function clonarAnaliseEstruturada(analise) {
+  return criarAnaliseEstruturada(analise?.prioridade || "BAIXA", {
+    valeAbordar: analise?.valeAbordar,
+    motivos: analise?.motivos,
+    problemaProvavel: analise?.problemaProvavel,
+    comoAbordar: analise?.comoAbordar,
+    canalSugerido: analise?.canalSugerido,
+  });
+}
+
+function extrairValorPorRotulo(texto, rotulo) {
+  const linhas = String(texto || "").split(/\r?\n/);
+  const alvo = removerAcentos(rotulo).toUpperCase();
+
+  for (let i = 0; i < linhas.length; i++) {
+    const linha = linhas[i];
+    const linhaNormalizada = removerAcentos(linha).toUpperCase();
+    if (!linhaNormalizada.startsWith(alvo)) continue;
+
+    const idx = Math.max(linha.indexOf(":"), linha.indexOf("?"));
+    const naMesmaLinha = idx >= 0 ? linha.slice(idx + 1).trim() : "";
+    if (naMesmaLinha) return naMesmaLinha;
+
+    for (let j = i + 1; j < linhas.length; j++) {
+      const proxima = linhas[j].trim();
+      if (proxima) return proxima;
+    }
+  }
+
+  return "";
+}
+
+function extrairMotivosAnalise(texto) {
+  const linhas = String(texto || "").split(/\r?\n/);
+  const motivos = [];
+  let coletando = false;
+
+  for (const linha of linhas) {
+    const trim = linha.trim();
+    const normalizada = removerAcentos(trim).toUpperCase();
+
+    if (!coletando && normalizada.startsWith("POR QU")) {
+      coletando = true;
+      continue;
+    }
+
+    if (!coletando) continue;
+
+    if (
+      normalizada.startsWith("PROBLEMA MAIS PROV") ||
+      normalizada.startsWith("COMO ABORDAR") ||
+      normalizada.startsWith("CANAL SUGERIDO:") ||
+      normalizada.startsWith("MENSAGEM PRONTA:")
+    ) {
+      break;
+    }
+
+    if (trim.startsWith("-")) {
+      motivos.push(trim.replace(/^-+\s*/, "").trim());
+    }
+  }
+
+  return motivos.filter(Boolean);
+}
+
+function extrairAnaliseEstruturada(texto, fallback) {
+  const base = fallback ? clonarAnaliseEstruturada(fallback) : criarAnaliseEstruturada("BAIXA", { valeAbordar: "NAO" });
+  const prioridadeExtraida = normalizarPrioridadeAnalise(extrairValorPorRotulo(texto, "Prioridade"));
+  const valeAbordarExtraido = normalizarValeAbordar(extrairValorPorRotulo(texto, "Vale abordar"));
+  const motivosExtraidos = extrairMotivosAnalise(texto);
+  const problemaProvavel = extrairValorPorRotulo(texto, "Problema mais prov");
+  const comoAbordar = extrairValorPorRotulo(texto, "Como abordar");
+  const canalSugerido = extrairValorPorRotulo(texto, "Canal sugerido");
+
+  const extraiuAlgo = Boolean(
+    prioridadeExtraida ||
+    valeAbordarExtraido ||
+    motivosExtraidos.length ||
+    problemaProvavel ||
+    comoAbordar ||
+    canalSugerido
+  );
+
+  const analiseEstruturada = criarAnaliseEstruturada(prioridadeExtraida || base.prioridade, {
+    valeAbordar: valeAbordarExtraido || base.valeAbordar,
+    motivos: motivosExtraidos.length ? motivosExtraidos : base.motivos,
+    problemaProvavel: problemaProvavel || base.problemaProvavel,
+    comoAbordar: comoAbordar || base.comoAbordar,
+    canalSugerido: canalSugerido || base.canalSugerido,
+  });
+
+  return { analiseEstruturada, extraiuAlgo, prioridadeExtraida };
+}
+
+function criarFallbackManualEstruturado(resposta) {
+  if (/preciso de mais contexto para analisar/i.test(String(resposta || ""))) {
+    return criarAnaliseEstruturada("BAIXA", {
+      valeAbordar: "NAO",
+      motivos: ["Contexto insuficiente para analisar."],
+      problemaProvavel: "Contexto insuficiente.",
+    });
+  }
+
+  return criarAnaliseEstruturada("BAIXA", {
+    valeAbordar: "NAO",
+    motivos: ["Nao foi possivel estruturar a resposta da analise manual."],
+  });
+}
+
+function criarFallbackGoogleEstruturado(prioridadeOficial) {
+  const prioridade = normalizarPrioridadeAnalise(prioridadeOficial) || "BAIXA";
+  const motivos = prioridade === "DESCARTE"
+    ? [`Classificacao deterministica: ${prioridade}.`]
+    : [`Classificacao deterministica: ${prioridade}.`];
+
+  return criarAnaliseEstruturada(prioridade, {
+    valeAbordar: prioridade === "DESCARTE" ? "NAO" : "SIM",
+    motivos,
+  });
+}
+
+function aplicarPrioridadeOficial(analiseEstruturada, prioridadeOficial, prioridadeIA, contexto) {
+  const prioridadeNormalizada = normalizarPrioridadeAnalise(prioridadeOficial);
+  if (!prioridadeNormalizada) return clonarAnaliseEstruturada(analiseEstruturada);
+
+  if (prioridadeIA && prioridadeIA !== prioridadeNormalizada) {
+    console.warn(`[SDR] Divergencia de prioridade em ${contexto}: IA=${prioridadeIA} | oficial=${prioridadeNormalizada}`);
+  }
+
+  const final = clonarAnaliseEstruturada(analiseEstruturada);
+  final.prioridade = prioridadeNormalizada;
+  if (!final.valeAbordar || prioridadeNormalizada === "DESCARTE") {
+    final.valeAbordar = prioridadeNormalizada === "DESCARTE" ? "NAO" : "SIM";
+  }
+  return final;
+}
+
+async function chamarTextoAnaliseSDR(prompt, origem) {
+  console.log(`[IA] Chamando OpenAI (${origem})...`);
+
+  const resp = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  console.log("[IA] Resposta recebida.");
+  return resp.choices[0].message.content;
+}
+
 /*
   IA
 */
@@ -1053,16 +1243,7 @@ Regras finais:
 - Sem frases de consultoria. Sem obviedades.
 `;
 
-
-  console.log("[IA] Chamando OpenAI (Google)...");
-
-  const resp = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  console.log("[IA] Resposta recebida.");
-  return resp.choices[0].message.content;
+  return chamarTextoAnaliseSDR(prompt, "Google");
 }
 
 async function gerarAnaliseManual(cenario) {
@@ -1196,16 +1377,7 @@ Por quê:
 - [sinais positivos presentes, sem falha explícita]
 - [ausência de problema mencionado]
 `;
-
-  console.log("[IA] Chamando OpenAI (manual)...");
-
-  const resp = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  console.log("[IA] Resposta recebida.");
-  return resp.choices[0].message.content;
+  return chamarTextoAnaliseSDR(prompt, "manual");
 }
 
 async function gerarRefinamentoManual(mensagem, estado) {
@@ -1316,16 +1488,81 @@ Regras finais:
 - Mensagem pronta: nunca técnica, nunca diagnóstico
 - Sem frases de consultoria
 `;
+  return chamarTextoAnaliseSDR(prompt, "refinamento manual");
+}
 
-  console.log("[IA] Chamando OpenAI (refinamento manual)...");
+async function analisarLeadSDR({ origem, mensagem, dadosLead, estado, prioridadeOficial, executarIA = true, contexto = "" }) {
+  if (origem === "manual") {
+    if (!mensagem) {
+      return {
+        resposta: "",
+        analiseEstruturada: criarFallbackManualEstruturado(""),
+        ehNovoCenario: false,
+      };
+    }
 
-  const resp = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [{ role: "user", content: prompt }],
-  });
+    if (!executarIA) {
+      return {
+        resposta: "",
+        analiseEstruturada: criarFallbackManualEstruturado(""),
+        ehNovoCenario: false,
+      };
+    }
 
-  console.log("[IA] Resposta recebida.");
-  return resp.choices[0].message.content;
+    if (estado?.cenarioOriginal) {
+      const respostaBruta = await gerarRefinamentoManual(mensagem, estado);
+      const ehNovoCenario = respostaBruta.startsWith("[NOVO]");
+      const resposta = respostaBruta.replace(/^\[(NOVO|FOLLOW-UP)\]\s*/, "");
+      const analiseAnterior = estado.analiseEstruturada
+        ? clonarAnaliseEstruturada(estado.analiseEstruturada)
+        : extrairAnaliseEstruturada(estado.analiseAtual, criarFallbackManualEstruturado(estado.analiseAtual)).analiseEstruturada;
+
+      const extraida = extrairAnaliseEstruturada(resposta, analiseAnterior);
+      const analiseEstruturada = ehNovoCenario
+        ? extraida.analiseEstruturada
+        : (extraida.extraiuAlgo ? extraida.analiseEstruturada : analiseAnterior);
+
+      return { resposta, analiseEstruturada, ehNovoCenario };
+    }
+
+    const resposta = await gerarAnaliseManual(mensagem);
+    const extraida = extrairAnaliseEstruturada(resposta, criarFallbackManualEstruturado(resposta));
+    return {
+      resposta,
+      analiseEstruturada: extraida.analiseEstruturada,
+      ehNovoCenario: true,
+    };
+  }
+
+  if (origem === "google") {
+    const prioridadeBase = normalizarPrioridadeAnalise(prioridadeOficial) || classificarLead(
+      dadosLead?.nota,
+      dadosLead?.avaliacoes,
+      !!dadosLead?.site
+    );
+
+    const fallback = criarFallbackGoogleEstruturado(prioridadeBase);
+
+    if (!executarIA) {
+      return {
+        resposta: "",
+        analiseEstruturada: aplicarPrioridadeOficial(fallback, prioridadeBase, "", contexto || "google"),
+      };
+    }
+
+    const resposta = await gerarAnalise(dadosLead);
+    const extraida = extrairAnaliseEstruturada(resposta, fallback);
+    const analiseEstruturada = aplicarPrioridadeOficial(
+      extraida.analiseEstruturada,
+      prioridadeBase,
+      extraida.prioridadeExtraida,
+      contexto || "google"
+    );
+
+    return { resposta, analiseEstruturada };
+  }
+
+  throw new Error(`Origem de analise SDR nao suportada: ${origem}`);
 }
 
 /*
@@ -2020,17 +2257,6 @@ async function registrarLog(entrada) {
   }
 }
 
-// ── GESTOR: CONSTANTES ────────────────────────────────────────────────────────
-const ACOES_GESTOR_VALIDAS = [
-  "manter", "subir criativo", "criar novo conjunto", "duplicar campanha",
-  "pausar", "revisar criativo", "revisar público", "aguardar dados",
-];
-
-const LINGUAGEM_GENERICA = [
-  "você pode", "considere", "talvez", "pode ser", "uma opção",
-  "outra alternativa", "seria interessante", "recomendo que você",
-];
-
 // ── GESTOR: ANÁLISE LOCAL (sem IA) ────────────────────────────────────────────
 
 // Fase do pixel — considera restrições declaradas e thresholds da conta
@@ -2154,9 +2380,6 @@ function extrairRestricoes(historico) {
   return encontradas;
 }
 
-// Legacy functions removed after unification with @analytics
-// (processarMagicPrompt, montarPrompt, validarRespostaGestor, corrigirResposta)
-
 // Fallback determinístico — rule-based, zero IA, sempre conservador
 function fallbackDeterministico(restricoes, campanha, accountConfig) {
   const n  = (v, pre = "", suf = "", d = 2) => v != null ? `${pre}${parseFloat(v).toFixed(d)}${suf}` : "sem dado";
@@ -2266,59 +2489,6 @@ RETORNE APENAS ESTE JSON — sem texto adicional:
   "base_dados": "dados específicos que embasam esta decisão",
   "confianca": 0-100
 }`;
-}
-
-// Valida resposta estruturada JSON do modelo
-function validarRespostaGestor(parsed, restricoes) {
-  if (!parsed || typeof parsed !== "object") {
-    return { valido: false, motivo: "resposta não é JSON válido" };
-  }
-  if (!ACOES_GESTOR_VALIDAS.includes(parsed.acao)) {
-    return { valido: false, motivo: `ação inválida: "${parsed.acao}"` };
-  }
-  const texto = `${parsed.justificativa || ""} ${parsed.base_dados || ""}`.toLowerCase();
-  const generica = LINGUAGEM_GENERICA.find(p => texto.includes(p));
-  if (generica) return { valido: false, motivo: `linguagem ambígua: "${generica}"` };
-  if (!parsed.justificativa || parsed.justificativa.length < 10) {
-    return { valido: false, motivo: "justificativa ausente ou muito curta" };
-  }
-  if (!parsed.base_dados || parsed.base_dados.length < 5) {
-    return { valido: false, motivo: "base_dados ausente" };
-  }
-  for (const r of restricoes) {
-    if (r.tipo === "sem_verba" && ["duplicar campanha", "criar novo conjunto"].includes(parsed.acao)) {
-      return { valido: false, motivo: `viola sem_verba: ação "${parsed.acao}"` };
-    }
-    if (r.tipo === "sem_criativo" && ["subir criativo", "revisar criativo"].includes(parsed.acao)) {
-      return { valido: false, motivo: `viola sem_criativo: ação "${parsed.acao}"` };
-    }
-    if (r.tipo === "sem_acesso" && ["pausar", "duplicar campanha", "criar novo conjunto", "subir criativo"].includes(parsed.acao)) {
-      return { valido: false, motivo: `viola sem_acesso: ação "${parsed.acao}"` };
-    }
-  }
-  return { valido: true };
-}
-
-// Prompt de correção — enviado ao modelo após resposta inválida
-async function corrigirResposta(msgs, respostaAnterior, motivo) {
-  const retryMsgs = [
-    ...msgs,
-    { role: "assistant", content: typeof respostaAnterior === "string" ? respostaAnterior : JSON.stringify(respostaAnterior) },
-    {
-      role: "user",
-      content: `Resposta inválida: ${motivo}. Corrija retornando JSON: { "acao": uma da lista válida, "justificativa": 1-2 frases diretas com números reais, "base_dados": dados específicos, "confianca": 0-100 }. Sem linguagem ambígua. Sem violar restrições.`,
-    },
-  ];
-  try {
-    const resp = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: retryMsgs,
-      response_format: { type: "json_object" },
-      max_tokens: 400,
-      temperature: 0,
-    });
-    return JSON.parse(resp.choices[0].message.content);
-  } catch { return null; }
 }
 
 // Fallback determinístico — rule-based, zero IA, sempre conservador
@@ -2684,27 +2854,37 @@ async function handler(req, res) {
         }
 
         let resposta;
+        let analiseEstruturada;
+        let ehNovoCenario = false;
 
         if (MODO_TESTE) {
           resposta = "[TESTE] Análise manual simulada.";
-          estadoManual = { cenarioOriginal: mensagem, analiseAtual: resposta };
-        } else if (estadoManual) {
-          const respostaBruta = await gerarRefinamentoManual(mensagem, estadoManual);
-          const ehNovo = respostaBruta.startsWith("[NOVO]");
-          resposta = respostaBruta.replace(/^\[(NOVO|FOLLOW-UP)\]\s*/, "");
-          if (ehNovo) {
-            estadoManual = { cenarioOriginal: mensagem, analiseAtual: resposta };
-          } else {
-            estadoManual.analiseAtual = resposta;
-          }
-          console.log(`[OK] Manual ${ehNovo ? "nova análise" : "follow-up"} concluído.`);
+          analiseEstruturada = criarFallbackManualEstruturado(resposta);
+          ehNovoCenario = true;
         } else {
-          resposta = await gerarAnaliseManual(mensagem);
-          estadoManual = { cenarioOriginal: mensagem, analiseAtual: resposta };
-          console.log("[OK] Análise manual concluída.");
+          const resultado = await analisarLeadSDR({
+            origem: "manual",
+            mensagem,
+            estado: estadoManual,
+          });
+          resposta = resultado.resposta;
+          analiseEstruturada = resultado.analiseEstruturada;
+          ehNovoCenario = !!resultado.ehNovoCenario;
         }
 
-        return enviarJson(res, 200, { modo: "manual", resposta });
+        if (!analiseEstruturada) {
+          analiseEstruturada = criarFallbackManualEstruturado(resposta);
+        }
+
+        if (!estadoManual || ehNovoCenario) {
+          estadoManual = { cenarioOriginal: mensagem, analiseAtual: resposta, analiseEstruturada };
+        } else {
+          estadoManual.analiseAtual = resposta;
+          estadoManual.analiseEstruturada = analiseEstruturada;
+        }
+
+        console.log(`[OK] Manual ${ehNovoCenario ? "nova análise" : "follow-up"} concluído.`);
+        return enviarJson(res, 200, { modo: "manual", resposta, analiseEstruturada });
       }
 
       // 🔍 BUSCAR
@@ -2746,19 +2926,30 @@ async function handler(req, res) {
           endereco: detalhes.formattedAddress,
         };
 
+        const prioridadeOficial = classificarLead(dados.nota, dados.avaliacoes, !!dados.site);
         let resposta;
+        let analiseEstruturada;
 
         if (MODO_TESTE) {
           resposta = "Teste ativo";
+          analiseEstruturada = criarFallbackGoogleEstruturado(prioridadeOficial);
         } else {
-          resposta = await gerarAnalise(dados);
+          const resultado = await analisarLeadSDR({
+            origem: "google",
+            dadosLead: dados,
+            prioridadeOficial,
+            contexto: `google placeId=${placeId}`,
+          });
+          resposta = resultado.resposta;
+          analiseEstruturada = resultado.analiseEstruturada;
         }
 
         console.log("[OK] Análise Google concluída.");
         return enviarJson(res, 200, {
           modo: "analise",
-          dados,
+          dados: { ...dados, prioridade: prioridadeOficial },
           resposta,
+          analiseEstruturada,
         });
       }
 
@@ -2783,6 +2974,10 @@ async function handler(req, res) {
           prioridade: classificarLead(l.rating, l.userRatingCount, !!l.websiteUri),
         }));
 
+        classificados.forEach((lead) => {
+          lead.analiseEstruturada = criarFallbackGoogleEstruturado(lead.prioridade);
+        });
+
         const leads = classificados.filter((l) => l.prioridade !== "DESCARTE");
         const descartados = classificados.filter((l) => l.prioridade === "DESCARTE");
 
@@ -2804,18 +2999,28 @@ async function handler(req, res) {
         if (!MODO_TESTE && leadsParaAnalisar.length > 0) {
           const analises = await Promise.all(
             leadsParaAnalisar.map((l) =>
-              gerarAnalise({
-                nome: l.nome,
-                nota: l.nota,
-                avaliacoes: l.avaliacoes,
-                telefone: l.telefone,
-                site: l.site,
-                endereco: l.endereco,
-                categoria: l.categoria,
+              analisarLeadSDR({
+                origem: "google",
+                dadosLead: {
+                  nome: l.nome,
+                  nota: l.nota,
+                  avaliacoes: l.avaliacoes,
+                  telefone: l.telefone,
+                  site: l.site,
+                  endereco: l.endereco,
+                  categoria: l.categoria,
+                },
+                prioridadeOficial: l.prioridade,
+                contexto: `leads placeId=${l.id}`,
               }).catch(() => null)
             )
           );
-          leadsParaAnalisar.forEach((l, i) => { l.analise = analises[i]; });
+          leadsParaAnalisar.forEach((l, i) => {
+            if (!analises[i]) return;
+            l.analise = analises[i].resposta;
+            l.analiseEstruturada = analises[i].analiseEstruturada;
+            l.prioridade = analises[i].analiseEstruturada.prioridade;
+          });
         }
 
         const resumo = {
