@@ -4579,6 +4579,294 @@
         backdrop-filter: blur(14px);
         -webkit-backdrop-filter: blur(14px);
       }
+
+      /* Mobile-only functional hardening: iPhone safe areas, keyboard and touch targets */
+      html.mobile-overlay-open,
+      body.mobile-overlay-open {
+        overflow: hidden !important;
+        overscroll-behavior: none;
+      }
+
+      body.mobile-keyboard-open .main-header {
+        position: static;
+      }
+
+      .app,
+      .sidebar,
+      .main,
+      body.mobile-chat-open .main,
+      .leads-overlay,
+      .crm-overlay,
+      .criativos-overlay,
+      .estrategia-overlay,
+      .trafego-overlay,
+      .analysis-drawer,
+      .central-window,
+      .leads-modal,
+      .crm-panel,
+      .crm-ficha,
+      .criativos-panel,
+      .estrategia-panel,
+      .trafego-panel {
+        height: var(--lumyn-mobile-vh, 100dvh);
+        max-height: var(--lumyn-mobile-vh, 100dvh);
+      }
+
+      button,
+      .lead-card,
+      .crm-card,
+      .leads-chip,
+      .trafego-table tbody tr,
+      .mobile-activity-item {
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .leads-close-btn,
+      .cw-header-btn,
+      .trafego-refresh-btn,
+      .trafego-account-btn,
+      .slack-send-btn,
+      .estrategia-send-btn,
+      .trafego-chat-send-btn {
+        min-width: 44px;
+        min-height: 44px;
+      }
+
+      .leads-modal-top,
+      .crm-header,
+      .crm-ficha-header,
+      .criativos-header,
+      .estrategia-header,
+      .trafego-header,
+      .analysis-drawer-header,
+      .cw-header,
+      .slack-chat-header {
+        flex-shrink: 0;
+      }
+
+      .leads-modal {
+        gap: 12px;
+      }
+
+      .leads-query-input {
+        width: 100%;
+        min-height: 50px;
+      }
+
+      .leads-modal.results-open .leads-modal-top {
+        padding-bottom: 12px;
+      }
+
+      .leads-tool-results {
+        scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom));
+      }
+
+      .lead-card {
+        min-height: 64px;
+      }
+
+      .lead-card-body {
+        align-items: stretch;
+      }
+
+      .lead-card-quick-actions {
+        align-self: center;
+      }
+
+      .lead-card-qa-btn {
+        min-height: 38px;
+      }
+
+      .analysis-drawer-header {
+        padding: max(14px, env(safe-area-inset-top)) 14px 12px;
+      }
+
+      .analysis-drawer-body {
+        padding: 14px;
+        scroll-padding-bottom: calc(128px + env(safe-area-inset-bottom));
+      }
+
+      .analysis-decision {
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+
+      .analysis-score-panel,
+      .mensagem-wrap {
+        margin-top: 12px;
+      }
+
+      .analysis-drawer-footer {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+        flex-shrink: 0;
+        padding: 10px 14px calc(12px + env(safe-area-inset-bottom));
+      }
+
+      .analysis-drawer-footer-actions,
+      .analysis-drawer-footer > div:last-child {
+        display: grid !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        width: 100%;
+      }
+
+      .analysis-drawer-footer > div:last-child {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .analysis-whatsapp-btn,
+      .analysis-copy-btn,
+      .analysis-crm-btn,
+      .analysis-next-btn,
+      .analysis-close-btn {
+        width: 100%;
+        min-height: 44px;
+        padding: 8px 10px;
+        font-size: 12px;
+        white-space: normal;
+      }
+
+      .outreach-tabs,
+      .ficha-estilo-tabs {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 2px;
+      }
+
+      .estilo-tab,
+      .ficha-estilo-tab {
+        flex: 0 0 auto;
+        min-width: 112px;
+        min-height: 44px;
+      }
+
+      .mensagem-box,
+      .textarea-like {
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .crm-columns {
+        gap: 0;
+        padding-bottom: calc(28px + env(safe-area-inset-bottom));
+      }
+
+      .crm-column {
+        min-height: 126px;
+      }
+
+      .crm-column-body {
+        overflow: visible;
+      }
+
+      .crm-card {
+        min-height: 58px;
+      }
+
+      .crm-ficha-header {
+        padding-top: max(14px, env(safe-area-inset-top));
+      }
+
+      .ficha-notas {
+        min-height: 112px;
+      }
+
+      .ficha-acoes .ficha-btn,
+      .ficha-btn {
+        min-height: 44px;
+      }
+
+      .trafego-header {
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 10px;
+      }
+
+      .trafego-account-selector {
+        order: 3;
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .trafego-header-actions {
+        margin-left: auto;
+      }
+
+      .trafego-list-col.comprimida {
+        max-height: 34vh;
+        overflow-y: auto;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .trafego-chat-col.aberta {
+        height: auto;
+        min-height: min(56vh, 520px);
+        flex: 1 1 auto;
+      }
+
+      .trafego-campanha-header {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        background: rgba(16,18,38,0.96);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+      }
+
+      .trafego-chat-input,
+      .estrategia-input,
+      .slack-textarea {
+        min-height: 44px;
+      }
+
+      .estrategia-chat,
+      .trafego-chat-msgs,
+      .slack-feed {
+        scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom));
+      }
+
+      .slack-layout,
+      .slack-chat {
+        min-height: 0;
+        height: 100%;
+      }
+
+      .slack-feed {
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .slack-composer {
+        position: sticky;
+        bottom: 0;
+        z-index: 6;
+        background: rgba(16,18,38,0.97);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+      }
+
+      .criativos-body {
+        flex-direction: column;
+      }
+
+      .criativos-preview {
+        min-height: 220px;
+      }
+
+      .criativos-input,
+      .criativos-select,
+      .ficha-notas,
+      input,
+      select,
+      textarea {
+        font-size: 16px !important;
+      }
     }
 
     /* ========== PORTRAIT ESTREITO (≤480px) ========== */
@@ -5055,6 +5343,60 @@
       return !!(window.matchMedia && window.matchMedia("(max-width: 1024px)").matches);
     }
 
+    function updateMobileViewportState() {
+      if (!isMobileViewport()) {
+        document.documentElement.style.removeProperty("--lumyn-mobile-vh");
+        document.documentElement.classList.remove("mobile-overlay-open");
+        document.body.classList.remove("mobile-overlay-open", "mobile-keyboard-open");
+        return;
+      }
+
+      const visualHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      document.documentElement.style.setProperty("--lumyn-mobile-vh", Math.round(visualHeight) + "px");
+
+      const keyboardOpen = window.visualViewport
+        ? window.innerHeight - window.visualViewport.height > 120
+        : false;
+      document.body.classList.toggle("mobile-keyboard-open", keyboardOpen);
+    }
+
+    function syncMobileOverlayState() {
+      updateMobileViewportState();
+      if (!isMobileViewport()) return;
+
+      const overlayOpen = [
+        "leadsOverlay",
+        "crmOverlay",
+        "criativosOverlay",
+        "estrategiaOverlay",
+        "trafegoOverlay",
+        "analysisDrawer",
+        "centralWindow"
+      ].some((id) => document.getElementById(id)?.classList.contains("open"));
+
+      document.documentElement.classList.toggle("mobile-overlay-open", overlayOpen);
+      document.body.classList.toggle("mobile-overlay-open", overlayOpen);
+    }
+
+    function focusDesktopOnly(el, delay = 0) {
+      if (!el || isMobileViewport()) return;
+      if (delay > 0) setTimeout(() => el.focus(), delay);
+      else el.focus();
+    }
+
+    function scrollMobileIntoView(el, delay = 80) {
+      if (!el || !isMobileViewport()) return;
+      setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "nearest" }), delay);
+    }
+
+    updateMobileViewportState();
+    window.addEventListener("resize", syncMobileOverlayState);
+    window.addEventListener("orientationchange", () => setTimeout(syncMobileOverlayState, 250));
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", syncMobileOverlayState);
+      window.visualViewport.addEventListener("scroll", syncMobileOverlayState);
+    }
+
     function isLeadsMobileSurfaceActive() {
       return leadsMobileMode && isMobileViewport() && leadsToolResults;
     }
@@ -5365,7 +5707,7 @@
       } finally {
         isSending = false;
         sendBtn.disabled = false;
-        input.focus();
+        focusDesktopOnly(input);
       }
     }
 
@@ -5489,7 +5831,7 @@
       } finally {
         isSending = false;
         sendBtn.disabled = false;
-        input.focus();
+        focusDesktopOnly(input);
       }
     }
 
@@ -5513,7 +5855,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ modo: "limpar" })
       }).catch(() => {});
-      input.focus();
+      focusDesktopOnly(input);
     });
 
     if (modeSelect) modeSelect.addEventListener("change", updateModeUI);
@@ -5597,9 +5939,10 @@
       if (leadsToolResults) leadsToolResults.innerHTML = "";
       if (leadsCloseBtn) leadsCloseBtn.textContent = "×";
       leadsOverlay.classList.add("open");
+      syncMobileOverlayState();
       renderizarHistoricoModal();
       renderizarCidadeChips();
-      setTimeout(() => leadsQueryInput.focus(), 80);
+      focusDesktopOnly(leadsQueryInput, 80);
     }
 
     function closeLeadsModal() {
@@ -5612,6 +5955,7 @@
       leadsQueue = [];
       cardMap = new Map();
       currentLeadIndex = -1;
+      syncMobileOverlayState();
     }
 
     function mostrarResultadosMobile() {
@@ -5661,6 +6005,7 @@
         if (leadsModal) leadsModal.classList.add("results-open");
         if (leadsToolResults) leadsToolResults.innerHTML = "";
         if (leadsCloseBtn) leadsCloseBtn.textContent = "Voltar";
+        syncMobileOverlayState();
       } else {
         closeLeadsModal();
         mostrarResultadosMobile();
@@ -5796,6 +6141,7 @@
       currentAnalysisText = "";
       currentLead = null;
       currentMsgText = "";
+      syncMobileOverlayState();
     }
 
     function renderLeadScoreResumo(lead) {
@@ -6005,6 +6351,8 @@
       analysisCopyBtn.textContent = "Copiar mensagem";
       analysisWhatsappBtn.disabled = !lead.telefone;
       analysisDrawer.classList.add("open");
+      syncMobileOverlayState();
+      scrollMobileIntoView(analysisDrawer);
 
       // Marcar card ativo na lista
       cardMap.forEach(c => c.classList.remove("ativo"));
@@ -6649,11 +6997,13 @@
     function abrirCRM() {
       renderizarCRM();
       crmOverlay.classList.add("open");
+      syncMobileOverlayState();
     }
 
     function fecharCRM() {
       fecharFicha();
       crmOverlay.classList.remove("open");
+      syncMobileOverlayState();
     }
 
     if (crmPanelBtn) crmPanelBtn.addEventListener("click", abrirCRM);
@@ -6719,12 +7069,14 @@
 
     function abrirEstrategia() {
       estrategiaOverlay.classList.add("open");
-      estrategiaInput.focus();
+      syncMobileOverlayState();
+      focusDesktopOnly(estrategiaInput);
     }
 
     function fecharEstrategia() {
       estrategiaOverlay.classList.remove("open");
       historicoDiretor = []; // reset ao fechar
+      syncMobileOverlayState();
     }
 
     function adicionarMsgEstrategia(tipo, texto, loading = false) {
@@ -6828,7 +7180,7 @@
       } finally {
         estrategiaEnviando = false;
         estrategiaSendBtn.disabled = false;
-        estrategiaInput.focus();
+        focusDesktopOnly(estrategiaInput);
         estrategiaChat.scrollTop = estrategiaChat.scrollHeight;
       }
     }
@@ -6896,6 +7248,7 @@
 
     function abrirTrafego() {
       trafegoOverlay.classList.add("open");
+      syncMobileOverlayState();
       carregarTrafego();
     }
 
@@ -6905,6 +7258,7 @@
       historicoChatTrafego = [];
       trafegoChatCol.classList.remove("aberta");
       trafegoListCol.classList.remove("comprimida");
+      syncMobileOverlayState();
     }
 
     async function carregarTrafego() {
@@ -7077,7 +7431,7 @@
       } finally {
         trafegoChatEnviando = false;
         trafegoChatSendBtn.disabled = false;
-        trafegoChatInput.focus();
+        focusDesktopOnly(trafegoChatInput);
         trafegoChatMsgs.scrollTop = trafegoChatMsgs.scrollHeight;
       }
     }
@@ -7269,9 +7623,13 @@
 
     function abrirCriativos() {
       criativosOverlay.classList.add("open");
+      syncMobileOverlayState();
       carregarGaleria();
     }
-    function fecharCriativos() { criativosOverlay.classList.remove("open"); }
+    function fecharCriativos() {
+      criativosOverlay.classList.remove("open");
+      syncMobileOverlayState();
+    }
 
     if (criativosBtn) criativosBtn.addEventListener("click", abrirCriativos);
     if (criativosCloseBtn) criativosCloseBtn.addEventListener("click", fecharCriativos);
@@ -7392,7 +7750,7 @@
         if (data.edit_prompt) {
           criativosInstrucao.value = data.edit_prompt;
           criativos_bloco_instrucao.style.display = "flex";
-          criativosInstrucao.focus();
+          focusDesktopOnly(criativosInstrucao);
           criativosInstrucao.scrollIntoView({ behavior: "smooth", block: "nearest" });
         } else {
           alert(data.erro || "Designer-agent não retornou instrução.");
@@ -8102,11 +8460,13 @@
       cwFooter.style.display = "none";
       cwBackdrop.classList.add("open");
       cwWin.classList.add("open");
+      syncMobileOverlayState();
     }
 
     function fecharCW() {
       cwBackdrop.classList.remove("open");
       cwWin.classList.remove("open");
+      syncMobileOverlayState();
     }
 
     function isMobileLayout() {
