@@ -6127,6 +6127,9 @@
     function outreachFastCacheKey(lead) {
       return `outreach_fast_v1_${lead?.id || lead?.nome || "?"}`;
     }
+    function outreachUltraCacheKey(lead) {
+      return `outreach_ultra_v1_${lead?.id || lead?.nome || "?"}`;
+    }
     function getOutreachCache(lead) {
       try { return JSON.parse(localStorage.getItem(outreachCacheKey(lead)) || "null"); } catch { return null; }
     }
@@ -6139,6 +6142,7 @@
     function clearOutreachCache(lead) {
       localStorage.removeItem(outreachCacheKey(lead));
       localStorage.removeItem(outreachFastCacheKey(lead));
+      localStorage.removeItem(outreachUltraCacheKey(lead));
     }
     function getOutreachFastCache(lead) {
       try { return localStorage.getItem(outreachFastCacheKey(lead)) || ""; } catch { return ""; }
@@ -6148,6 +6152,30 @@
       localStorage.setItem(outreachFastCacheKey(lead), mensagem);
     }
     const outreachFastInFlight = new Map();
+
+    function gerarMensagemUltraLeve(lead) {
+      const opcoes = [
+        "oi, tudo bem? consigo falar com o responsável?",
+        "oi, quem cuida do WhatsApp aí?",
+        "oi, é com quem eu falo aí sobre atendimento?",
+        "oi, consigo falar com quem cuida dessa parte aí?",
+      ];
+      const base = String(lead?.id || lead?.nome || "lead");
+      const index = Array.from(base).reduce((acc, char) => acc + char.charCodeAt(0), 0) % opcoes.length;
+      return opcoes[index];
+    }
+
+    function getMensagemUltraLeve(lead) {
+      try {
+        const cached = localStorage.getItem(outreachUltraCacheKey(lead));
+        if (cached) return cached;
+        const mensagem = gerarMensagemUltraLeve(lead);
+        localStorage.setItem(outreachUltraCacheKey(lead), mensagem);
+        return mensagem;
+      } catch {
+        return gerarMensagemUltraLeve(lead);
+      }
+    }
 
     function primeiraMensagemVariacoes(variacoes) {
       if (!variacoes) return "";
@@ -6322,6 +6350,22 @@
       });
     }
 
+    function renderMensagemUltraLeveHTML(container, lead) {
+      const mensagem = getMensagemUltraLeve(lead);
+      currentMsgText = mensagem;
+      currentMsgTipo = "direta";
+      container.innerHTML = `
+        <div class="mensagem-wrap">
+          <div class="mensagem-titulo">Mensagem ultra leve</div>
+          <div class="analysis-score-muted" style="margin-bottom:8px;">Pronta para copiar. Sem IA e sem espera.</div>
+          <div class="mensagem-box" id="mensagemBox">${escapeHtml(mensagem)}</div>
+          <button class="outreach-regenerar-btn" id="btnGerarVariacoes" type="button">Gerar mensagem do Outreacher</button>
+        </div>`;
+      container.querySelector("#btnGerarVariacoes")?.addEventListener("click", async () => {
+        await gerarEExibirVariacoes(lead, container);
+      });
+    }
+
     async function gerarMensagemPrincipalEExibir(lead, section, force = false) {
       if (!section) section = document.getElementById("variacoesSection");
       if (!section || !lead) return;
@@ -6349,41 +6393,8 @@
       if (!section || !lead) return;
 
       const cached = getOutreachCache(lead);
-      if (cached && variacoesTemMensagem(cached)) {
-        renderVariacoesHTML(section, cached, lead);
-      } else if (getOutreachFastCache(lead)) {
-        if (cached && !variacoesTemMensagem(cached)) clearOutreachVariacoesCache(lead);
-        renderMensagemPrincipalHTML(section, getOutreachFastCache(lead), lead, "Mensagem rápida preparada em segundo plano.");
-      } else if (outreachFastInFlight.has(leadCacheId(lead))) {
-        if (cached && !variacoesTemMensagem(cached)) clearOutreachVariacoesCache(lead);
-        section.innerHTML = `<div class="mensagem-wrap"><div class="loading"><span class="spinner"></span><span>Preparando mensagem...</span></div></div>`;
-        outreachFastInFlight.get(leadCacheId(lead))
-          .then((mensagem) => {
-            if (leadCacheId(currentLead) === leadCacheId(lead)) renderMensagemPrincipalHTML(section, mensagem, lead, "Mensagem rápida preparada em segundo plano.");
-          })
-          .catch(() => {
-            if (leadCacheId(currentLead) === leadCacheId(lead)) {
-              section.innerHTML = `
-                <div class="mensagem-wrap">
-                  <div class="mensagem-titulo">Mensagem de abordagem</div>
-                  <button class="outreach-gerar-btn" id="btnGerarVariacoes" type="button">Gerar mensagem</button>
-                </div>`;
-              section.querySelector("#btnGerarVariacoes")?.addEventListener("click", async () => {
-                await gerarMensagemPrincipalEExibir(lead, section, true);
-              });
-            }
-          });
-      } else {
-        if (cached && !variacoesTemMensagem(cached)) clearOutreachVariacoesCache(lead);
-        section.innerHTML = `
-          <div class="mensagem-wrap">
-            <div class="mensagem-titulo">Mensagem de abordagem</div>
-            <button class="outreach-gerar-btn" id="btnGerarVariacoes" type="button">Gerar mensagem</button>
-          </div>`;
-        document.getElementById("btnGerarVariacoes")?.addEventListener("click", async () => {
-          await gerarMensagemPrincipalEExibir(lead, section);
-        });
-      }
+      if (cached && !variacoesTemMensagem(cached)) clearOutreachVariacoesCache(lead);
+      renderMensagemUltraLeveHTML(section, lead);
     }
 
     // Chama API e exibe as 5 variações
@@ -6400,8 +6411,6 @@
         const data = await r.json();
         if (data.variacoes) {
           setOutreachCache(lead, data.variacoes);
-          const primeira = primeiraMensagemInicialComTipo(data.variacoes).mensagem || primeiraMensagemVariacoes(data.variacoes);
-          if (primeira) setOutreachFastCache(lead, primeira);
           renderVariacoesHTML(section, data.variacoes, lead);
         } else {
           section.innerHTML = `<div class="mensagem-wrap"><div class="error-box">${escapeHtml(data.erro || "Erro ao gerar.")}</div></div>`;
@@ -6590,13 +6599,10 @@
         if (waBtn) {
           waBtn.addEventListener("click", async (e) => {
             e.stopPropagation();
-            const cached = getOutreachCache(lead);
-            const info = primeiraMensagemInicialComTipo(cached);
-            const msg = variacoesTemMensagem(cached) ? (info.mensagem || primeiraMensagemVariacoes(cached)) : (getOutreachFastCache(lead) || "");
-            const tipo = variacoesTemMensagem(cached) ? info.tipo : "direta";
+            const msg = getMensagemUltraLeve(lead);
             window.open(montarLinkWhatsApp(lead.telefone, msg), "_blank");
             marcarContatado(lead);
-            if (msg) await registrarMensagemInicialEnviadaCRM(lead, msg, tipo);
+            if (msg) await registrarMensagemInicialEnviadaCRM(lead, msg, "direta");
           });
         }
 
@@ -6648,20 +6654,7 @@
     }
 
     function prefetchMensagensTopLeads(leads) {
-      const fila = selecionarLeadsPrefetchOutreach(leads)
-        .filter(lead => !getOutreachFastCache(lead) && !variacoesTemMensagem(getOutreachCache(lead)) && !outreachFastInFlight.has(leadCacheId(lead)));
-      if (!fila.length) return;
-
-      let index = 0;
-      const worker = async () => {
-        while (index < fila.length) {
-          const lead = fila[index++];
-          try { await buscarMensagemPrincipalLead(lead); } catch { /* prefetch silencioso */ }
-        }
-      };
-
-      const concorrencia = Math.min(2, fila.length);
-      for (let i = 0; i < concorrencia; i++) worker();
+      (leads || []).forEach(getMensagemUltraLeve);
     }
 
     function createLeadsBubble(data) {
@@ -8077,12 +8070,10 @@
           }
           if (!drawerAberto && leadHovered?.telefone) {
             e.preventDefault();
-            const cachedHov = getOutreachCache(leadHovered);
-            const info = primeiraMensagemInicialComTipo(cachedHov);
-            const msg = cachedHov ? (info.mensagem || "") : "";
+            const msg = getMensagemUltraLeve(leadHovered);
             window.open(montarLinkWhatsApp(leadHovered.telefone, msg), "_blank");
             marcarContatado(leadHovered);
-            if (msg) registrarMensagemInicialEnviadaCRM(leadHovered, msg, cachedHov ? info.tipo : "direta").catch(() => {});
+            if (msg) registrarMensagemInicialEnviadaCRM(leadHovered, msg, "direta").catch(() => {});
             return;
           }
         }
