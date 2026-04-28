@@ -29,9 +29,9 @@ Rules:
 
 Examples:
 
-- oi, tudo bem? consigo falar com o responsável?
-- oi, quem cuida do WhatsApp aí?
-- oi, é com quem eu falo aí sobre atendimento?
+- oi, tudo bem? consigo falar com o responsavel?
+- oi, quem cuida do WhatsApp ai?
+- oi, e com quem eu falo ai sobre atendimento?
 
 ## Second Message
 
@@ -41,43 +41,58 @@ Use only after the lead replied.
 
 Structure:
 
-1. light context
-2. real situation or implied pain
-3. curiosity
-4. light invitation to see it in 15min
+1. light opener
+2. real situation in spoken language
+3. quick connection with the business
+4. curiosity
+5. light invitation to see it in 15min
 
 Rules:
 
-- simple language
+- simple Portuguese
 - short lines
-- real conversation tone
-- no expert tone
+- sounds typed in 5 seconds
+- sounds like WhatsApp, not content
+- use spoken phrases
 - do not explain the problem
 - only suggest that there is something worth seeing
+
+Use real situations, not explanations:
+
+- muita gente chama, tira duvida e some
+- entra contato mas nao vira nada
+- o pessoal pede uma vez e depois nao volta
+- tem horario vazio que parece normal
+- a pessoa conta o caso e depois desaparece
 
 Good direction:
 
 boa
-no WhatsApp geralmente tem coisa simples que trava bastante sem o dono notar
-se fizer sentido te mostro em 15min
+muita gente chama no WhatsApp, tira duvida e some
+vi um ponto ai que pode estar causando isso
+se quiser te mostro em 15min
 
 boa
-dei uma olhada rápida e tem um ponto aí que pode estar fazendo você perder cliente sem perceber
-se quiser te mostro rápido em 15min
+muita gente pede uma vez e depois nao volta
+dei uma olhada ai e pode estar acontecendo com voces
+se fizer sentido te mostro em 15min
 
 ## Forbidden
 
-- estratégia
-- análise
+- costuma
+- ocorre
+- pode estar acontecendo devido a
+- estrategia
+- analise
 - identifiquei
-- otimização
+- otimizacao
 - agency language
 - formal text
 - long explanation
 - asking hard for a meeting
 - agendar call
-- marcar reunião
-- score, nota, avaliações, SDR, sinais internos
+- marcar reuniao
+- score, nota, avaliacoes, SDR, sinais internos
 
 ## Output
 

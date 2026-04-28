@@ -661,13 +661,15 @@ Reescreva TODAS as 5 variacoes em JSON.
 Regras inegociaveis:
 - segunda mensagem, usada depois que o lead respondeu
 - maximo 3 linhas curtas
-- estrutura: contexto leve + dor implicita + curiosidade + convite leve para ver em 15min
+- estrutura: abertura leve + situacao real + conexao com o negocio + curiosidade + convite leve para ver em 15min
 - nao explique o problema; apenas sugira
 - precisa gerar curiosidade sem parecer pitch
 - pode falar "15min", "te mostro" ou "te mando um ponto"
+- escreva como WhatsApp digitado rapido, com frases que poderiam ser faladas em voz alta
+- troque explicacao por situacao real: "muita gente chama e some", "entra contato mas nao vira nada", "o pessoal pede e depois nao volta"
 - nao pedir reuniao, call, agenda ou marcar horario
 - nao citar dados internos, score, nota, avaliacoes, SDR ou analise
-- nao usar "estrategia", "identifiquei", "otimizacao" ou linguagem de agencia
+- nao usar "costuma", "ocorre", "estrategia", "identifiquei", "otimizacao" ou linguagem de agencia
 - precisa se conectar ao angulo: ${contexto.anguloAbordagem}
 - objetivo: ${contexto.objetivoMensagem}
 - intensidade: ${contexto.intensidade}
@@ -735,27 +737,27 @@ function gerarFallbackSegundaOutreach(contexto = {}, tipo = "direta") {
   const fonte = normalizarTextoOutreach([contexto.anguloAbordagem, contexto.categoria].filter(Boolean).join(" "));
 
   if (/advoc|advog|jurid|consultiv|contabil/.test(fonte)) {
-    return "boa\nolhei rapido e tem um ponto de triagem que pode estar fazendo caso bom esfriar sem perceber\nse fizer sentido te mostro em 15min";
+    return "boa\ntem gente que chama, explica o caso e depois nao volta\nvi um ponto ai que pode estar deixando esses contatos morrerem\nse fizer sentido te mostro em 15min";
   }
   if (/automot|carro|polimento|veiculo/.test(fonte)) {
-    return "boa\nno WhatsApp costuma ter orcamento de servico bom que trava sem o dono notar\nse quiser te mostro o ponto em 15min";
+    return "boa\ntem cliente que pede preco de servico bom e depois some\nvi um ponto ai que pode estar travando isso\nse quiser te mostro em 15min";
   }
   if (/restaurante|pizz|delivery|pedido/.test(fonte)) {
-    return "boa\npedido direto pelo WhatsApp costuma esconder perda simples de recompra\nse fizer sentido te mostro rapido em 15min";
+    return "boa\nmuita gente pede uma vez e depois nao volta\ndei uma olhada ai e pode estar acontecendo com voces\nse fizer sentido te mostro em 15min";
   }
   if (/agenda|horario|retorno|barbear|salao|estetic/.test(fonte)) {
-    return "boa\nagenda costuma ter horario que fica ocioso sem parecer problema grande\nse quiser te mostro um ponto rapido em 15min";
+    return "boa\ntem horario que fica vazio e parece normal no dia a dia\nvi um ponto ai que pode estar puxando isso\nse quiser te mostro em 15min";
   }
   if (/odont|saude|clinica|paciente/.test(fonte)) {
-    return "boa\nquando paciente tira duvida no WhatsApp tem um ponto simples que pode esfriar orcamento\nse fizer sentido te mostro em 15min";
+    return "boa\nmuita gente chama no WhatsApp, tira duvida e some depois\nvi um ponto ai que pode estar causando isso\nse quiser te mostro em 15min";
   }
   if (/academ|pilates|fitness|matricula|retencao/.test(fonte)) {
-    return "boa\nmatricula costuma esfriar em detalhe pequeno depois da primeira duvida\nse quiser te mostro o ponto em 15min";
+    return "boa\ntem gente que pergunta da matricula e depois desaparece\nvi um ponto ai que pode estar fazendo isso acontecer\nse quiser te mostro em 15min";
   }
   if (tipo === "provocativa") {
-    return `boa\ntem coisa simples em ${tema} que pode estar custando cliente sem aparecer no dia a dia\nse quiser te mostro em 15min`;
+    return "boa\ntem cliente bom que some por detalhe pequeno e quase ninguem percebe\nvi um ponto ai que talvez esteja causando isso\nse quiser te mostro em 15min";
   }
-  return `boa\ndei uma olhada rapida e tem um ponto em ${tema} que pode estar fazendo contato bom esfriar\nse fizer sentido te mostro em 15min`;
+  return "boa\ntem contato que parece interessado e depois some\ndei uma olhada ai e vi um ponto que pode estar causando isso\nse fizer sentido te mostro em 15min";
 }
 
 function mensagemSeguraSegundaOutreach(texto, contexto, tipo = "direta") {
@@ -763,7 +765,7 @@ function mensagemSeguraSegundaOutreach(texto, contexto, tipo = "direta") {
   if (validarMensagemSegundaOutreach(tentativa, contexto).ok) return tentativa;
   const fallback = gerarFallbackSegundaOutreach(contexto, tipo);
   if (validarMensagemSegundaOutreach(fallback, contexto).ok) return fallback;
-  return "boa\ntem um ponto simples que pode estar fazendo contato bom esfriar sem perceber\nse fizer sentido te mostro em 15min";
+  return "boa\ntem contato que parece bom e some do nada\nvi um ponto ai que pode estar causando isso\nse fizer sentido te mostro em 15min";
 }
 
 function preencherVariacoesFallbackOutreach(variacoes, contexto) {
@@ -837,12 +839,18 @@ async function gerarMensagemContinuidadeOutreach(lead, respostaLead = "") {
   const systemPrompt = `Voce escreve a segunda mensagem de WhatsApp depois que o lead respondeu.
 Objetivo: gerar curiosidade e abrir caminho para uma conversa rapida de 15min.
 Use o angulo principal apenas como direcao natural.
-Estrutura: contexto leve + situacao real/dor implicita + curiosidade + convite leve para ver em 15min.
-Nao explique o problema; apenas sugira.
-Maximo 3 linhas curtas, linguagem simples, nada formal.
-Pode dizer "dei uma olhada rapida", "tem um ponto", "pode estar travando" ou "pode estar fazendo perder cliente sem perceber".
+Estrutura: abertura leve + situacao real + conexao com o negocio + curiosidade + convite leve para ver em 15min.
+Escreva como mensagem digitada rapido no celular, com frase falada e simples.
+Troque explicacao por situacao real:
+- "muita gente chama, tira duvida e some"
+- "entra contato mas nao vira nada"
+- "o pessoal pede uma vez e depois nao volta"
+- "tem horario vazio que parece normal"
+Nao explique o problema; apenas sugira que tem um ponto.
+Maximo 4 linhas curtas, linguagem simples, nada formal.
+Pode dizer "dei uma olhada ai", "vi um ponto ai", "pode estar causando isso" ou "se quiser te mostro".
 Nao cite score, prioridade, sinais, confianca, SDR, analise, nota, avaliacoes, estrategia, otimizacao ou termos tecnicos.
-Nao use "identifiquei", "agencia", "marketing digital", "agendar call" ou "marcar reuniao".
+Nao use "costuma", "ocorre", "identifiquei", "agencia", "marketing digital", "agendar call" ou "marcar reuniao".
 Retorne APENAS JSON: {"mensagem":"..."}`;
 
   const userMsg = `${montarUserMsgOutreach(contextoOutreach)}
@@ -874,7 +882,7 @@ Crie uma segunda mensagem curta que sugira valor sem explicar o problema.`;
 async function gerarVariacoesOutreach(lead) {
   const contextoOutreach = montarContextoOutreachLead(lead);
 
-  const systemPrompt = `Voce escreve a segunda mensagem de WhatsApp para prospeccao local, usada depois que o lead respondeu. Cada mensagem deve parecer escrita por uma pessoa, nunca por uma ferramenta.
+  const systemPrompt = `Voce escreve a segunda mensagem de WhatsApp para prospeccao local, usada depois que o lead respondeu. Cada mensagem deve parecer digitada rapido no celular, nunca escrita por uma ferramenta.
 
 HIERARQUIA OBRIGATORIA:
 1. Angulo principal vindo do SDR
@@ -884,21 +892,29 @@ HIERARQUIA OBRIGATORIA:
 5. Tom humano
 
 PADRAO POS-RESPOSTA:
-- contexto leve
-- situacao real ou dor implicita
+- abertura leve
+- situacao real em linguagem falada
+- conexao curta com o negocio
 - abertura de curiosidade
 - convite leve para ver em 15min
-- no maximo 3 linhas curtas
+- no maximo 4 linhas curtas
 - nunca explicar o problema inteiro
 - nunca soar como agencia, script ou consultor
-- a mensagem precisa gerar a sensacao: "tem algo simples aqui que vale ver"
+- a mensagem precisa gerar a sensacao: "isso acontece aqui e vale ver"
+
+TRANSFORME EXPLICACAO EM CENA REAL:
+- em vez de "perda de recompra": "muita gente pede uma vez e depois nao volta"
+- em vez de "orcamento esfria": "a pessoa chama, tira duvida e some"
+- em vez de "contato travado": "entra contato mas nao vira nada"
+- em vez de "horario ocioso": "tem horario vazio que parece normal"
+- em vez de "triagem travando": "a pessoa conta o caso e depois desaparece"
 
 USO DO ANGULO:
-- agenda e recorrencia: sugira horario ocioso, retorno ou fluxo travado
-- WhatsApp direto: sugira conversa/orcamento travando sem o dono notar
-- captacao local: sugira contato bom esfriando antes de virar conversa
-- reputacao/autoridade: sugira confianca ou triagem travando
-- recorrencia/matriculas/cuidados: sugira retorno, frequencia ou recompra esfriando
+- agenda e recorrencia: fale de horario vazio, retorno que nao acontece ou cliente que some
+- WhatsApp direto: fale de gente que chama, pergunta e desaparece
+- captacao local: fale de contato que parece bom mas nao vira conversa
+- reputacao/autoridade: fale de gente que fica em duvida antes de chamar
+- recorrencia/matriculas/cuidados: fale de pessoa que vem uma vez, pergunta e nao volta
 
 REGRA DE TOM:
 - Barbearia, restaurante, loja, pizzaria, pet shop, bar: "Fala," curto, direto, sem formalidade
@@ -913,6 +929,7 @@ ESTRUTURA:
 - termine com convite leve: "se fizer sentido te mostro em 15min"
 - sem emoji excessivo
 - sem parecer script ou palestra
+- evite palavras pensadas demais; use "some", "nao volta", "trava", "fica vazio", "nao vira"
 - se sinais fracos forem fortes, seja mais leve e menos agressivo
 - se sinais fortes forem claros, pode ser mais direto
 
@@ -927,6 +944,9 @@ PROIBIDO EM TODAS:
 - citar score, prioridade, sinais, confianca ou analise SDR
 - "identifiquei"
 - "analisei seu negocio"
+- "costuma"
+- "ocorre"
+- "pode estar acontecendo devido a"
 - numero de avaliacoes
 - nota
 - "estrategia"
