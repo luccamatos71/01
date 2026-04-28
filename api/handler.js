@@ -322,6 +322,7 @@ function definirObjetivoOutreach(lead = {}, intensidade = "normal") {
 function montarContextoOutreachLead(lead = {}) {
   const intensidade = calcularIntensidadeOutreach(lead);
   return {
+    id: lead.id || lead.placeId || lead.nome || "",
     nome: lead.nome || "negocio",
     categoria: lead.categoria || "negocio local",
     endereco: lead.endereco || "nao informado",
@@ -402,59 +403,75 @@ const SEGUNDA_MENSAGEM_PATTERNS = [
     id: "automotivo",
     descricao: "estetica automotiva, lava jato premium, polimento e servicos de maior valor",
     match: /automot|carro|polimento|veiculo|lava\s*jato|martelinho|estetica automotiva/,
-    comportamento: "tem cliente que pede preco de servico bom e depois some",
-    problema: "as vezes isso trava no WhatsApp sem parecer problema grande",
+    comportamento: "pede orcamento e depois some",
+    consequencia: "isso as vezes passa batido no WhatsApp",
   },
   {
     id: "restaurante_pizzaria",
     descricao: "restaurantes, pizzarias, delivery, comida local e pedidos por WhatsApp",
     match: /restaurante|pizz|delivery|pedido|comida|lanch|hamburg|ifood|\bbar\b/,
-    comportamento: "muita gente pede uma vez e depois nao volta",
-    problema: "as vezes isso passa batido no WhatsApp",
+    comportamento: "pede uma vez e depois nao volta",
+    consequencia: "isso as vezes passa batido no WhatsApp",
   },
   {
     id: "clinica_estetica_odonto",
     descricao: "clinicas, odontologia, estetica, saude e procedimentos com agendamento",
     match: /odont|dent|saude|clinica|paciente|estetic|procedimento|botox|laser|harmonizacao|dermato/,
-    comportamento: "muita gente chama, tira duvida e some depois",
-    problema: "as vezes isso acaba esfriando agendamento",
+    comportamento: "chama, tira duvida e nao agenda",
+    consequencia: "isso as vezes passa batido no WhatsApp",
   },
   {
     id: "barbearia_salao",
     descricao: "barbearia, salao, beleza e servicos de retorno frequente",
     match: /barbear|salao|cabelo|manicure|sobrancelha|beleza/,
-    comportamento: "muita gente vai uma vez e nao retorna",
-    problema: "as vezes isso vira buraco na agenda sem perceber",
+    comportamento: "vai uma vez e depois nao retorna",
+    consequencia: "isso as vezes passa batido no WhatsApp",
   },
   {
     id: "advocacia_consultivo",
     descricao: "advocacia, contabilidade, consultoria e negocios consultivos",
     match: /advoc|advog|jurid|consultiv|contabil|contador|imobiliaria|corretor/,
-    comportamento: "muita gente chama meio perdida e nao avanca",
-    problema: "as vezes isso trava antes da triagem",
+    comportamento: "chama, explica o caso e depois nao avanca",
+    consequencia: "isso as vezes passa batido no WhatsApp",
   },
   {
     id: "academia_pilates",
     descricao: "academia, pilates, fitness e recorrencia de matricula",
     match: /academ|pilates|fitness|funcional|crossfit|musculacao|matricula|treino/,
-    comportamento: "tem gente que pergunta da matricula e depois desaparece",
-    problema: "as vezes isso fica perdido no primeiro contato",
+    comportamento: "chama, demonstra interesse e depois nao comeca",
+    consequencia: "isso as vezes passa batido no WhatsApp",
   },
   {
     id: "loja_varejo",
     descricao: "lojas locais, varejo, pet shop e atendimento direto por WhatsApp",
     match: /loja|varejo|boutique|moda|calcad|roupa|pet|veterin|otica|farmacia|mercado/,
-    comportamento: "tem gente que chama perguntando e depois nao compra",
-    problema: "as vezes isso passa como atendimento normal",
+    comportamento: "pergunta preco e depois nao volta",
+    consequencia: "isso as vezes passa batido no WhatsApp",
   },
   {
     id: "generico_local",
     descricao: "negocio local sem nicho claro",
     match: /./,
-    comportamento: "tem contato que parece interessado e depois some",
-    problema: "as vezes isso passa batido no WhatsApp",
+    comportamento: "chama, demonstra interesse e depois some",
+    consequencia: "isso as vezes passa batido no WhatsApp",
   },
 ];
+
+const CONECTIVOS_SEGUNDA_MENSAGEM = ["", "entao,", "assim,", "na real,"];
+
+const CONECTIVOS_POR_VARIACAO_SEGUNDA_MENSAGEM = {
+  leve: ["", "entao,"],
+  direta: ["entao,", ""],
+  provocativa: ["na real,", ""],
+  followup: ["", "assim,"],
+  reuniao: ["entao,", "assim,"],
+};
+
+function hashTextoOutreach(texto) {
+  return String(texto || "").split("").reduce((acc, char) => {
+    return ((acc << 5) - acc + char.charCodeAt(0)) >>> 0;
+  }, 0);
+}
 
 function normalizarTextoOutreach(texto) {
   return removerAcentos(String(texto || "").toLowerCase());
@@ -724,39 +741,38 @@ function validarMensagemSegundaOutreach(texto, contexto = {}) {
   const motivos = [];
 
   if (!original) motivos.push("mensagem vazia");
-  if (original.length > 360 || original.split(/\s+/).filter(Boolean).length > 70) motivos.push("mensagem longa demais");
-  if ((original.match(/[.!?]+/g) || []).length > 6) motivos.push("frases demais para WhatsApp");
+  if (original.includes("\n")) motivos.push("mensagem com quebra de linha");
+  if (original.includes("?")) motivos.push("pergunta direta");
+  if (original.length > 230) motivos.push("mensagem longa demais");
 
   const proibidos = [
     ["score", /\bscore\b|pontuacao/],
     ["prioridade", /\bprioridade\b/],
     ["analise interna", /analise|analisei|sdr|sinais?|confianca interna/],
     ["nota/avaliacao", /\bnota\b|avaliac|estrelas/],
+    ["conectivo artificial", /^boa,|^olha,|^passando rapido,/],
+    ["conforme analise", /conforme analise/],
+    ["diagnostico", /diagnostico/],
     ["identifiquei", /identifiquei|identificamos/],
     ["estrategia", /estrategia/],
     ["otimizacao", /otimiz/],
     ["linguagem montada", /costuma|ocorre|pode estar acontecendo devido a/],
     ["tom de agencia", /sou da|trabalho com marketing|marketing digital|trafego pago|nossa agencia|especialista em marketing/],
     ["pitch generico", /aumentar visibilidade|atrair mais clientes|crescer seu negocio|temos uma solucao|poderia te ajudar|oportunidade de crescimento/],
-    ["convite duro", /agendar call|marcar call|marcar reuniao|agendar reuniao|vamos marcar|podemos agendar|calendly/],
+    ["convite duro", /agendar|agenda uma|agenda um|ver agenda|call|reuniao|marcar|calendly/],
     ["formal demais", /gostaria de apresentar|venho apresentar|prezado|caro responsavel/],
   ];
   proibidos.forEach(([motivo, regex]) => {
     if (regex.test(t)) motivos.push(motivo);
   });
 
-  if (!/ponto|algo|coisa|olhada|olhei|vi|perder|trav|sem perceber|notar|esfri|cust|dinheiro|cliente|contato|whatsapp/.test(t)) {
-    motivos.push("nao gera curiosidade");
-  }
-  if (!/15\s?min|quinze|rapido|rapidinho/.test(t)) {
-    motivos.push("nao puxa para 15min leve");
-  }
-  if (!/te mostro|mostrar|te mando|mandar|passar|posso te mostrar|se quiser|se fizer sentido/.test(t)) {
-    motivos.push("nao abre convite leve");
-  }
-  if ((t.match(/\bporque\b/g) || []).length > 1) {
-    motivos.push("explica demais o problema");
-  }
+  const comportamentos = SEGUNDA_MENSAGEM_PATTERNS
+    .map(pattern => normalizarTextoOutreach(pattern.comportamento))
+    .filter(Boolean);
+  const temComportamento = comportamentos.some(comportamento => t.includes(comportamento));
+  if (!temComportamento) motivos.push("sem comportamento do nicho");
+  if (!t.includes("isso as vezes passa batido no whatsapp")) motivos.push("sem consequencia padrao");
+  if (!t.includes("se fizer sentido te mostro rapido")) motivos.push("sem convite leve padrao");
 
   return { ok: motivos.length === 0, motivos };
 }
@@ -863,36 +879,53 @@ function mensagemSeguraOutreach(texto, contexto, tipo = "direta") {
   return `${contexto.nome || "Seu negocio"}, quando esse ponto de ${resumirAnguloOutreach(contexto)} nao fica claro, alguns contatos bons esfriam. Isso acontece ai tambem?`;
 }
 
-function conviteSegundaMensagemOutreach(tipo = "direta") {
-  if (tipo === "leve") return "se quiser te mostro rapido";
-  if (tipo === "followup") return "se fizer sentido te mostro rapidinho";
-  if (tipo === "reuniao") return "te mostro em 15min se fizer sentido";
-  if (tipo === "provocativa") return "se quiser te mostro em 15min";
-  return "se fizer sentido te mostro rapido";
+function normalizarMensagemLinhaUnicaOutreach(texto) {
+  return String(texto || "")
+    .replace(/\s*\n+\s*/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/,\s*,+/g, ",")
+    .replace(/^(entao,|assim,|na real,)\s+(entao,|assim,|na real,)\s+/i, "$1 ")
+    .replace(/\s+,/g, ",")
+    .trim();
 }
 
-function conexaoSegundaMensagemOutreach(tipo = "direta") {
-  if (tipo === "provocativa") return "isso pode virar cliente perdido sem aparecer";
-  if (tipo === "followup") return "acho que vale olhar esse ponto rapidinho";
-  if (tipo === "leve") return "vi um ponto ai que pode estar causando isso";
-  if (tipo === "reuniao") return "vi um ponto ai que pode estar causando isso";
-  return "vi um ponto ai que pode estar causando isso";
+function escolherConectivoSegundaMensagem(contexto = {}, tipo = "direta", usados = []) {
+  const opcoes = CONECTIVOS_POR_VARIACAO_SEGUNDA_MENSAGEM[tipo] || CONECTIVOS_SEGUNDA_MENSAGEM;
+  const base = [
+    contexto.id,
+    contexto.nome,
+    contexto.categoria,
+    contexto.anguloAbordagem,
+    tipo,
+  ].filter(Boolean).join("|");
+  let escolhido = opcoes[hashTextoOutreach(base) % opcoes.length] || "";
+  const ultimos = usados.slice(-2);
+
+  if (ultimos.length === 2 && ultimos.every(conectivo => conectivo === escolhido)) {
+    escolhido = escolhido ? "" : "entao,";
+  }
+
+  return CONECTIVOS_SEGUNDA_MENSAGEM.includes(escolhido) ? escolhido : "";
 }
 
-function montarMensagemSemiFixaOutreach(pattern, contexto = {}, tipo = "direta") {
+function montarMensagemSemiFixaOutreach(pattern, contexto = {}, tipo = "direta", conectivoInformado = null) {
   const padrao = pattern || escolherPadraoFallbackOutreach(contexto);
-  return [
-    "boa",
-    padrao.comportamento,
-    padrao.problema,
-    conexaoSegundaMensagemOutreach(tipo),
-    conviteSegundaMensagemOutreach(tipo),
-  ].join("\n");
+  const conectivo = conectivoInformado === null
+    ? escolherConectivoSegundaMensagem(contexto, tipo)
+    : conectivoInformado;
+  const prefixo = conectivo ? `${conectivo} ` : "";
+  const consequencia = padrao.consequencia || "isso as vezes passa batido no WhatsApp";
+  return normalizarMensagemLinhaUnicaOutreach(
+    `${prefixo}hoje em dia muita gente ${padrao.comportamento}, ${consequencia}, se fizer sentido te mostro rapido`
+  );
 }
 
 function montarVariacoesSemiFixasOutreach(pattern, contexto = {}) {
+  const usados = [];
   return CHAVES_VARIACOES_OUTREACH.reduce((acc, key) => {
-    acc[key] = montarMensagemSemiFixaOutreach(pattern, contexto, key);
+    const conectivo = escolherConectivoSegundaMensagem(contexto, key, usados);
+    usados.push(conectivo);
+    acc[key] = montarMensagemSemiFixaOutreach(pattern, contexto, key, conectivo);
     return acc;
   }, {});
 }
@@ -906,7 +939,7 @@ function mensagemSeguraSegundaOutreach(texto, contexto, tipo = "direta") {
   if (validarMensagemSegundaOutreach(tentativa, contexto).ok) return tentativa;
   const fallback = gerarFallbackSegundaOutreach(contexto, tipo);
   if (validarMensagemSegundaOutreach(fallback, contexto).ok) return fallback;
-  return "boa\ntem contato que parece interessado e depois some\nas vezes isso passa batido no WhatsApp\nvi um ponto ai que pode estar causando isso\nse fizer sentido te mostro rapido";
+  return "hoje em dia muita gente chama, demonstra interesse e depois some, isso as vezes passa batido no WhatsApp, se fizer sentido te mostro rapido";
 }
 
 function preencherVariacoesFallbackOutreach(variacoes, contexto) {

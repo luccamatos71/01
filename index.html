@@ -814,7 +814,10 @@
     .lead-card-qa-btn:hover { background: var(--surface-3); color: var(--text); border-color: rgba(255,255,255,0.12); }
     .lead-card-qa-btn.wa { border-color: rgba(74,222,128,0.2); color: rgba(74,222,128,0.7); }
     .lead-card-qa-btn.wa:hover { background: rgba(74,222,128,0.08); color: rgba(74,222,128,0.95); }
+    .lead-card-qa-btn.copy-phone { border-color: rgba(165,180,252,0.18); color: rgba(165,180,252,0.76); }
+    .lead-card-qa-btn.copy-phone:hover { background: rgba(99,102,241,0.08); color: rgba(199,210,254,0.95); }
     .lead-card-qa-btn.saved { color: rgba(34,197,94,0.6); border-color: rgba(34,197,94,0.2); cursor: default; }
+    .desktop-prospect-action { display: inline-flex; align-items: center; justify-content: center; }
 
     .lead-card-body {
       display: flex;
@@ -1787,6 +1790,23 @@
     }
 
     .analysis-copy-btn:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+
+    .analysis-number-btn {
+      background: transparent;
+      border: 1px solid rgba(165,180,252,0.18);
+      color: rgba(165,180,252,0.78);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      padding: 7px 11px;
+      border-radius: var(--r-md);
+      white-space: nowrap;
+    }
+
+    .analysis-number-btn:hover { background: rgba(99,102,241,0.08); color: rgba(199,210,254,0.96); }
+    .analysis-number-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
 
     /* Fechar */
     .analysis-close-btn {
@@ -4603,6 +4623,10 @@
         touch-action: manipulation;
       }
 
+      .desktop-prospect-action {
+        display: none !important;
+      }
+
       .analysis-drawer {
         z-index: 280;
       }
@@ -5379,6 +5403,8 @@
     <div class="analysis-drawer-footer">
       <div class="analysis-drawer-footer-actions">
         <button id="analysisWhatsappBtn" class="analysis-whatsapp-btn" type="button" disabled>WhatsApp</button>
+        <button id="analysisCopyNumberBtn" class="analysis-number-btn desktop-prospect-action" type="button" disabled>Copiar número</button>
+        <button id="analysisCopyNumberWaBtn" class="analysis-number-btn desktop-prospect-action" type="button" disabled>Copiar + WA</button>
         <button id="analysisCopyBtn" class="analysis-copy-btn" type="button">Copiar mensagem</button>
         <button id="analysisCrmBtn" class="analysis-crm-btn" type="button">+ CRM</button>
       </div>
@@ -6167,6 +6193,8 @@
     const analysisDrawerBody = document.getElementById("analysisDrawerBody");
     const analysisCopyBtn = document.getElementById("analysisCopyBtn");
     const analysisWhatsappBtn = document.getElementById("analysisWhatsappBtn");
+    const analysisCopyNumberBtn = document.getElementById("analysisCopyNumberBtn");
+    const analysisCopyNumberWaBtn = document.getElementById("analysisCopyNumberWaBtn");
     const analysisNextBtn = document.getElementById("analysisNextBtn");
 
     let currentAnalysisText = "";
@@ -6267,6 +6295,62 @@
       card.classList.add("contatado");
       const badge = card.querySelector(".lead-badge");
       if (badge) { badge.className = "lead-badge contatado"; badge.textContent = "✓ Contatado"; }
+    }
+
+    function telefoneLimpoLead(lead) {
+      return String(lead?.telefone || "").replace(/\D/g, "");
+    }
+
+    async function copiarTextoSeguro(texto) {
+      const valor = String(texto || "").trim();
+      if (!valor) return false;
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(valor);
+        return true;
+      }
+      const textarea = document.createElement("textarea");
+      textarea.value = valor;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+      const ok = document.execCommand("copy");
+      textarea.remove();
+      return ok;
+    }
+
+    function feedbackBotaoTemporario(btn, texto, fallback, tempo = 1200) {
+      if (!btn) return;
+      const original = fallback || btn.dataset.originalLabel || btn.textContent;
+      btn.dataset.originalLabel = original;
+      btn.textContent = texto;
+      setTimeout(() => { btn.textContent = original; }, tempo);
+    }
+
+    async function registrarAbordagemManualNumeroCRM(lead) {
+      const mensagem = getMensagemUltraLeve(lead);
+      marcarContatado(lead);
+      await registrarMensagemInicialEnviadaCRM(lead, mensagem, "direta", "ultra_leve");
+    }
+
+    async function copiarNumeroLead(lead, btn, abrirWhatsApp = false) {
+      if (!lead?.telefone) return;
+      const numero = telefoneLimpoLead(lead);
+      if (!numero) {
+        feedbackBotaoTemporario(btn, "Sem número", btn?.textContent, 1500);
+        return;
+      }
+      try {
+        await copiarTextoSeguro(numero);
+        if (abrirWhatsApp) {
+          window.open(montarLinkWhatsApp(lead.telefone, getMensagemUltraLeve(lead)), "_blank");
+        }
+        await registrarAbordagemManualNumeroCRM(lead);
+        feedbackBotaoTemporario(btn, abrirWhatsApp ? "Copiado + WA" : "Número copiado", btn?.textContent);
+      } catch {
+        feedbackBotaoTemporario(btn, "Falhou", btn?.textContent, 1500);
+      }
     }
 
     function atualizarBotaoProximo() {
@@ -6548,6 +6632,14 @@
       if (msg) await registrarMensagemInicialEnviadaCRM(currentLead, msg, tipoMensagemAtual());
     });
 
+    if (analysisCopyNumberBtn) analysisCopyNumberBtn.addEventListener("click", async () => {
+      await copiarNumeroLead(currentLead, analysisCopyNumberBtn, false);
+    });
+
+    if (analysisCopyNumberWaBtn) analysisCopyNumberWaBtn.addEventListener("click", async () => {
+      await copiarNumeroLead(currentLead, analysisCopyNumberWaBtn, true);
+    });
+
     async function openAnalysisDrawer(lead) {
       const p = lead.prioridade;
       const badgeClass = p === "MEDIA" ? "media" : p === "ALTA" ? "alta" : p === "DESCARTE" ? "descarte" : "baixa";
@@ -6571,6 +6663,8 @@
       currentAnalysisText = "";
       analysisCopyBtn.textContent = "Copiar mensagem";
       analysisWhatsappBtn.disabled = !lead.telefone;
+      if (analysisCopyNumberBtn) analysisCopyNumberBtn.disabled = !lead.telefone;
+      if (analysisCopyNumberWaBtn) analysisCopyNumberWaBtn.disabled = !lead.telefone;
       analysisDrawer.classList.add("open");
       syncMobileOverlayState();
       scrollMobileIntoView(analysisDrawer);
@@ -6626,6 +6720,8 @@
       const quickActions = p !== "DESCARTE" ? `
         <div class="lead-card-quick-actions">
           ${lead.telefone ? `<button class="lead-card-qa-btn wa" data-wa="1" type="button">WhatsApp</button>` : ""}
+          ${lead.telefone ? `<button class="lead-card-qa-btn copy-phone desktop-prospect-action" data-copy-phone="1" type="button">Copiar nº</button>` : ""}
+          ${lead.telefone ? `<button class="lead-card-qa-btn copy-phone desktop-prospect-action" data-copy-phone-wa="1" type="button">Copiar + WA</button>` : ""}
           <button class="lead-card-qa-btn crm-quick" type="button">+CRM</button>
         </div>` : "";
 
@@ -6657,6 +6753,22 @@
             window.open(montarLinkWhatsApp(lead.telefone, msg), "_blank");
             marcarContatado(lead);
             if (msg) await registrarMensagemInicialEnviadaCRM(lead, msg, "direta");
+          });
+        }
+
+        const copyPhoneBtn = card.querySelector("[data-copy-phone]");
+        if (copyPhoneBtn) {
+          copyPhoneBtn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            await copiarNumeroLead(lead, copyPhoneBtn, false);
+          });
+        }
+
+        const copyPhoneWaBtn = card.querySelector("[data-copy-phone-wa]");
+        if (copyPhoneWaBtn) {
+          copyPhoneWaBtn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            await copiarNumeroLead(lead, copyPhoneWaBtn, true);
           });
         }
 
