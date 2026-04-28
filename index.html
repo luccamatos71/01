@@ -1857,6 +1857,66 @@
       color: var(--text-3);
     }
 
+    .crm-learning-toggle {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.03);
+      color: var(--text-2);
+      border-radius: 6px;
+      padding: 6px 9px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .crm-learning-toggle.active {
+      color: var(--text);
+      border-color: rgba(99,102,241,0.45);
+      background: rgba(99,102,241,0.12);
+    }
+
+    .crm-learning-panel {
+      border-bottom: 1px solid var(--border-soft);
+      padding: 12px 16px;
+      background: rgba(255,255,255,0.015);
+      max-height: 260px;
+      overflow: auto;
+    }
+
+    .crm-learning-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(110px, 1fr));
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .crm-learning-metric {
+      border: 1px solid var(--border-soft);
+      border-radius: 8px;
+      padding: 8px;
+      background: rgba(0,0,0,0.12);
+    }
+
+    .crm-learning-label { font-size: 10px; color: var(--text-3); margin-bottom: 3px; }
+    .crm-learning-value { font-size: 15px; color: var(--text); font-weight: 700; }
+    .crm-learning-note { font-size: 11px; color: var(--text-3); line-height: 1.45; }
+
+    .crm-learning-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      color: var(--text-2);
+    }
+
+    .crm-learning-table th,
+    .crm-learning-table td {
+      border-bottom: 1px solid var(--border-soft);
+      padding: 6px 5px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .crm-learning-table th { color: var(--text-3); font-weight: 600; }
+    .crm-learning-muted { color: var(--text-3); }
+
     .crm-columns {
       display: flex;
       gap: 0;
@@ -5107,9 +5167,11 @@
         <h2>Pipeline CRM</h2>
         <div class="crm-header-right">
           <span id="crmTotalLabel" class="crm-total"></span>
+          <button id="crmLearningBtn" class="crm-learning-toggle" type="button">Learning</button>
           <button id="crmCloseBtn" class="leads-close-btn" type="button">&times;</button>
         </div>
       </div>
+      <div id="crmLearningPanel" class="crm-learning-panel" hidden></div>
       <div id="crmColumns" class="crm-columns"></div>
     </div>
 
@@ -6726,11 +6788,15 @@
     const crmPanelBtn  = document.getElementById("crmPanelBtn");
     const crmTotalLabel = document.getElementById("crmTotalLabel");
     const crmCounters      = document.getElementById("crmCounters");
+    const crmLearningBtn   = document.getElementById("crmLearningBtn");
+    const crmLearningPanel = document.getElementById("crmLearningPanel");
     const alertasSideCard  = document.getElementById("alertasSideCard");
     const alertasList      = document.getElementById("alertasList");
     const analysisCrmBtn = document.getElementById("analysisCrmBtn");
 
     let crmData = { leads: [] };
+    let crmLearningAberto = false;
+    let crmLearningData = null;
     const FOLLOWUP_PRAZO_HORAS = 24;
 
     async function crmFetch(payload) {
@@ -6740,6 +6806,31 @@
         body: JSON.stringify(payload),
       });
       return r.json();
+    }
+
+    function calcularHorasEntreCRM(inicio, fim) {
+      if (!inicio || !fim) return null;
+      const a = new Date(inicio).getTime();
+      const b = new Date(fim).getTime();
+      if (!Number.isFinite(a) || !Number.isFinite(b) || b < a) return null;
+      return Math.round(((b - a) / 3600000) * 10) / 10;
+    }
+
+    function tipoMensagemLearning(tipo) {
+      return ["ultra_leve", "segunda_mensagem", "followup", "reuniao"].includes(tipo) ? tipo : "segunda_mensagem";
+    }
+
+    function mensagensUsadasComNovoEvento(lead, tipo, texto, variacao = "") {
+      const evento = {
+        tipo: tipoMensagemLearning(tipo),
+        etapa: tipoMensagemLearning(tipo),
+        variacao: variacao || "",
+        texto: texto || "",
+        enviadoEm: new Date().toISOString(),
+        patternId: lead?.outreachPatternId || "",
+      };
+      const atuais = Array.isArray(lead?.mensagensUsadas) ? lead.mensagensUsadas : [];
+      return [...atuais, evento].slice(-30);
     }
 
     function crmLeadAtivo(lead) {
@@ -6806,11 +6897,12 @@
     }
 
     function normalizarTipoMensagemInicial(tipo) {
-      return ["leve", "direta", "provocativa"].includes(tipo) ? tipo : "direta";
+      return ["leve", "direta", "provocativa", "followup", "reuniao"].includes(tipo) ? tipo : "direta";
     }
 
-    async function registrarMensagemInicialEnviadaCRM(lead, mensagem, tipo = "direta") {
+    async function registrarMensagemInicialEnviadaCRM(lead, mensagem, tipo = "direta", etapaMensagem = "ultra_leve") {
       const agora = new Date().toISOString();
+      const etapa = tipoMensagemLearning(etapaMensagem);
       return salvarAtualizacaoCRMLead(lead, {
         status: "abordado",
         ultimoMovimento: "eu",
@@ -6819,6 +6911,9 @@
         primeiraMensagemEnviadaEm: lead.primeiraMensagemEnviadaEm || agora,
         mensagemInicial: mensagem || lead.mensagemInicial || "",
         tipoMensagemInicial: normalizarTipoMensagemInicial(tipo),
+        ultimaMensagemTipo: etapa,
+        outreachVariationUsada: tipo || "",
+        mensagensUsadas: mensagensUsadasComNovoEvento(lead, etapa, mensagem, tipo),
         needsFollowUp: false,
         estagioFinal: "abordado",
         nicho: lead.nicho || lead.categoria || "",
@@ -6838,6 +6933,9 @@
         usouFollowUp: true,
         needsFollowUp: false,
         followUpEnviadoEm: agora,
+        ultimaMensagemTipo: "followup",
+        outreachVariationUsada: "followup",
+        mensagensUsadas: mensagensUsadasComNovoEvento(lead, "followup", mensagem, "followup"),
         estagioFinal: statusBase,
       });
     }
@@ -6880,6 +6978,7 @@
         crmData = data;
         await sincronizarFollowUpsPendentes();
         atualizarContadoresSidebar();
+        if (crmLearningAberto) carregarCRMLearning();
       } catch { /* silencioso */ }
     }
 
@@ -6952,6 +7051,76 @@
       alertasList.querySelectorAll(".alerta-item").forEach(el => {
         el.addEventListener("click", () => abrirCRM());
       });
+    }
+
+    function formatarPctCRM(valor) {
+      const n = Number(valor);
+      return Number.isFinite(n) ? `${n.toFixed(n % 1 ? 1 : 0)}%` : "0%";
+    }
+
+    function renderLearningTabela(titulo, lista = []) {
+      const rows = (lista || []).slice(0, 6);
+      if (!rows.length) return `<div class="crm-learning-note">${escapeHtml(titulo)}: dados insuficientes.</div>`;
+      return `
+        <div class="crm-learning-note" style="margin:8px 0 4px;">${escapeHtml(titulo)}</div>
+        <table class="crm-learning-table">
+          <thead><tr><th>Grupo</th><th>Abordados</th><th>Resp.</th><th>Reunião</th><th>Status</th></tr></thead>
+          <tbody>
+            ${rows.map(item => `
+              <tr>
+                <td>${escapeHtml(item.chave || "nao informado")}</td>
+                <td>${item.abordados || 0}</td>
+                <td>${formatarPctCRM(item.taxaResposta)}</td>
+                <td>${formatarPctCRM(item.taxaReuniao)}</td>
+                <td class="${item.dadosInsuficientes ? 'crm-learning-muted' : ''}">${item.dadosInsuficientes ? "dados insuficientes" : "amostra ok"}</td>
+              </tr>`).join("")}
+          </tbody>
+        </table>`;
+    }
+
+    function renderizarCRMLearning() {
+      if (!crmLearningPanel) return;
+      const data = crmLearningData;
+      if (!crmLearningAberto) {
+        crmLearningPanel.hidden = true;
+        return;
+      }
+      crmLearningPanel.hidden = false;
+      if (!data) {
+        crmLearningPanel.innerHTML = `<div class="loading"><span class="spinner"></span><span>Carregando learning...</span></div>`;
+        return;
+      }
+      const resumo = data.resumo || {};
+      const recomendacoes = data.recomendacoes || [];
+      const avisos = data.avisos || [];
+      crmLearningPanel.innerHTML = `
+        <div class="crm-learning-grid">
+          <div class="crm-learning-metric"><div class="crm-learning-label">Abordados</div><div class="crm-learning-value">${resumo.abordados || 0}</div></div>
+          <div class="crm-learning-metric"><div class="crm-learning-label">Taxa resposta</div><div class="crm-learning-value">${formatarPctCRM(resumo.taxaResposta)}</div></div>
+          <div class="crm-learning-metric"><div class="crm-learning-label">Taxa reunião</div><div class="crm-learning-value">${formatarPctCRM(resumo.taxaReuniao)}</div></div>
+          <div class="crm-learning-metric"><div class="crm-learning-label">Fechados</div><div class="crm-learning-value">${resumo.fechados || 0}</div></div>
+          <div class="crm-learning-metric"><div class="crm-learning-label">Tempo resp.</div><div class="crm-learning-value">${resumo.tempoMedioRespostaHoras ?? "—"}h</div></div>
+        </div>
+        <div class="crm-learning-note">
+          ${(recomendacoes.length ? recomendacoes : avisos).map(item => `<div>${escapeHtml(item)}</div>`).join("") || "dados insuficientes"}
+        </div>
+        ${renderLearningTabela("Por nicho", data.porNicho)}
+        ${renderLearningTabela("Por angulo", data.porAngulo)}
+        ${renderLearningTabela("Por tipo de mensagem", data.porTipoMensagem)}
+      `;
+    }
+
+    async function carregarCRMLearning() {
+      if (!crmLearningAberto) return;
+      crmLearningData = null;
+      renderizarCRMLearning();
+      try {
+        const data = await crmFetch({ modo: "learning" });
+        crmLearningData = data;
+      } catch {
+        crmLearningData = { resumo: {}, recomendacoes: [], avisos: ["erro ao carregar learning"] };
+      }
+      renderizarCRMLearning();
     }
 
     // ── Ficha ──────────────────────────────────────────
@@ -7229,7 +7398,8 @@
 
         fichaMsgContainer.querySelector("#btnWaFichaMsgNova")?.addEventListener("click", async () => {
           window.open(montarLinkWhatsApp(lead.telefone, textoAtivo), "_blank");
-          if (textoAtivo) await registrarMensagemInicialEnviadaCRM(lead, textoAtivo, textoAtivoTipo);
+          const etapa = textoAtivoTipo === "reuniao" ? "reuniao" : textoAtivoTipo === "followup" ? "followup" : "segunda_mensagem";
+          if (textoAtivo) await registrarMensagemInicialEnviadaCRM(lead, textoAtivo, textoAtivoTipo, etapa);
         });
 
         fichaMsgContainer.querySelector("#btnRegerarFichaMsgNova")?.addEventListener("click", async () => {
@@ -7304,6 +7474,9 @@
             statusConversa: "aguardando_cliente",
             ultimaInteracaoEm: agora,
             needsFollowUp: false,
+            ultimaMensagemTipo: "reuniao",
+            outreachVariationUsada: "reuniao",
+            mensagensUsadas: mensagensUsadasComNovoEvento(lead, "reuniao", textoAtivo, "reuniao"),
             estagioFinal: "conversando",
           });
         });
@@ -7373,17 +7546,20 @@
 
       // Lead respondeu → conversando, lead falou, aguardando minha resposta
       const btnLeadRespondeu = fichaBody.querySelector("#btnLeadRespondeu");
-      if (btnLeadRespondeu) btnLeadRespondeu.addEventListener("click", () =>
-        atualizarLead(lead.id, {
+      if (btnLeadRespondeu) btnLeadRespondeu.addEventListener("click", () => {
+        const agora = agoraISO();
+        return atualizarLead(lead.id, {
           status: "conversando",
           ultimoMovimento: "lead",
           statusConversa: "aguardando_resposta",
-          ultimaInteracaoEm: agoraISO(),
+          ultimaInteracaoEm: agora,
           respondeu: true,
-          respondeuEm: agoraISO(),
+          respondeuEm: agora,
+          tempoAteRespostaHoras: calcularHorasEntreCRM(lead.primeiraMensagemEnviadaEm, agora),
           needsFollowUp: false,
           estagioFinal: "conversando",
-        }));
+        });
+      });
 
       // Eu respondi → conversando, eu falei, aguardando cliente
       const btnEuRespondi = fichaBody.querySelector("#btnEuRespondi");
@@ -7406,17 +7582,21 @@
 
       // Mover etapas
       const btnReuniao = fichaBody.querySelector("#btnReuniao");
-      if (btnReuniao) btnReuniao.addEventListener("click", () =>
-        atualizarLead(lead.id, {
+      if (btnReuniao) btnReuniao.addEventListener("click", () => {
+        const agora = agoraISO();
+        return atualizarLead(lead.id, {
           status: "reuniao",
           ultimoMovimento: "eu",
           statusConversa: "aguardando_cliente",
-          ultimaInteracaoEm: agoraISO(),
+          ultimaInteracaoEm: agora,
           virouReuniao: true,
-          reuniaoEm: agoraISO(),
+          reuniaoEm: agora,
+          tempoAteReuniaoHoras: calcularHorasEntreCRM(lead.primeiraMensagemEnviadaEm, agora),
           needsFollowUp: false,
+          ultimaMensagemTipo: "reuniao",
           estagioFinal: "reuniao",
-        }));
+        });
+      });
 
       const btnProposta = fichaBody.querySelector("#btnProposta");
       if (btnProposta) btnProposta.addEventListener("click", () =>
@@ -7564,6 +7744,8 @@
 
     function abrirCRM() {
       renderizarCRM();
+      renderizarCRMLearning();
+      if (crmLearningAberto) carregarCRMLearning();
       crmOverlay.classList.add("open");
       syncMobileOverlayState();
     }
@@ -7577,6 +7759,12 @@
     if (crmPanelBtn) crmPanelBtn.addEventListener("click", abrirCRM);
     if (crmCloseBtn) crmCloseBtn.addEventListener("click", fecharCRM);
     if (crmOverlay) crmOverlay.addEventListener("click", e => { if (e.target === crmOverlay) fecharCRM(); });
+    if (crmLearningBtn) crmLearningBtn.addEventListener("click", async () => {
+      crmLearningAberto = !crmLearningAberto;
+      crmLearningBtn.classList.toggle("active", crmLearningAberto);
+      renderizarCRMLearning();
+      if (crmLearningAberto) await carregarCRMLearning();
+    });
 
     // Botão "+ CRM" no drawer
     if (analysisCrmBtn) analysisCrmBtn.addEventListener("click", async () => {

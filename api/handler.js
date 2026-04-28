@@ -1486,6 +1486,310 @@ CLIENTES_CRIATIVOS.forEach(c => {
 });
 
 // CRM — Supabase Postgres (com fallback para arquivo local em dev sem Supabase)
+const CRM_LEARNING_MIN_AMOSTRA = 5;
+const CRM_LEARNING_TIPOS_MENSAGEM = new Set(["ultra_leve", "segunda_mensagem", "followup", "reuniao"]);
+
+function numeroCRM(valor) {
+  const n = Number(valor);
+  return Number.isFinite(n) ? n : null;
+}
+
+function horasEntreCRM(inicio, fim) {
+  if (!inicio || !fim) return null;
+  const a = new Date(inicio).getTime();
+  const b = new Date(fim).getTime();
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b < a) return null;
+  return Math.round(((b - a) / 3600000) * 10) / 10;
+}
+
+function normalizarTipoMensagemLearning(tipo) {
+  const t = String(tipo || "").trim();
+  return CRM_LEARNING_TIPOS_MENSAGEM.has(t) ? t : "segunda_mensagem";
+}
+
+function normalizarMensagensUsadasCRM(lead = {}) {
+  const eventos = Array.isArray(lead.mensagensUsadas) ? lead.mensagensUsadas : [];
+  const normalizados = eventos
+    .map(ev => ({
+      tipo: normalizarTipoMensagemLearning(ev.tipo || ev.etapa),
+      etapa: normalizarTipoMensagemLearning(ev.etapa || ev.tipo),
+      variacao: String(ev.variacao || "").trim(),
+      texto: String(ev.texto || "").trim(),
+      enviadoEm: ev.enviadoEm || ev.criadoEm || null,
+      patternId: ev.patternId || lead.outreachPatternId || "",
+    }))
+    .filter(ev => ev.tipo && (ev.texto || ev.enviadoEm));
+
+  if (!normalizados.length && lead.mensagemInicial && lead.primeiraMensagemEnviadaEm) {
+    normalizados.push({
+      tipo: "ultra_leve",
+      etapa: "ultra_leve",
+      variacao: lead.tipoMensagemInicial || "",
+      texto: lead.mensagemInicial,
+      enviadoEm: lead.primeiraMensagemEnviadaEm,
+      patternId: "",
+    });
+  }
+  if (lead.mensagemFollowUp && lead.followUpEnviadoEm && !normalizados.some(ev => ev.tipo === "followup")) {
+    normalizados.push({
+      tipo: "followup",
+      etapa: "followup",
+      variacao: "followup",
+      texto: lead.mensagemFollowUp,
+      enviadoEm: lead.followUpEnviadoEm,
+      patternId: lead.outreachPatternId || "",
+    });
+  }
+  return normalizados.slice(-30);
+}
+
+function resultadoComercialCRM(lead = {}) {
+  const status = lead.status || "";
+  if (status === "fechado") return "fechado";
+  if (status === "perdido") return "perdido";
+  if (lead.virouReuniao || status === "reuniao" || status === "proposta") return "reuniao";
+  if (lead.respondeu || status === "conversando" || status === "respondeu") return "respondeu";
+  if (lead.primeiraMensagemEnviadaEm || lead.mensagemInicial || ["abordado", "follow_up"].includes(status)) return "sem_resposta";
+  return "sem_contato";
+}
+
+function sinalScoreResultadoCRM(lead = {}) {
+  const score = numeroCRM(lead.score);
+  const resultado = resultadoComercialCRM(lead);
+  if (score === null || resultado === "sem_contato") return "dados_insuficientes";
+  const positivo = ["respondeu", "reuniao", "fechado"].includes(resultado);
+  if (score >= 75 && positivo) return "score_alto_com_sinal_positivo";
+  if (score >= 75 && ["sem_resposta", "perdido"].includes(resultado)) return "score_alto_sem_retorno";
+  if (score < 60 && positivo) return "score_baixo_com_sinal_positivo";
+  return "neutro";
+}
+
+function normalizarLeadCRM(lead = {}) {
+  const status = lead.status || "novo";
+  const respondeu = !!(lead.respondeu || status === "respondeu" || status === "conversando");
+  const virouReuniao = !!(lead.virouReuniao || status === "reuniao" || status === "proposta" || status === "fechado");
+  const primeiraMensagemEnviadaEm = lead.primeiraMensagemEnviadaEm || null;
+  const respondeuEm = lead.respondeuEm || null;
+  const reuniaoEm = lead.reuniaoEm || null;
+  const tempoAteRespostaHoras = numeroCRM(lead.tempoAteRespostaHoras) ?? horasEntreCRM(primeiraMensagemEnviadaEm, respondeuEm);
+  const tempoAteReuniaoHoras = numeroCRM(lead.tempoAteReuniaoHoras) ?? horasEntreCRM(primeiraMensagemEnviadaEm, reuniaoEm);
+
+  const normalizado = {
+    ...lead,
+    status,
+    statusConversa: lead.statusConversa ?? null,
+    ultimoMovimento: lead.ultimoMovimento ?? null,
+    ultimaInteracaoEm: lead.ultimaInteracaoEm || null,
+    needsFollowUp: !!lead.needsFollowUp,
+    respondeu,
+    usouFollowUp: !!lead.usouFollowUp,
+    virouReuniao,
+    estagioFinal: lead.estagioFinal || status,
+    nicho: lead.nicho || lead.categoria || "",
+    score: numeroCRM(lead.score),
+    scoreConfianca: numeroCRM(lead.scoreConfianca),
+    scoreVersion: lead.scoreVersion || null,
+    scoreBreakdown: lead.scoreBreakdown || null,
+    anguloAbordagem: lead.anguloAbordagem || "",
+    contextoAbordagem: lead.contextoAbordagem || "",
+    gatilhoConversacional: lead.gatilhoConversacional || "",
+    tipoMensagemInicial: lead.tipoMensagemInicial || "",
+    mensagemInicial: lead.mensagemInicial || "",
+    mensagemFollowUp: lead.mensagemFollowUp || lead.followUp || "",
+    followUp: lead.followUp || lead.mensagemFollowUp || "",
+    primeiraMensagemEnviadaEm,
+    followUpEnviadoEm: lead.followUpEnviadoEm || null,
+    respondeuEm,
+    reuniaoEm,
+    perdidoEm: lead.perdidoEm || null,
+    learningTags: Array.isArray(lead.learningTags) ? lead.learningTags : [],
+    motivoPerda: lead.motivoPerda || "",
+    outreachPatternId: lead.outreachPatternId || "",
+    outreachVariationUsada: lead.outreachVariationUsada || "",
+    ultimaMensagemTipo: lead.ultimaMensagemTipo || "",
+    tempoAteRespostaHoras,
+    tempoAteReuniaoHoras,
+  };
+  normalizado.mensagensUsadas = normalizarMensagensUsadasCRM(normalizado);
+  normalizado.resultadoComercial = resultadoComercialCRM(normalizado);
+  normalizado.sinalScoreResultado = sinalScoreResultadoCRM(normalizado);
+  return normalizado;
+}
+
+function normalizarCRMData(crm = { leads: [] }) {
+  const leads = (crm.leads || []).map(normalizarLeadCRM);
+  leads.sort((a, b) => (new Date(b.atualizadoEm || b.criadoEm || 0) - new Date(a.atualizadoEm || a.criadoEm || 0)));
+  return { ...crm, leads };
+}
+
+function leadCRMAbordado(lead = {}) {
+  return !!(
+    lead.primeiraMensagemEnviadaEm ||
+    lead.mensagemInicial ||
+    ["abordado", "follow_up", "conversando", "respondeu", "reuniao", "proposta", "fechado", "perdido"].includes(lead.status)
+  );
+}
+
+function taxaCRM(valor, total) {
+  if (!total) return 0;
+  return Math.round((valor / total) * 1000) / 10;
+}
+
+function scoreRangeCRM(score) {
+  const n = numeroCRM(score);
+  if (n === null) return "sem_score";
+  if (n < 40) return "0-39";
+  if (n < 60) return "40-59";
+  if (n < 75) return "60-74";
+  if (n < 90) return "75-89";
+  return "90-100";
+}
+
+function criarStatsLearning(chave) {
+  return {
+    chave,
+    leads: 0,
+    abordados: 0,
+    respostas: 0,
+    reunioes: 0,
+    fechados: 0,
+    perdidos: 0,
+    followups: 0,
+    taxaResposta: 0,
+    taxaReuniao: 0,
+    taxaFechamento: 0,
+    dadosInsuficientes: true,
+  };
+}
+
+function adicionarLeadStatsLearning(stats, lead) {
+  stats.leads += 1;
+  if (leadCRMAbordado(lead)) stats.abordados += 1;
+  if (lead.respondeu || ["conversando", "respondeu", "reuniao", "proposta", "fechado"].includes(lead.status)) stats.respostas += 1;
+  if (lead.virouReuniao || ["reuniao", "proposta", "fechado"].includes(lead.status)) stats.reunioes += 1;
+  if (lead.status === "fechado") stats.fechados += 1;
+  if (lead.status === "perdido") stats.perdidos += 1;
+  if (lead.usouFollowUp || lead.followUpEnviadoEm) stats.followups += 1;
+}
+
+function finalizarStatsLearning(stats) {
+  stats.taxaResposta = taxaCRM(stats.respostas, stats.abordados);
+  stats.taxaReuniao = taxaCRM(stats.reunioes, stats.abordados);
+  stats.taxaFechamento = taxaCRM(stats.fechados, stats.abordados);
+  stats.dadosInsuficientes = stats.abordados < CRM_LEARNING_MIN_AMOSTRA;
+  return stats;
+}
+
+function agruparLearningPorLead(leads, obterChave) {
+  const mapa = new Map();
+  leads.forEach(lead => {
+    const chave = String(obterChave(lead) || "nao informado").trim() || "nao informado";
+    if (!mapa.has(chave)) mapa.set(chave, criarStatsLearning(chave));
+    adicionarLeadStatsLearning(mapa.get(chave), lead);
+  });
+  return Array.from(mapa.values())
+    .map(finalizarStatsLearning)
+    .sort((a, b) => b.abordados - a.abordados || b.taxaResposta - a.taxaResposta)
+    .slice(0, 12);
+}
+
+function agruparLearningPorMensagem(leads, obterChave) {
+  const mapa = new Map();
+  leads.forEach(lead => {
+    const eventos = Array.isArray(lead.mensagensUsadas) ? lead.mensagensUsadas : [];
+    const chaves = new Set(eventos.map(obterChave).filter(Boolean));
+    if (!chaves.size && lead.ultimaMensagemTipo) chaves.add(lead.ultimaMensagemTipo);
+    chaves.forEach(chave => {
+      const key = String(chave || "nao informado").trim() || "nao informado";
+      if (!mapa.has(key)) mapa.set(key, criarStatsLearning(key));
+      adicionarLeadStatsLearning(mapa.get(key), lead);
+    });
+  });
+  return Array.from(mapa.values())
+    .map(finalizarStatsLearning)
+    .sort((a, b) => b.abordados - a.abordados || b.taxaResposta - a.taxaResposta)
+    .slice(0, 12);
+}
+
+function recomendacoesLearningCRM({ resumo, porNicho, porAngulo, porTipoMensagem }) {
+  const recomendacoes = [];
+  const avisos = [];
+  const grupos = [
+    { nome: "nicho", lista: porNicho },
+    { nome: "angulo", lista: porAngulo },
+    { nome: "tipoMensagem", lista: porTipoMensagem },
+  ];
+
+  grupos.forEach(({ nome, lista }) => {
+    const validos = lista.filter(item => !item.dadosInsuficientes);
+    if (!validos.length) {
+      avisos.push(`${nome}: dados insuficientes (minimo ${CRM_LEARNING_MIN_AMOSTRA} leads abordados)`);
+      return;
+    }
+    const melhorResposta = validos[0];
+    if (melhorResposta && melhorResposta.taxaResposta >= Math.max(20, resumo.taxaResposta + 5)) {
+      recomendacoes.push(`${nome} "${melhorResposta.chave}" respondeu acima da media (${melhorResposta.taxaResposta}%).`);
+    }
+    const melhorReuniao = [...validos].sort((a, b) => b.taxaReuniao - a.taxaReuniao)[0];
+    if (melhorReuniao && melhorReuniao.taxaReuniao >= Math.max(10, resumo.taxaReuniao + 3)) {
+      recomendacoes.push(`${nome} "${melhorReuniao.chave}" gerou mais reunioes (${melhorReuniao.taxaReuniao}%).`);
+    }
+  });
+
+  if (!recomendacoes.length) {
+    avisos.push(`dados insuficientes para recomendacoes confiaveis; use pelo menos ${CRM_LEARNING_MIN_AMOSTRA} leads abordados por grupo.`);
+  }
+  return { recomendacoes: recomendacoes.slice(0, 6), avisos: Array.from(new Set(avisos)).slice(0, 6) };
+}
+
+function calcularCRMLearning(leads = []) {
+  const normalizados = leads.map(normalizarLeadCRM);
+  const abordados = normalizados.filter(leadCRMAbordado);
+  const respostas = normalizados.filter(l => l.respondeu || ["conversando", "respondeu", "reuniao", "proposta", "fechado"].includes(l.status));
+  const reunioes = normalizados.filter(l => l.virouReuniao || ["reuniao", "proposta", "fechado"].includes(l.status));
+  const fechados = normalizados.filter(l => l.status === "fechado");
+  const perdidos = normalizados.filter(l => l.status === "perdido");
+  const temposResposta = normalizados.map(l => numeroCRM(l.tempoAteRespostaHoras)).filter(n => n !== null);
+  const tempoMedioRespostaHoras = temposResposta.length
+    ? Math.round((temposResposta.reduce((a, b) => a + b, 0) / temposResposta.length) * 10) / 10
+    : null;
+
+  const resumo = {
+    totalLeads: normalizados.length,
+    abordados: abordados.length,
+    responderam: respostas.length,
+    reunioes: reunioes.length,
+    fechados: fechados.length,
+    perdidos: perdidos.length,
+    taxaResposta: taxaCRM(respostas.length, abordados.length),
+    taxaReuniao: taxaCRM(reunioes.length, abordados.length),
+    taxaFechamento: taxaCRM(fechados.length, abordados.length),
+    tempoMedioRespostaHoras,
+    amostraMinima: CRM_LEARNING_MIN_AMOSTRA,
+  };
+
+  const porNicho = agruparLearningPorLead(normalizados, l => l.nicho || l.categoria);
+  const porAngulo = agruparLearningPorLead(normalizados, l => l.anguloAbordagem || "sem angulo");
+  const porScoreRange = agruparLearningPorLead(normalizados, l => scoreRangeCRM(l.score));
+  const porTipoMensagem = agruparLearningPorMensagem(normalizados, ev => ev.tipo || ev.etapa);
+  const porPatternOutreach = agruparLearningPorMensagem(normalizados, ev => ev.patternId);
+  const sinaisScoreResultado = agruparLearningPorLead(normalizados, l => l.sinalScoreResultado);
+  const { recomendacoes, avisos } = recomendacoesLearningCRM({ resumo, porNicho, porAngulo, porTipoMensagem });
+
+  return {
+    ok: true,
+    resumo,
+    porNicho,
+    porAngulo,
+    porScoreRange,
+    porTipoMensagem,
+    porPatternOutreach,
+    sinaisScoreResultado,
+    recomendacoes,
+    avisos,
+  };
+}
+
 async function lerCRM() {
   if (supabase) {
     // Tenta ler com ordem se a coluna existir, senão sem ordem
@@ -1496,31 +1800,31 @@ async function lerCRM() {
       // fallback para arquivo local se Supabase falhar
       try {
         if (!fs.existsSync(CRM_FILE)) return { leads: [] };
-        return JSON.parse(fs.readFileSync(CRM_FILE, "utf8"));
+        return normalizarCRMData(JSON.parse(fs.readFileSync(CRM_FILE, "utf8")));
       } catch { return { leads: [] }; }
     }
     // Ordena no JS se tiver dados
     const leads = (data || []).map(r => r.dados);
-    leads.sort((a, b) => (new Date(b.atualizadoEm || 0) - new Date(a.atualizadoEm || 0)));
-    return { leads };
+    return normalizarCRMData({ leads });
   }
   try {
     if (!fs.existsSync(CRM_FILE)) return { leads: [] };
-    return JSON.parse(fs.readFileSync(CRM_FILE, "utf8"));
+    return normalizarCRMData(JSON.parse(fs.readFileSync(CRM_FILE, "utf8")));
   } catch { return { leads: [] }; }
 }
 
 async function salvarLead(lead) {
+  const leadNormalizado = normalizarLeadCRM(lead);
   if (supabase) {
-    const { error } = await supabase.from("leads").upsert({ id: lead.id, dados: lead });
+    const { error } = await supabase.from("leads").upsert({ id: leadNormalizado.id, dados: leadNormalizado });
     if (error) console.error("[CRM] Erro ao salvar lead:", error.message);
     return;
   }
   // fallback local
   try {
     const crm = fs.existsSync(CRM_FILE) ? JSON.parse(fs.readFileSync(CRM_FILE, "utf8")) : { leads: [] };
-    const idx = crm.leads.findIndex(l => l.id === lead.id);
-    if (idx >= 0) crm.leads[idx] = lead; else crm.leads.unshift(lead);
+    const idx = crm.leads.findIndex(l => l.id === leadNormalizado.id);
+    if (idx >= 0) crm.leads[idx] = leadNormalizado; else crm.leads.unshift(leadNormalizado);
     fs.writeFileSync(CRM_FILE, JSON.stringify(crm, null, 2), "utf8");
   } catch (e) { console.error("[CRM] Erro fallback local:", e.message); }
 }
@@ -4565,6 +4869,11 @@ async function handler(req, res) {
         return enviarJson(res, 200, await lerCRM());
       }
 
+      if (modo === "learning") {
+        const crm = await lerCRM();
+        return enviarJson(res, 200, calcularCRMLearning(crm.leads || []));
+      }
+
       if (modo === "salvar") {
         const crm = await lerCRM();
         const lead = body.lead;
@@ -4616,6 +4925,16 @@ async function handler(req, res) {
           respondeuEm: null,
           reuniaoEm: null,
           perdidoEm: null,
+          learningTags: [],
+          motivoPerda: "",
+          mensagensUsadas: [],
+          outreachPatternId: lead.outreachPatternId || "",
+          outreachVariationUsada: lead.outreachVariationUsada || "",
+          ultimaMensagemTipo: lead.ultimaMensagemTipo || "",
+          tempoAteRespostaHoras: null,
+          tempoAteReuniaoHoras: null,
+          resultadoComercial: "sem_contato",
+          sinalScoreResultado: "dados_insuficientes",
           notas: "",
           criadoEm: agora,
           atualizadoEm: agora,
@@ -4629,11 +4948,14 @@ async function handler(req, res) {
         const crm = await lerCRM();
         const idx = crm.leads.findIndex(l => l.id === body.id);
         if (idx < 0) return enviarJson(res, 404, { erro: "Lead não encontrado" });
+        crm.leads[idx] = normalizarLeadCRM(crm.leads[idx]);
         const CAMPOS_PERMITIDOS = [
           "status", "ultimoMovimento", "statusConversa", "ultimaInteracaoEm",
           "needsFollowUp", "mensagemInicial", "tipoMensagemInicial", "mensagemFollowUp", "followUp", "notas",
           "respondeu", "usouFollowUp", "virouReuniao", "estagioFinal", "nicho",
           "primeiraMensagemEnviadaEm", "followUpEnviadoEm", "respondeuEm", "reuniaoEm", "perdidoEm",
+          "learningTags", "motivoPerda", "mensagensUsadas", "outreachPatternId", "outreachVariationUsada",
+          "ultimaMensagemTipo", "tempoAteRespostaHoras", "tempoAteReuniaoHoras", "resultadoComercial", "sinalScoreResultado",
           "site", "mapsUrl", "businessStatus",
           "scoreVersion", "score", "scoreConfianca", "scoreBreakdown", "sinaisFortes", "sinaisFracos",
           "proximoPasso", "anguloAbordagem", "contextoAbordagem", "gatilhoConversacional", "riscoTom", "origemBusca",
@@ -4642,6 +4964,7 @@ async function handler(req, res) {
           if (body[c] !== undefined) crm.leads[idx][c] = body[c];
         });
         crm.leads[idx].atualizadoEm = new Date().toISOString();
+        crm.leads[idx] = normalizarLeadCRM(crm.leads[idx]);
         await salvarLead(crm.leads[idx]);
         return enviarJson(res, 200, { ok: true, lead: crm.leads[idx] });
       }
