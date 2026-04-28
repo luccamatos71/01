@@ -397,8 +397,138 @@ Nao cite nenhum dado interno, score, confianca, prioridade, sinais, intensidade,
 
 const CHAVES_VARIACOES_OUTREACH = ["leve", "direta", "provocativa", "followup", "reuniao"];
 
+const SEGUNDA_MENSAGEM_PATTERNS = [
+  {
+    id: "automotivo",
+    descricao: "estetica automotiva, lava jato premium, polimento e servicos de maior valor",
+    match: /automot|carro|polimento|veiculo|lava\s*jato|martelinho|estetica automotiva/,
+    comportamento: "tem cliente que pede preco de servico bom e depois some",
+    problema: "as vezes isso trava no WhatsApp sem parecer problema grande",
+  },
+  {
+    id: "restaurante_pizzaria",
+    descricao: "restaurantes, pizzarias, delivery, comida local e pedidos por WhatsApp",
+    match: /restaurante|pizz|delivery|pedido|comida|lanch|hamburg|ifood|\bbar\b/,
+    comportamento: "muita gente pede uma vez e depois nao volta",
+    problema: "as vezes isso passa batido no WhatsApp",
+  },
+  {
+    id: "clinica_estetica_odonto",
+    descricao: "clinicas, odontologia, estetica, saude e procedimentos com agendamento",
+    match: /odont|dent|saude|clinica|paciente|estetic|procedimento|botox|laser|harmonizacao|dermato/,
+    comportamento: "muita gente chama, tira duvida e some depois",
+    problema: "as vezes isso acaba esfriando agendamento",
+  },
+  {
+    id: "barbearia_salao",
+    descricao: "barbearia, salao, beleza e servicos de retorno frequente",
+    match: /barbear|salao|cabelo|manicure|sobrancelha|beleza/,
+    comportamento: "muita gente vai uma vez e nao retorna",
+    problema: "as vezes isso vira buraco na agenda sem perceber",
+  },
+  {
+    id: "advocacia_consultivo",
+    descricao: "advocacia, contabilidade, consultoria e negocios consultivos",
+    match: /advoc|advog|jurid|consultiv|contabil|contador|imobiliaria|corretor/,
+    comportamento: "muita gente chama meio perdida e nao avanca",
+    problema: "as vezes isso trava antes da triagem",
+  },
+  {
+    id: "academia_pilates",
+    descricao: "academia, pilates, fitness e recorrencia de matricula",
+    match: /academ|pilates|fitness|funcional|crossfit|musculacao|matricula|treino/,
+    comportamento: "tem gente que pergunta da matricula e depois desaparece",
+    problema: "as vezes isso fica perdido no primeiro contato",
+  },
+  {
+    id: "loja_varejo",
+    descricao: "lojas locais, varejo, pet shop e atendimento direto por WhatsApp",
+    match: /loja|varejo|boutique|moda|calcad|roupa|pet|veterin|otica|farmacia|mercado/,
+    comportamento: "tem gente que chama perguntando e depois nao compra",
+    problema: "as vezes isso passa como atendimento normal",
+  },
+  {
+    id: "generico_local",
+    descricao: "negocio local sem nicho claro",
+    match: /./,
+    comportamento: "tem contato que parece interessado e depois some",
+    problema: "as vezes isso passa batido no WhatsApp",
+  },
+];
+
 function normalizarTextoOutreach(texto) {
   return removerAcentos(String(texto || "").toLowerCase());
+}
+
+function fonteSegundaMensagemOutreach(contexto = {}) {
+  return normalizarTextoOutreach([
+    contexto.nome,
+    contexto.categoria,
+    contexto.anguloAbordagem,
+    contexto.contextoAbordagem,
+    contexto.gatilhoConversacional,
+    ...(normalizarListaOutreach(contexto.sinaisFortes || [])),
+    ...(normalizarListaOutreach(contexto.sinaisFracos || [])),
+  ].filter(Boolean).join(" "));
+}
+
+function obterPadraoSegundaMensagemOutreach(patternId) {
+  return SEGUNDA_MENSAGEM_PATTERNS.find(pattern => pattern.id === patternId) || null;
+}
+
+function escolherPadraoFallbackOutreach(contexto = {}) {
+  const fonte = fonteSegundaMensagemOutreach(contexto);
+  return SEGUNDA_MENSAGEM_PATTERNS.find(pattern => pattern.id !== "generico_local" && pattern.match.test(fonte))
+    || obterPadraoSegundaMensagemOutreach("generico_local");
+}
+
+function normalizarTomSegundaMensagem(tom, contexto = {}) {
+  const valor = normalizarTextoOutreach(tom);
+  if (["leve", "direta", "normal"].includes(valor)) return valor;
+  if (["leve", "direta", "normal"].includes(contexto.intensidade)) return contexto.intensidade;
+  return "normal";
+}
+
+async function escolherPadraoSegundaMensagemOutreach(contexto = {}) {
+  const fallback = escolherPadraoFallbackOutreach(contexto);
+  const opcoes = SEGUNDA_MENSAGEM_PATTERNS
+    .map(pattern => `${pattern.id}: ${pattern.descricao}`)
+    .join("\n");
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `Voce escolhe um padrao de segunda mensagem de WhatsApp. Nao escreva a mensagem final.
+Retorne apenas JSON com:
+{"patternId":"um_id_da_lista","tom":"leve|normal|direta"}
+
+IDs disponiveis:
+${opcoes}
+
+Regras:
+- use categoria, angulo e sinais apenas para escolher o patternId
+- se estiver em duvida, escolha o mais especifico
+- nunca escreva texto de mensagem`,
+        },
+        {
+          role: "user",
+          content: montarUserMsgOutreach(contexto),
+        },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.1,
+      max_tokens: 90,
+    });
+    const parsed = JSON.parse(completion.choices[0].message.content || "{}");
+    const pattern = obterPadraoSegundaMensagemOutreach(parsed.patternId);
+    if (!pattern) return { pattern: fallback, tom: normalizarTomSegundaMensagem("", contexto), origem: "fallback" };
+    return { pattern, tom: normalizarTomSegundaMensagem(parsed.tom, contexto), origem: "ia" };
+  } catch {
+    return { pattern: fallback, tom: normalizarTomSegundaMensagem("", contexto), origem: "fallback" };
+  }
 }
 
 function palavrasDeAnguloOutreach(contexto = {}) {
@@ -605,6 +735,7 @@ function validarMensagemSegundaOutreach(texto, contexto = {}) {
     ["identifiquei", /identifiquei|identificamos/],
     ["estrategia", /estrategia/],
     ["otimizacao", /otimiz/],
+    ["linguagem montada", /costuma|ocorre|pode estar acontecendo devido a/],
     ["tom de agencia", /sou da|trabalho com marketing|marketing digital|trafego pago|nossa agencia|especialista em marketing/],
     ["pitch generico", /aumentar visibilidade|atrair mais clientes|crescer seu negocio|temos uma solucao|poderia te ajudar|oportunidade de crescimento/],
     ["convite duro", /agendar call|marcar call|marcar reuniao|agendar reuniao|vamos marcar|podemos agendar|calendly/],
@@ -732,32 +863,42 @@ function mensagemSeguraOutreach(texto, contexto, tipo = "direta") {
   return `${contexto.nome || "Seu negocio"}, quando esse ponto de ${resumirAnguloOutreach(contexto)} nao fica claro, alguns contatos bons esfriam. Isso acontece ai tambem?`;
 }
 
-function gerarFallbackSegundaOutreach(contexto = {}, tipo = "direta") {
-  const tema = resumirAnguloOutreach(contexto);
-  const fonte = normalizarTextoOutreach([contexto.anguloAbordagem, contexto.categoria].filter(Boolean).join(" "));
+function conviteSegundaMensagemOutreach(tipo = "direta") {
+  if (tipo === "leve") return "se quiser te mostro rapido";
+  if (tipo === "followup") return "se fizer sentido te mostro rapidinho";
+  if (tipo === "reuniao") return "te mostro em 15min se fizer sentido";
+  if (tipo === "provocativa") return "se quiser te mostro em 15min";
+  return "se fizer sentido te mostro rapido";
+}
 
-  if (/advoc|advog|jurid|consultiv|contabil/.test(fonte)) {
-    return "boa\ntem gente que chama, explica o caso e depois nao volta\nvi um ponto ai que pode estar deixando esses contatos morrerem\nse fizer sentido te mostro em 15min";
-  }
-  if (/automot|carro|polimento|veiculo/.test(fonte)) {
-    return "boa\ntem cliente que pede preco de servico bom e depois some\nvi um ponto ai que pode estar travando isso\nse quiser te mostro em 15min";
-  }
-  if (/restaurante|pizz|delivery|pedido/.test(fonte)) {
-    return "boa\nmuita gente pede uma vez e depois nao volta\ndei uma olhada ai e pode estar acontecendo com voces\nse fizer sentido te mostro em 15min";
-  }
-  if (/agenda|horario|retorno|barbear|salao|estetic/.test(fonte)) {
-    return "boa\ntem horario que fica vazio e parece normal no dia a dia\nvi um ponto ai que pode estar puxando isso\nse quiser te mostro em 15min";
-  }
-  if (/odont|saude|clinica|paciente/.test(fonte)) {
-    return "boa\nmuita gente chama no WhatsApp, tira duvida e some depois\nvi um ponto ai que pode estar causando isso\nse quiser te mostro em 15min";
-  }
-  if (/academ|pilates|fitness|matricula|retencao/.test(fonte)) {
-    return "boa\ntem gente que pergunta da matricula e depois desaparece\nvi um ponto ai que pode estar fazendo isso acontecer\nse quiser te mostro em 15min";
-  }
-  if (tipo === "provocativa") {
-    return "boa\ntem cliente bom que some por detalhe pequeno e quase ninguem percebe\nvi um ponto ai que talvez esteja causando isso\nse quiser te mostro em 15min";
-  }
-  return "boa\ntem contato que parece interessado e depois some\ndei uma olhada ai e vi um ponto que pode estar causando isso\nse fizer sentido te mostro em 15min";
+function conexaoSegundaMensagemOutreach(tipo = "direta") {
+  if (tipo === "provocativa") return "isso pode virar cliente perdido sem aparecer";
+  if (tipo === "followup") return "acho que vale olhar esse ponto rapidinho";
+  if (tipo === "leve") return "vi um ponto ai que pode estar causando isso";
+  if (tipo === "reuniao") return "vi um ponto ai que pode estar causando isso";
+  return "vi um ponto ai que pode estar causando isso";
+}
+
+function montarMensagemSemiFixaOutreach(pattern, contexto = {}, tipo = "direta") {
+  const padrao = pattern || escolherPadraoFallbackOutreach(contexto);
+  return [
+    "boa",
+    padrao.comportamento,
+    padrao.problema,
+    conexaoSegundaMensagemOutreach(tipo),
+    conviteSegundaMensagemOutreach(tipo),
+  ].join("\n");
+}
+
+function montarVariacoesSemiFixasOutreach(pattern, contexto = {}) {
+  return CHAVES_VARIACOES_OUTREACH.reduce((acc, key) => {
+    acc[key] = montarMensagemSemiFixaOutreach(pattern, contexto, key);
+    return acc;
+  }, {});
+}
+
+function gerarFallbackSegundaOutreach(contexto = {}, tipo = "direta") {
+  return montarMensagemSemiFixaOutreach(escolherPadraoFallbackOutreach(contexto), contexto, tipo);
 }
 
 function mensagemSeguraSegundaOutreach(texto, contexto, tipo = "direta") {
@@ -765,7 +906,7 @@ function mensagemSeguraSegundaOutreach(texto, contexto, tipo = "direta") {
   if (validarMensagemSegundaOutreach(tentativa, contexto).ok) return tentativa;
   const fallback = gerarFallbackSegundaOutreach(contexto, tipo);
   if (validarMensagemSegundaOutreach(fallback, contexto).ok) return fallback;
-  return "boa\ntem contato que parece bom e some do nada\nvi um ponto ai que pode estar causando isso\nse fizer sentido te mostro em 15min";
+  return "boa\ntem contato que parece interessado e depois some\nas vezes isso passa batido no WhatsApp\nvi um ponto ai que pode estar causando isso\nse fizer sentido te mostro rapido";
 }
 
 function preencherVariacoesFallbackOutreach(variacoes, contexto) {
@@ -836,174 +977,18 @@ Retorne APENAS JSON: {"mensagem":"..."}`;
 
 async function gerarMensagemContinuidadeOutreach(lead, respostaLead = "") {
   const contextoOutreach = montarContextoOutreachLead(lead);
-  const systemPrompt = `Voce escreve a segunda mensagem de WhatsApp depois que o lead respondeu.
-Objetivo: gerar curiosidade e abrir caminho para uma conversa rapida de 15min.
-Use o angulo principal apenas como direcao natural.
-Estrutura: abertura leve + situacao real + conexao com o negocio + curiosidade + convite leve para ver em 15min.
-Escreva como mensagem digitada rapido no celular, com frase falada e simples.
-Troque explicacao por situacao real:
-- "muita gente chama, tira duvida e some"
-- "entra contato mas nao vira nada"
-- "o pessoal pede uma vez e depois nao volta"
-- "tem horario vazio que parece normal"
-Nao explique o problema; apenas sugira que tem um ponto.
-Maximo 4 linhas curtas, linguagem simples, nada formal.
-Pode dizer "dei uma olhada ai", "vi um ponto ai", "pode estar causando isso" ou "se quiser te mostro".
-Nao cite score, prioridade, sinais, confianca, SDR, analise, nota, avaliacoes, estrategia, otimizacao ou termos tecnicos.
-Nao use "costuma", "ocorre", "identifiquei", "agencia", "marketing digital", "agendar call" ou "marcar reuniao".
-Retorne APENAS JSON: {"mensagem":"..."}`;
-
-  const userMsg = `${montarUserMsgOutreach(contextoOutreach)}
-
-Possivel resposta do lead: ${respostaLead || "nao informada"}
-
-Crie uma segunda mensagem curta que sugira valor sem explicar o problema.`;
-
-  try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMsg }
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.5,
-      max_tokens: 220
-    });
-    const raw = completion.choices[0].message.content || "{}";
-    const parsed = JSON.parse(raw);
-    return mensagemContinuidadeSeguraOutreach(parsed.mensagem, contextoOutreach, respostaLead);
-  } catch {
-    return mensagemContinuidadeSeguraOutreach("", contextoOutreach, respostaLead);
-  }
+  const escolha = await escolherPadraoSegundaMensagemOutreach(contextoOutreach);
+  const tipo = respostaLead ? "reuniao" : "direta";
+  const mensagem = montarMensagemSemiFixaOutreach(escolha.pattern, contextoOutreach, tipo);
+  return mensagemSeguraSegundaOutreach(mensagem, contextoOutreach, tipo);
 }
 
 // Gera 5 variacoes de segunda mensagem guiadas pelo contexto do SDR.
 async function gerarVariacoesOutreach(lead) {
   const contextoOutreach = montarContextoOutreachLead(lead);
-
-  const systemPrompt = `Voce escreve a segunda mensagem de WhatsApp para prospeccao local, usada depois que o lead respondeu. Cada mensagem deve parecer digitada rapido no celular, nunca escrita por uma ferramenta.
-
-HIERARQUIA OBRIGATORIA:
-1. Angulo principal vindo do SDR
-2. Sinais fortes
-3. Sinais fracos
-4. Nicho/categoria
-5. Tom humano
-
-PADRAO POS-RESPOSTA:
-- abertura leve
-- situacao real em linguagem falada
-- conexao curta com o negocio
-- abertura de curiosidade
-- convite leve para ver em 15min
-- no maximo 4 linhas curtas
-- nunca explicar o problema inteiro
-- nunca soar como agencia, script ou consultor
-- a mensagem precisa gerar a sensacao: "isso acontece aqui e vale ver"
-
-TRANSFORME EXPLICACAO EM CENA REAL:
-- em vez de "perda de recompra": "muita gente pede uma vez e depois nao volta"
-- em vez de "orcamento esfria": "a pessoa chama, tira duvida e some"
-- em vez de "contato travado": "entra contato mas nao vira nada"
-- em vez de "horario ocioso": "tem horario vazio que parece normal"
-- em vez de "triagem travando": "a pessoa conta o caso e depois desaparece"
-
-USO DO ANGULO:
-- agenda e recorrencia: fale de horario vazio, retorno que nao acontece ou cliente que some
-- WhatsApp direto: fale de gente que chama, pergunta e desaparece
-- captacao local: fale de contato que parece bom mas nao vira conversa
-- reputacao/autoridade: fale de gente que fica em duvida antes de chamar
-- recorrencia/matriculas/cuidados: fale de pessoa que vem uma vez, pergunta e nao volta
-
-REGRA DE TOM:
-- Barbearia, restaurante, loja, pizzaria, pet shop, bar: "Fala," curto, direto, sem formalidade
-- Clinica, escola, coaching, academia, salao, estetica: "Ola," proximo, sem jargao
-- Advocacia, contabilidade, consultoria, imobiliaria: sem girias, direto e consultivo
-
-ESTRUTURA:
-- estilo WhatsApp
-- frases curtas, pode quebrar linha
-- comece como resposta natural: "boa", "perfeito", "show" ou similar
-- sugira o ponto sem detalhar
-- termine com convite leve: "se fizer sentido te mostro em 15min"
-- sem emoji excessivo
-- sem parecer script ou palestra
-- evite palavras pensadas demais; use "some", "nao volta", "trava", "fica vazio", "nao vira"
-- se sinais fracos forem fortes, seja mais leve e menos agressivo
-- se sinais fortes forem claros, pode ser mais direto
-
-Cada variacao tem objetivo diferente:
-- leve: curiosidade baixa pressao
-- direta: ponto claro e convite de 15min
-- provocativa: sugere perda de cliente/dinheiro sem acusar
-- followup: retomada natural
-- reuniao: ponte mais clara para conversa, sem "marcar reuniao"
-
-PROIBIDO EM TODAS:
-- citar score, prioridade, sinais, confianca ou analise SDR
-- "identifiquei"
-- "analisei seu negocio"
-- "costuma"
-- "ocorre"
-- "pode estar acontecendo devido a"
-- numero de avaliacoes
-- nota
-- "estrategia"
-- "otimizacao"
-- termos tecnicos
-- "temos uma solucao"
-- "poderia te ajudar a crescer"
-- "vi suas avaliacoes no Google"
-- "agendar call"
-- "marcar reuniao"
-- explicar o problema em detalhes
-- mensagem generica que funcionaria para qualquer negocio
-
-OBRIGATORIO:
-- usar o angulo principal como foco real da conversa
-- criar curiosidade
-- sugerir perda, trava ou oportunidade sem explicar demais
-- puxar para 15min de forma leve
-- adaptar a intensidade aos sinais fortes/fracos
-- soar como conversa real
-
-Retorne APENAS JSON (sem markdown, sem texto extra):
-{ "leve": "...", "direta": "...", "provocativa": "...", "followup": "...", "reuniao": "..." }`;
-
-  const userMsg = montarUserMsgOutreach(contextoOutreach);
-
-  const chamarModelo = async (messages) => {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages,
-      response_format: { type: "json_object" },
-      temperature: 0.62,
-      max_tokens: 700
-    });
-
-    try {
-      return normalizarVariacoesOutreach(JSON.parse(completion.choices[0].message.content));
-    } catch {
-      return normalizarVariacoesOutreach({});
-    }
-  };
-
-  const mensagensBase = [
-    { role: "system", content: systemPrompt },
-    { role: "user", content: userMsg }
-  ];
-
-  const primeira = await chamarModelo(mensagensBase);
-  const validacaoInicial = validarVariacoesOutreach(primeira, contextoOutreach);
-  if (!validacaoInicial.invalidas.length) return preencherVariacoesFallbackOutreach(validacaoInicial.variacoes, contextoOutreach);
-
-  const segunda = await chamarModelo([
-    ...mensagensBase,
-    { role: "assistant", content: JSON.stringify(primeira) },
-    { role: "user", content: montarPromptCorrecaoOutreach(contextoOutreach, validacaoInicial.invalidas) },
-  ]);
-  return preencherVariacoesFallbackOutreach(validarVariacoesOutreach(segunda, contextoOutreach).variacoes, contextoOutreach);
+  const escolha = await escolherPadraoSegundaMensagemOutreach(contextoOutreach);
+  const variacoes = montarVariacoesSemiFixasOutreach(escolha.pattern, contextoOutreach);
+  return preencherVariacoesFallbackOutreach(validarVariacoesOutreach(variacoes, contextoOutreach).variacoes, contextoOutreach);
 }
 
 const PROMPTS_AGENTES = {

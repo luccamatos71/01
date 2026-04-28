@@ -6127,8 +6127,8 @@
     function outreachFastCacheKey(lead) {
       return `outreach_fast_v1_${lead?.id || lead?.nome || "?"}`;
     }
-    function outreachUltraCacheKey(lead) {
-      return `outreach_ultra_v1_${lead?.id || lead?.nome || "?"}`;
+    function outreachUltraCacheKey() {
+      return "outreach_ultra_v1";
     }
     function getOutreachCache(lead) {
       try { return JSON.parse(localStorage.getItem(outreachCacheKey(lead)) || "null"); } catch { return null; }
@@ -6153,27 +6153,19 @@
     }
     const outreachFastInFlight = new Map();
 
-    function gerarMensagemUltraLeve(lead) {
-      const opcoes = [
-        "oi, tudo bem? consigo falar com o responsável?",
-        "oi, quem cuida do WhatsApp aí?",
-        "oi, é com quem eu falo aí sobre atendimento?",
-        "oi, consigo falar com quem cuida dessa parte aí?",
-      ];
-      const base = String(lead?.id || lead?.nome || "lead");
-      const index = Array.from(base).reduce((acc, char) => acc + char.charCodeAt(0), 0) % opcoes.length;
-      return opcoes[index];
+    function gerarMensagemUltraLeve() {
+      return "oi, gostaria de falar com o responsável";
     }
 
-    function getMensagemUltraLeve(lead) {
+    function getMensagemUltraLeve() {
       try {
-        const cached = localStorage.getItem(outreachUltraCacheKey(lead));
+        const cached = localStorage.getItem(outreachUltraCacheKey());
         if (cached) return cached;
-        const mensagem = gerarMensagemUltraLeve(lead);
-        localStorage.setItem(outreachUltraCacheKey(lead), mensagem);
+        const mensagem = gerarMensagemUltraLeve();
+        localStorage.setItem(outreachUltraCacheKey(), mensagem);
         return mensagem;
       } catch {
-        return gerarMensagemUltraLeve(lead);
+        return gerarMensagemUltraLeve();
       }
     }
 
