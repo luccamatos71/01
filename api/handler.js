@@ -1540,6 +1540,91 @@ function normalizarTipoMensagemLearning(tipo) {
   return CRM_LEARNING_TIPOS_MENSAGEM.has(t) ? t : "segunda_mensagem";
 }
 
+const CRM_NICHO_CANONICO_TAXONOMIAS = [
+  {
+    id: "estetica_automotiva",
+    label: "estetica automotiva",
+    termos: ["estetica automotiva", "higienizacao automotiva", "lava rapido", "polimento", "vitrificacao", "martelinho", "detailing"],
+    fragmentos: ["automot", "veicul", "carro"],
+  },
+  {
+    id: "odonto",
+    label: "clinica odontologica",
+    termos: ["clinica odontologica", "odontologia", "dentista", "dental", "dente", "implante", "clareamento"],
+    fragmentos: ["odont", "ortodont"],
+  },
+  {
+    id: "clinica_estetica",
+    label: "clinica estetica",
+    termos: ["clinica estetica", "clinica", "estetica", "esteticista", "harmonizacao", "botox", "depilacao", "laser", "sobrancelha", "spa", "massagem"],
+    fragmentos: ["estetic"],
+  },
+  {
+    id: "barbearia",
+    label: "barbearia",
+    termos: ["barbearia", "barbeiro", "barber", "salao", "salao de beleza", "manicure"],
+  },
+  {
+    id: "restaurante",
+    label: "restaurante e delivery",
+    termos: ["pizzaria", "restaurante", "delivery", "lanchonete", "comida", "bar"],
+    fragmentos: ["hamburg", "marmit"],
+  },
+  {
+    id: "academia",
+    label: "academia e fitness",
+    termos: ["academia", "fitness", "pilates", "crossfit", "personal", "treino funcional", "sala de fitness"],
+  },
+  {
+    id: "pet",
+    label: "pet e veterinaria",
+    termos: ["pet shop", "veterinaria", "veterinario", "banho e tosa"],
+    fragmentos: ["veterin"],
+  },
+  {
+    id: "advocacia",
+    label: "advocacia",
+    termos: ["advocacia", "advogado", "advogada", "juridico"],
+  },
+  {
+    id: "contabilidade",
+    label: "contabilidade",
+    termos: ["contabilidade", "contador", "contabil"],
+    fragmentos: ["contabil"],
+  },
+  {
+    id: "profissional",
+    label: "servico profissional",
+    termos: ["consultoria", "imobiliaria", "arquitetura", "corretor"],
+  },
+  {
+    id: "loja",
+    label: "loja local",
+    termos: ["loja", "boutique", "moda", "roupa", "calcado", "moveis", "otica", "farmacia", "mercado"],
+  },
+];
+
+function classificarNichoCanonicoLead(lead = {}) {
+  const texto = removerAcentos([
+    lead.nome,
+    lead.categoria,
+    lead.categoriaGoogle,
+    lead.endereco,
+    lead.anguloAbordagem,
+  ].filter(Boolean).join(" ")).toLowerCase();
+
+  const termoRegex = (termo) => {
+    const escaped = String(termo).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+    return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
+  };
+  const temTermo = (termos = []) => termos.some((termo) => termoRegex(removerAcentos(termo).toLowerCase()).test(texto));
+  const temFragmento = (termos = []) => termos.some((termo) => texto.includes(removerAcentos(termo).toLowerCase()));
+  const taxonomia = CRM_NICHO_CANONICO_TAXONOMIAS.find((item) => temTermo(item.termos) || temFragmento(item.fragmentos));
+
+  if (taxonomia) return { id: taxonomia.id, label: taxonomia.label };
+  return { id: "generico", label: "nicho pouco claro" };
+}
+
 function normalizarMensagensUsadasCRM(lead = {}) {
   const eventos = Array.isArray(lead.mensagensUsadas) ? lead.mensagensUsadas : [];
   const normalizados = eventos
@@ -1606,10 +1691,15 @@ function normalizarLeadCRM(lead = {}) {
   const reuniaoEm = lead.reuniaoEm || null;
   const tempoAteRespostaHoras = numeroCRM(lead.tempoAteRespostaHoras) ?? horasEntreCRM(primeiraMensagemEnviadaEm, respondeuEm);
   const tempoAteReuniaoHoras = numeroCRM(lead.tempoAteReuniaoHoras) ?? horasEntreCRM(primeiraMensagemEnviadaEm, reuniaoEm);
+  const categoriaGoogle = lead.categoriaGoogle || lead.categoria || "";
+  const nichoCanonico = classificarNichoCanonicoLead({ ...lead, categoriaGoogle });
 
   const normalizado = {
     ...lead,
     status,
+    categoriaGoogle,
+    nichoCanonico: nichoCanonico.id,
+    nichoLabel: nichoCanonico.label,
     statusConversa: lead.statusConversa ?? null,
     ultimoMovimento: lead.ultimoMovimento ?? null,
     ultimaInteracaoEm: lead.ultimaInteracaoEm || null,
@@ -1618,7 +1708,7 @@ function normalizarLeadCRM(lead = {}) {
     usouFollowUp: !!lead.usouFollowUp,
     virouReuniao,
     estagioFinal: lead.estagioFinal || status,
-    nicho: lead.nicho || lead.categoria || "",
+    nicho: lead.nicho || nichoCanonico.label || lead.categoria || "",
     score: numeroCRM(lead.score),
     scoreConfianca: numeroCRM(lead.scoreConfianca),
     scoreVersion: lead.scoreVersion || null,
@@ -1716,8 +1806,14 @@ function finalizarStatsLearning(stats) {
 function agruparLearningPorLead(leads, obterChave) {
   const mapa = new Map();
   leads.forEach(lead => {
-    const chave = String(obterChave(lead) || "nao informado").trim() || "nao informado";
+    const valor = obterChave(lead);
+    const meta = valor && typeof valor === "object" ? valor : {};
+    const chaveBase = meta.chave || meta.nichoLabel || meta.label || meta.id || valor;
+    const chave = String(chaveBase || "nao informado").trim() || "nao informado";
     if (!mapa.has(chave)) mapa.set(chave, criarStatsLearning(chave));
+    if (meta && typeof meta === "object") {
+      Object.assign(mapa.get(chave), meta, { chave });
+    }
     adicionarLeadStatsLearning(mapa.get(chave), lead);
   });
   return Array.from(mapa.values())
@@ -1801,7 +1897,11 @@ function calcularCRMLearning(leads = []) {
     amostraMinima: CRM_LEARNING_MIN_AMOSTRA,
   };
 
-  const porNicho = agruparLearningPorLead(normalizados, l => l.nicho || l.categoria);
+  const porNicho = agruparLearningPorLead(normalizados, l => ({
+    chave: l.nichoLabel || l.nichoCanonico || l.nicho || l.categoria,
+    nichoCanonico: l.nichoCanonico || "",
+    nichoLabel: l.nichoLabel || "",
+  }));
   const porAngulo = agruparLearningPorLead(normalizados, l => l.anguloAbordagem || "sem angulo");
   const porScoreRange = agruparLearningPorLead(normalizados, l => scoreRangeCRM(l.score));
   const porTipoMensagem = agruparLearningPorMensagem(normalizados, ev => ev.tipo || ev.etapa);
@@ -4915,11 +5015,15 @@ async function handler(req, res) {
           return enviarJson(res, 200, { ok: true, lead: existing, jaExiste: true });
         }
         const agora = new Date().toISOString();
+        const nichoCanonico = classificarNichoCanonicoLead(lead);
         const novo = {
           id: lead.id,
           nome: lead.nome || "",
           telefone: lead.telefone || null,
           categoria: lead.categoria || null,
+          categoriaGoogle: lead.categoriaGoogle || lead.categoria || null,
+          nichoCanonico: nichoCanonico.id,
+          nichoLabel: nichoCanonico.label,
           endereco: lead.endereco || null,
           site: lead.site || null,
           mapsUrl: lead.mapsUrl || null,
@@ -4952,7 +5056,7 @@ async function handler(req, res) {
           usouFollowUp: false,
           virouReuniao: false,
           estagioFinal: "novo",
-          nicho: lead.nicho || lead.categoria || "",
+          nicho: lead.nicho || lead.nichoLabel || nichoCanonico.label || lead.categoria || "",
           primeiraMensagemEnviadaEm: null,
           followUpEnviadoEm: null,
           respondeuEm: null,
@@ -4989,7 +5093,7 @@ async function handler(req, res) {
           "primeiraMensagemEnviadaEm", "followUpEnviadoEm", "respondeuEm", "reuniaoEm", "perdidoEm",
           "learningTags", "motivoPerda", "mensagensUsadas", "outreachPatternId", "outreachVariationUsada",
           "ultimaMensagemTipo", "tempoAteRespostaHoras", "tempoAteReuniaoHoras", "resultadoComercial", "sinalScoreResultado",
-          "site", "mapsUrl", "businessStatus",
+          "site", "mapsUrl", "businessStatus", "categoriaGoogle", "nichoCanonico", "nichoLabel",
           "scoreVersion", "score", "scoreConfianca", "scoreBreakdown", "sinaisFortes", "sinaisFracos",
           "proximoPasso", "anguloAbordagem", "contextoAbordagem", "gatilhoConversacional", "riscoTom", "origemBusca",
         ];

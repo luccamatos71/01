@@ -7178,14 +7178,17 @@
         <table class="crm-learning-table">
           <thead><tr><th>Grupo</th><th>Abordados</th><th>Resp.</th><th>Reunião</th><th>Status</th></tr></thead>
           <tbody>
-            ${rows.map(item => `
+            ${rows.map(item => {
+              const label = item.nichoLabel || item.label || item.chave || "nao informado";
+              return `
               <tr>
-                <td>${escapeHtml(item.chave || "nao informado")}</td>
+                <td>${escapeHtml(label)}</td>
                 <td>${item.abordados || 0}</td>
                 <td>${formatarPctCRM(item.taxaResposta)}</td>
                 <td>${formatarPctCRM(item.taxaReuniao)}</td>
                 <td class="${item.dadosInsuficientes ? 'crm-learning-muted' : ''}">${item.dadosInsuficientes ? "dados insuficientes" : "amostra ok"}</td>
-              </tr>`).join("")}
+              </tr>`;
+            }).join("")}
           </tbody>
         </table>`;
     }
