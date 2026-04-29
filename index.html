@@ -700,6 +700,135 @@
       box-shadow: 0 0 0 3px rgba(99,102,241,0.08);
     }
 
+    .leads-radar {
+      margin-bottom: 16px;
+      padding: 12px;
+      border: 1px solid var(--border-soft);
+      border-radius: var(--r-md);
+      background: rgba(255,255,255,0.025);
+    }
+
+    .leads-radar:empty { display: none; }
+
+    .leads-radar-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .leads-radar-title {
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .leads-radar-subtitle {
+      margin-top: 3px;
+      color: var(--text-3);
+      font-size: 11px;
+    }
+
+    .leads-radar-tabs {
+      display: inline-flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .leads-radar-tab {
+      padding: 4px 8px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--text-3);
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .leads-radar-tab.active {
+      background: var(--primary-dim);
+      border-color: var(--primary-border);
+      color: #a5b4fc;
+    }
+
+    .leads-radar-summary {
+      color: var(--text-2);
+      font-size: 11px;
+      margin-bottom: 8px;
+    }
+
+    .leads-radar-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .leads-radar-nicho {
+      width: 100%;
+      display: block;
+      text-align: left;
+      padding: 8px 9px;
+      border: 1px solid var(--border-soft);
+      border-radius: var(--r-sm);
+      background: rgba(255,255,255,0.02);
+      color: var(--text-2);
+    }
+
+    .leads-radar-nicho:hover {
+      border-color: var(--primary-border);
+      background: var(--primary-dim);
+      color: var(--text);
+    }
+
+    .leads-radar-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 3px;
+    }
+
+    .leads-radar-name {
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 650;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .leads-radar-badge {
+      flex-shrink: 0;
+      padding: 2px 6px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--text-3);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .leads-radar-badge.quente { color: #86efac; border-color: rgba(34,197,94,0.22); background: rgba(34,197,94,0.08); }
+    .leads-radar-badge.promissor { color: #93c5fd; border-color: rgba(59,130,246,0.22); background: rgba(59,130,246,0.08); }
+    .leads-radar-badge.cuidado { color: #fdba74; border-color: rgba(249,115,22,0.22); background: rgba(249,115,22,0.08); }
+    .leads-radar-badge.insuficiente { color: var(--text-3); }
+
+    .leads-radar-metrics {
+      color: var(--text-3);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .leads-radar-alert {
+      color: var(--text-3);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
     .leads-chips-label {
       font-size: var(--text-xs);
       text-transform: uppercase;
@@ -757,6 +886,10 @@
     }
 
     .leads-tool-results {
+      display: none;
+    }
+
+    .leads-modal.results-open .leads-radar {
       display: none;
     }
 
@@ -5159,6 +5292,8 @@
         autocomplete="off"
       />
 
+      <div id="leadsRadarSDR" class="leads-radar" aria-live="polite"></div>
+
       <div id="leadsHistorico" class="leads-historico" style="display:none"></div>
 
       <div class="leads-chips-label">Categoria rápida</div>
@@ -5985,6 +6120,7 @@
     const leadsCloseBtn    = document.getElementById("leadsCloseBtn");
     const leadsQueryInput  = document.getElementById("leadsQueryInput");
     const leadsSearchBtn   = document.getElementById("leadsSearchBtn");
+    const leadsRadarSDR    = document.getElementById("leadsRadarSDR");
     const leadsHistorico   = document.getElementById("leadsHistorico");
     const cidadeChipsWrap  = document.getElementById("cidadeChipsWrap");
     const cidadeChips      = document.getElementById("cidadeChips");
@@ -5996,6 +6132,8 @@
 
     // Lead em hover na lista (para atalho W sem drawer)
     let leadHovered = null;
+    let radarSDRJanelaDias = 7;
+    const radarSDRCache = new Map();
 
     // ---- Persistência de buscas ----
     function carregarHistorico() { try { return JSON.parse(localStorage.getItem("lumyn_buscas") || "[]"); } catch { return []; } }
@@ -6046,6 +6184,143 @@
       });
     }
 
+    function labelJanelaRadarSDR(dias) {
+      if (Number(dias) === 1) return "Hoje";
+      if (Number(dias) === 30) return "30 dias";
+      return "7 dias";
+    }
+
+    function renderTabsRadarSDR(janelaDias) {
+      return [1, 7, 30].map(dias => `
+        <button class="leads-radar-tab ${Number(janelaDias) === dias ? "active" : ""}" type="button" data-radar-janela="${dias}">
+          ${escapeHtml(labelJanelaRadarSDR(dias))}
+        </button>
+      `).join("");
+    }
+
+    function bindRadarSDR() {
+      if (!leadsRadarSDR) return;
+      leadsRadarSDR.querySelectorAll("[data-radar-janela]").forEach(btn => {
+        btn.addEventListener("click", () => carregarRadarSDRLeads(Number(btn.dataset.radarJanela) || 7, true));
+      });
+      leadsRadarSDR.querySelectorAll("[data-radar-query]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          if (!leadsQueryInput) return;
+          leadsQueryInput.value = btn.dataset.radarQuery || "";
+          leadsQueryInput.focus();
+        });
+      });
+    }
+
+    function renderRadarSDRLoading(janelaDias) {
+      if (!leadsRadarSDR) return;
+      leadsRadarSDR.innerHTML = `
+        <div class="leads-radar-head">
+          <div>
+            <div class="leads-radar-title">Radar SDR</div>
+            <div class="leads-radar-subtitle">Tendencias do CRM para prospectar melhor.</div>
+          </div>
+          <div class="leads-radar-tabs">${renderTabsRadarSDR(janelaDias)}</div>
+        </div>
+        <div class="leads-radar-alert">Carregando tendencias...</div>
+      `;
+      bindRadarSDR();
+    }
+
+    function renderRadarSDRErro(janelaDias) {
+      if (!leadsRadarSDR) return;
+      leadsRadarSDR.innerHTML = `
+        <div class="leads-radar-head">
+          <div>
+            <div class="leads-radar-title">Radar SDR</div>
+            <div class="leads-radar-subtitle">Tendencias do CRM para prospectar melhor.</div>
+          </div>
+          <div class="leads-radar-tabs">${renderTabsRadarSDR(janelaDias)}</div>
+        </div>
+        <div class="leads-radar-alert">Nao consegui carregar o radar agora. A busca continua normal.</div>
+      `;
+      bindRadarSDR();
+    }
+
+    function renderRadarSDR(data, janelaDias) {
+      if (!leadsRadarSDR) return;
+      const resumo = data?.resumo || {};
+      const topNichos = Array.isArray(data?.topNichos) ? data.topNichos : [];
+      const alertas = Array.isArray(data?.alertas) ? data.alertas : [];
+      const periodoLabel = Number(janelaDias) === 1
+        ? "Hoje"
+        : `Ultimos ${labelJanelaRadarSDR(janelaDias).toLowerCase()}`;
+      const resumoHtml = `
+        ${Number(resumo.abordados || 0)} abordados ·
+        ${Number(resumo.conversando || 0)} conversando ·
+        ${Number(resumo.reunioes || 0)} reunioes ·
+        ${Number(resumo.followupsPendentes || 0)} follow-ups
+      `;
+      const listaHtml = topNichos.length
+        ? topNichos.map(item => {
+          const nome = item.nichoLabel || item.chave || "nicho pouco claro";
+          const sinal = String(item.sinal || "insuficiente").replace(/[^a-z0-9_-]/gi, "") || "insuficiente";
+          const query = item.sugestaoBusca || `${nome} em `;
+          const motivo = item.motivo || "sem sinal claro ainda";
+          const dadosInsuficientes = item.statusAmostra === "dados_insuficientes";
+          return `
+            <button class="leads-radar-nicho" type="button" data-radar-query="${escapeHtml(query)}">
+              <div class="leads-radar-row">
+                <span class="leads-radar-name">${escapeHtml(nome)}</span>
+                <span class="leads-radar-badge ${escapeHtml(sinal)}">${escapeHtml(dadosInsuficientes ? "dados" : sinal)}</span>
+              </div>
+              <div class="leads-radar-metrics">
+                ${escapeHtml(motivo)} · ${Number(item.abordados || 0)} abordados · resp. ${Number(item.taxaResposta || 0)}% · reun. ${Number(item.taxaReuniao || 0)}%
+              </div>
+            </button>
+          `;
+        }).join("")
+        : `<div class="leads-radar-alert">Ainda nao ha dados suficientes no periodo. Prospecção nova vai alimentar este radar.</div>`;
+      const alertasHtml = alertas.length
+        ? `<div class="leads-radar-alert">${alertas.map(escapeHtml).join(" · ")}</div>`
+        : "";
+
+      leadsRadarSDR.innerHTML = `
+        <div class="leads-radar-head">
+          <div>
+            <div class="leads-radar-title">Radar SDR</div>
+            <div class="leads-radar-subtitle">${escapeHtml(periodoLabel)}: melhores nichos pelo CRM.</div>
+          </div>
+          <div class="leads-radar-tabs">${renderTabsRadarSDR(janelaDias)}</div>
+        </div>
+        <div class="leads-radar-summary">${resumoHtml}</div>
+        <div class="leads-radar-list">${listaHtml}</div>
+        ${alertasHtml}
+      `;
+      bindRadarSDR();
+    }
+
+    async function carregarRadarSDRLeads(janelaDias = radarSDRJanelaDias, force = false) {
+      if (!leadsRadarSDR) return;
+      radarSDRJanelaDias = [1, 7, 30].includes(Number(janelaDias)) ? Number(janelaDias) : 7;
+      const cacheKey = String(radarSDRJanelaDias);
+      const cached = radarSDRCache.get(cacheKey);
+      if (!force && cached && Date.now() - cached.ts < 5 * 60 * 1000) {
+        renderRadarSDR(cached.data, radarSDRJanelaDias);
+        return;
+      }
+
+      renderRadarSDRLoading(radarSDRJanelaDias);
+      try {
+        const response = await fetch("/api/crm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ modo: "radar_sdr", janelaDias: radarSDRJanelaDias })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data?.erro) throw new Error(data?.erro || "Falha ao carregar radar");
+        radarSDRCache.set(cacheKey, { ts: Date.now(), data });
+        renderRadarSDR(data, radarSDRJanelaDias);
+      } catch {
+        renderRadarSDRErro(radarSDRJanelaDias);
+      }
+    }
+
     function openLeadsModal() {
       leadsMobileMode = false;
       if (leadsModal) leadsModal.classList.remove("results-open");
@@ -6055,6 +6330,7 @@
       syncMobileOverlayState();
       renderizarHistoricoModal();
       renderizarCidadeChips();
+      carregarRadarSDRLeads(radarSDRJanelaDias);
       focusDesktopOnly(leadsQueryInput, 80);
     }
 

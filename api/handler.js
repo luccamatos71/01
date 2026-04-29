@@ -1923,6 +1923,160 @@ function calcularCRMLearning(leads = []) {
   };
 }
 
+function dataReferenciaRadarCRM(lead = {}) {
+  const candidatos = [
+    lead.primeiraMensagemEnviadaEm,
+    lead.ultimaInteracaoEm,
+    lead.atualizadoEm,
+    lead.criadoEm,
+  ];
+  for (const valor of candidatos) {
+    if (!valor) continue;
+    const ts = new Date(valor).getTime();
+    if (Number.isFinite(ts)) return ts;
+  }
+  return 0;
+}
+
+function criarStatsRadarSDR(meta = {}) {
+  return {
+    nichoCanonico: meta.nichoCanonico || "",
+    nichoLabel: meta.nichoLabel || meta.chave || "nicho pouco claro",
+    chave: meta.chave || meta.nichoLabel || meta.nichoCanonico || "nicho pouco claro",
+    leads: 0,
+    abordados: 0,
+    conversando: 0,
+    reunioes: 0,
+    fechados: 0,
+    perdidos: 0,
+    followupsPendentes: 0,
+    taxaResposta: 0,
+    taxaReuniao: 0,
+    statusAmostra: "dados_insuficientes",
+    sinal: "insuficiente",
+    motivo: "",
+    sugestaoBusca: "",
+    pontuacaoRadar: 0,
+  };
+}
+
+function finalizarStatsRadarSDR(stats, resumoBase) {
+  stats.taxaResposta = taxaCRM(stats.conversando, stats.abordados);
+  stats.taxaReuniao = taxaCRM(stats.reunioes, stats.abordados);
+  stats.statusAmostra = stats.abordados >= CRM_LEARNING_MIN_AMOSTRA ? "amostra_ok" : "dados_insuficientes";
+
+  const taxaPerda = taxaCRM(stats.perdidos, stats.abordados);
+  stats.pontuacaoRadar = stats.statusAmostra === "amostra_ok"
+    ? Math.round((
+      (stats.taxaResposta * 0.45) +
+      (stats.taxaReuniao * 0.35) +
+      (Math.min(stats.abordados, 20) * 0.6) +
+      (stats.fechados * 4) -
+      (stats.followupsPendentes * 1.5) -
+      (taxaPerda * 0.15)
+    ) * 10) / 10
+    : Math.min(stats.abordados, CRM_LEARNING_MIN_AMOSTRA - 1);
+
+  if (stats.statusAmostra !== "amostra_ok") {
+    stats.sinal = "insuficiente";
+    stats.motivo = `dados insuficientes (${stats.abordados}/${CRM_LEARNING_MIN_AMOSTRA} abordados)`;
+  } else if (stats.reunioes > 0 || stats.taxaReuniao >= Math.max(8, resumoBase.taxaReuniao + 2)) {
+    stats.sinal = "quente";
+    stats.motivo = "gerou reuniao ou sinal forte no periodo";
+  } else if (stats.taxaResposta >= Math.max(15, resumoBase.taxaResposta)) {
+    stats.sinal = "promissor";
+    stats.motivo = "boa taxa de resposta recente";
+  } else if (stats.followupsPendentes >= Math.max(2, Math.ceil(stats.abordados * 0.35))) {
+    stats.sinal = "cuidado";
+    stats.motivo = "muito follow-up pendente, abordar com cuidado";
+  } else {
+    stats.sinal = "estavel";
+    stats.motivo = "base abordada sem pico claro ainda";
+  }
+
+  stats.sugestaoBusca = `${stats.nichoLabel || stats.chave} em `;
+  return stats;
+}
+
+function calcularRadarSDR(leads = [], opcoes = {}) {
+  const janelaDiasRaw = Number(opcoes.janelaDias);
+  const janelaDias = [1, 7, 30].includes(janelaDiasRaw) ? janelaDiasRaw : 7;
+  const agora = Date.now();
+  const inicioJanela = agora - (janelaDias * 24 * 60 * 60 * 1000);
+  const normalizados = leads.map(normalizarLeadCRM);
+  const noPeriodo = normalizados.filter((lead) => {
+    const ref = dataReferenciaRadarCRM(lead);
+    return ref && ref >= inicioJanela && ref <= agora;
+  });
+
+  const abordados = noPeriodo.filter(leadCRMAbordado);
+  const conversando = noPeriodo.filter(l => l.respondeu || ["conversando", "respondeu", "reuniao", "proposta", "fechado"].includes(l.status));
+  const reunioes = noPeriodo.filter(l => l.virouReuniao || ["reuniao", "proposta", "fechado"].includes(l.status));
+  const fechados = noPeriodo.filter(l => l.status === "fechado");
+  const perdidos = noPeriodo.filter(l => l.status === "perdido");
+  const followupsPendentes = noPeriodo.filter(l => l.needsFollowUp);
+
+  const resumo = {
+    totalLeads: noPeriodo.length,
+    abordados: abordados.length,
+    conversando: conversando.length,
+    reunioes: reunioes.length,
+    fechados: fechados.length,
+    perdidos: perdidos.length,
+    followupsPendentes: followupsPendentes.length,
+    taxaResposta: taxaCRM(conversando.length, abordados.length),
+    taxaReuniao: taxaCRM(reunioes.length, abordados.length),
+    amostraMinima: CRM_LEARNING_MIN_AMOSTRA,
+  };
+
+  const mapa = new Map();
+  noPeriodo.forEach((lead) => {
+    const chave = lead.nichoCanonico || lead.nichoLabel || lead.nicho || lead.categoria || "generico";
+    if (!mapa.has(chave)) {
+      mapa.set(chave, criarStatsRadarSDR({
+        chave,
+        nichoCanonico: lead.nichoCanonico || "",
+        nichoLabel: lead.nichoLabel || lead.nicho || lead.categoria || "nicho pouco claro",
+      }));
+    }
+    const stats = mapa.get(chave);
+    stats.leads += 1;
+    if (leadCRMAbordado(lead)) stats.abordados += 1;
+    if (lead.respondeu || ["conversando", "respondeu", "reuniao", "proposta", "fechado"].includes(lead.status)) stats.conversando += 1;
+    if (lead.virouReuniao || ["reuniao", "proposta", "fechado"].includes(lead.status)) stats.reunioes += 1;
+    if (lead.status === "fechado") stats.fechados += 1;
+    if (lead.status === "perdido") stats.perdidos += 1;
+    if (lead.needsFollowUp) stats.followupsPendentes += 1;
+  });
+
+  const grupos = Array.from(mapa.values())
+    .map(stats => finalizarStatsRadarSDR(stats, resumo))
+    .sort((a, b) => b.pontuacaoRadar - a.pontuacaoRadar || b.abordados - a.abordados || b.taxaResposta - a.taxaResposta);
+
+  const topNichos = grupos.slice(0, 5);
+  const alertas = [];
+  if (!noPeriodo.length) alertas.push("sem historico no periodo selecionado");
+  if (noPeriodo.length && !topNichos.some(item => item.statusAmostra === "amostra_ok")) {
+    alertas.push(`dados insuficientes por nicho; use ao menos ${CRM_LEARNING_MIN_AMOSTRA} abordados por grupo`);
+  }
+  if (followupsPendentes.length) alertas.push(`${followupsPendentes.length} lead(s) precisam de follow-up`);
+
+  const sugestoes = topNichos
+    .filter(item => item.statusAmostra === "amostra_ok" && ["quente", "promissor"].includes(item.sinal))
+    .slice(0, 3)
+    .map(item => `prospectar ${item.nichoLabel}`);
+
+  return {
+    ok: true,
+    janelaDias,
+    geradoEm: new Date().toISOString(),
+    resumo,
+    topNichos,
+    alertas,
+    sugestoes,
+  };
+}
+
 async function lerCRM() {
   if (supabase) {
     // Tenta ler com ordem se a coluna existir, senão sem ordem
@@ -5005,6 +5159,11 @@ async function handler(req, res) {
       if (modo === "learning") {
         const crm = await lerCRM();
         return enviarJson(res, 200, calcularCRMLearning(crm.leads || []));
+      }
+
+      if (modo === "radar_sdr") {
+        const crm = await lerCRM();
+        return enviarJson(res, 200, calcularRadarSDR(crm.leads || [], { janelaDias: body.janelaDias }));
       }
 
       if (modo === "salvar") {
