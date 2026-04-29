@@ -4208,17 +4208,49 @@ async function editarImagemGemini(base64Input, mimeType, promptEdicao) {
 }
 
 const META_GRAPH_VERSION = "v19.0";
-const META_CAMPANHA_FIELDS = ["id", "name", "status", "objective"];
-const META_INSIGHTS_FIELDS = ["spend", "impressions", "clicks", "cpc", "ctr", "cpm", "frequency", "actions", "action_values"];
+const META_CAMPANHA_FIELDS = [
+  "id", "name", "status", "effective_status", "configured_status", "objective",
+  "daily_budget", "lifetime_budget", "budget_remaining", "start_time", "stop_time",
+];
+const META_ADSET_FIELDS = [
+  "id", "name", "campaign_id", "status", "effective_status", "configured_status",
+  "optimization_goal", "billing_event", "daily_budget", "lifetime_budget",
+  "budget_remaining", "attribution_spec", "start_time", "end_time",
+];
+const META_AD_FIELDS = [
+  "id", "name", "campaign_id", "adset_id", "status", "effective_status", "configured_status",
+  "creative{id,name,thumbnail_url,body,title,object_story_spec,asset_feed_spec,call_to_action_type}",
+];
+const META_INSIGHTS_SAFE_BASE_FIELDS = [
+  "spend", "impressions", "clicks", "cpc", "ctr", "cpm", "frequency",
+  "actions", "action_values",
+];
+const META_INSIGHTS_BASE_FIELDS = [
+  ...META_INSIGHTS_SAFE_BASE_FIELDS,
+  "reach", "inline_link_clicks", "cost_per_inline_link_click",
+  "outbound_clicks", "cost_per_outbound_click", "cost_per_action_type",
+  "video_play_actions", "video_thruplay_watched_actions", "video_avg_time_watched_actions",
+];
+const META_INSIGHTS_FIELDS_BY_LEVEL = {
+  campaign: ["campaign_id", "campaign_name", ...META_INSIGHTS_BASE_FIELDS],
+  adset: ["campaign_id", "campaign_name", "adset_id", "adset_name", ...META_INSIGHTS_BASE_FIELDS],
+  ad: ["campaign_id", "campaign_name", "adset_id", "adset_name", "ad_id", "ad_name", ...META_INSIGHTS_BASE_FIELDS],
+};
+const META_INSIGHTS_SAFE_FIELDS_BY_LEVEL = {
+  campaign: ["campaign_id", "campaign_name", ...META_INSIGHTS_SAFE_BASE_FIELDS],
+  adset: ["campaign_id", "campaign_name", "adset_id", "adset_name", ...META_INSIGHTS_SAFE_BASE_FIELDS],
+  ad: ["campaign_id", "campaign_name", "adset_id", "adset_name", "ad_id", "ad_name", ...META_INSIGHTS_SAFE_BASE_FIELDS],
+};
+const META_INSIGHTS_FIELDS = META_INSIGHTS_FIELDS_BY_LEVEL.campaign;
 const META_METRICAS_IMPORTANTES_FALTANTES = [
-  "campaign_id", "campaign_name", "adset_id", "adset_name", "ad_id", "ad_name",
+  "adset_id", "adset_name", "ad_id", "ad_name",
   "optimization_goal", "attribution_setting", "daily_budget", "lifetime_budget",
   "reach", "link_clicks", "outbound_clicks", "landing_page_views",
   "cost_per_landing_page_view", "cost_per_outbound_click",
-  "view_content", "cost_per_add_to_cart", "cost_per_initiate_checkout",
-  "cost_per_purchase", "creative_id", "thumbnail_url", "primary_text",
-  "headline", "description", "call_to_action", "video_plays", "thruplays",
-  "average_watch_time", "breakdowns_por_posicionamento", "breakdowns_por_idade_genero",
+  "view_content", "purchase", "purchase_value", "cost_per_add_to_cart",
+  "cost_per_initiate_checkout", "cost_per_purchase", "creative_id", "thumbnail_url",
+  "primary_text", "headline", "description", "call_to_action", "video_plays",
+  "thruplays", "average_watch_time",
 ];
 
 function dataMetaYYYYMMDD(date) {
@@ -4278,7 +4310,9 @@ function criarDebugMeta({ accountKey, cfg, periodo }) {
     endpointsChamados: [],
     camposSolicitados: {
       campanhas: META_CAMPANHA_FIELDS,
-      insights: META_INSIGHTS_FIELDS,
+      adsets: META_ADSET_FIELDS,
+      ads: META_AD_FIELDS,
+      insightsPorNivel: META_INSIGHTS_FIELDS_BY_LEVEL,
     },
     camposAusentes: [],
     erros: [],
@@ -4287,6 +4321,15 @@ function criarDebugMeta({ accountKey, cfg, periodo }) {
       insightsSolicitados: 0,
       insightsComDados: 0,
       insightsComErro: 0,
+      adsetsRetornados: 0,
+      adsRetornados: 0,
+      insightsAdsetsComDados: 0,
+      insightsAdsComDados: 0,
+      usouFallbackInsights: {
+        campaign: false,
+        adset: false,
+        ad: false,
+      },
     },
     metricasFaltantesPlanejadas: META_METRICAS_IMPORTANTES_FALTANTES,
     tempoRespostaMs: null,
@@ -4318,7 +4361,7 @@ function registrarErroDebugMeta(debug, erro) {
 
 function registrarCamposAusentesDebugMeta(debug, insight = {}) {
   if (!debug) return;
-  META_INSIGHTS_FIELDS.forEach((campo) => {
+  META_INSIGHTS_BASE_FIELDS.forEach((campo) => {
     if (insight[campo] == null) debug.camposAusentes.push(campo);
   });
   const actions = Array.isArray(insight.actions) ? insight.actions : [];
@@ -4329,10 +4372,412 @@ function registrarCamposAusentesDebugMeta(debug, insight = {}) {
   if (!temValue(["purchase", "offsite_conversion.fb_pixel_purchase"])) debug.camposAusentes.push("purchase_value");
   if (!temAction(["add_to_cart", "offsite_conversion.fb_pixel_add_to_cart"])) debug.camposAusentes.push("add_to_cart");
   if (!temAction(["initiate_checkout", "offsite_conversion.fb_pixel_initiate_checkout"])) debug.camposAusentes.push("initiate_checkout");
+  if (!temAction(["view_content", "offsite_conversion.fb_pixel_view_content"])) debug.camposAusentes.push("view_content");
+  if (!temAction(["landing_page_view"])) debug.camposAusentes.push("landing_page_views");
+  if (insight.outbound_clicks == null && !temAction(["outbound_click"])) debug.camposAusentes.push("outbound_clicks");
+  if (insight.video_play_actions == null && !temAction(["video_view"])) debug.camposAusentes.push("video_plays");
+  if (insight.video_thruplay_watched_actions == null) debug.camposAusentes.push("thruplays");
+  if (insight.video_avg_time_watched_actions == null) debug.camposAusentes.push("average_watch_time");
   if (!temAction(["lead", "offsite_conversion.fb_pixel_lead"])) debug.camposAusentes.push("lead");
 }
 
-async function buscarInsightsMeta(accountKey, opcoes = {}) {
+function parseNumeroMeta(valor) {
+  if (valor == null || valor === "") return null;
+  if (Array.isArray(valor)) return null;
+  const numero = parseFloat(valor);
+  return Number.isFinite(numero) ? numero : null;
+}
+
+function parseInteiroMeta(valor) {
+  const numero = parseNumeroMeta(valor);
+  return numero == null ? null : Math.round(numero);
+}
+
+function parseBudgetMeta(valor) {
+  const numero = parseNumeroMeta(valor);
+  return numero == null ? null : parseFloat((numero / 100).toFixed(2));
+}
+
+function arredondarMeta(valor, casas = 2) {
+  if (valor == null || !Number.isFinite(valor)) return null;
+  return parseFloat(valor.toFixed(casas));
+}
+
+function extrairActionMeta(arr, tipos) {
+  if (!Array.isArray(arr) || arr.length === 0) return null;
+  const found = arr.find(a => tipos.includes(a.action_type));
+  if (!found || found.value == null) return null;
+  return parseNumeroMeta(found.value);
+}
+
+function extrairNumeroMistoMeta(valor, tipos = []) {
+  if (Array.isArray(valor)) {
+    if (tipos.length > 0) return extrairActionMeta(valor, tipos);
+    const primeiro = valor.find(item => item && item.value != null);
+    return primeiro ? parseNumeroMeta(primeiro.value) : null;
+  }
+  return parseNumeroMeta(valor);
+}
+
+function dividirMeta(numerador, denominador, multiplicador = 1, casas = 2) {
+  if (numerador == null || denominador == null || denominador <= 0) return null;
+  return arredondarMeta((numerador / denominador) * multiplicador, casas);
+}
+
+function normalizarAttributionSpecMeta(spec) {
+  if (!Array.isArray(spec) || spec.length === 0) return null;
+  const partes = spec
+    .map(item => {
+      if (!item) return null;
+      const evento = item.event_type || item.event || null;
+      const janela = item.window_days != null ? `${item.window_days}d` : null;
+      return [evento, janela].filter(Boolean).join(":");
+    })
+    .filter(Boolean);
+  return partes.length ? partes.join(", ") : null;
+}
+
+function normalizarCriativoMeta(creative = {}) {
+  const objectStory = creative.object_story_spec || {};
+  const linkData = objectStory.link_data || {};
+  const videoData = objectStory.video_data || {};
+  const templateData = objectStory.template_data || {};
+  const assetFeed = creative.asset_feed_spec || {};
+  const primeiroTexto = (arr, campo = "text") => Array.isArray(arr) && arr[0] ? (arr[0][campo] || arr[0].value || null) : null;
+
+  return {
+    creative_id: creative.id || null,
+    creative_name: creative.name || null,
+    thumbnail_url: creative.thumbnail_url || null,
+    primary_text: creative.body || linkData.message || videoData.message || templateData.message || primeiroTexto(assetFeed.bodies) || null,
+    headline: creative.title || linkData.name || videoData.title || templateData.name || primeiroTexto(assetFeed.titles) || null,
+    description: linkData.description || templateData.description || primeiroTexto(assetFeed.descriptions) || null,
+    call_to_action:
+      creative.call_to_action_type ||
+      linkData.call_to_action?.type ||
+      videoData.call_to_action?.type ||
+      templateData.call_to_action?.type ||
+      (Array.isArray(assetFeed.call_to_action_types) ? assetFeed.call_to_action_types[0] : null) ||
+      null,
+  };
+}
+
+function normalizarMetricasInsightMeta(insight = {}) {
+  const rawActions = Array.isArray(insight.actions) ? insight.actions : [];
+  const rawActionValues = Array.isArray(insight.action_values) ? insight.action_values : [];
+  const rawCostPerAction = Array.isArray(insight.cost_per_action_type) ? insight.cost_per_action_type : [];
+
+  const gasto = parseNumeroMeta(insight.spend);
+  const impressoes = parseInteiroMeta(insight.impressions);
+  const reach = parseInteiroMeta(insight.reach);
+  const cliques = parseInteiroMeta(insight.clicks);
+  const link_clicks =
+    parseInteiroMeta(insight.inline_link_clicks) ??
+    parseInteiroMeta(extrairActionMeta(rawActions, ["link_click"]));
+  const ctr = parseNumeroMeta(insight.ctr);
+  const cpc = parseNumeroMeta(insight.cpc);
+  const cpm = parseNumeroMeta(insight.cpm);
+  const frequencia = parseNumeroMeta(insight.frequency);
+
+  const view_content = extrairActionMeta(rawActions, ["view_content", "offsite_conversion.fb_pixel_view_content"]);
+  const purchase = extrairActionMeta(rawActions, ["purchase", "offsite_conversion.fb_pixel_purchase"]);
+  const purchase_value = extrairActionMeta(rawActionValues, ["purchase", "offsite_conversion.fb_pixel_purchase"]);
+  const add_to_cart = extrairActionMeta(rawActions, ["add_to_cart", "offsite_conversion.fb_pixel_add_to_cart"]);
+  const initiate_checkout = extrairActionMeta(rawActions, ["initiate_checkout", "offsite_conversion.fb_pixel_initiate_checkout"]);
+  const leads = extrairActionMeta(rawActions, ["lead", "offsite_conversion.fb_pixel_lead"]);
+  const landing_page_views = extrairActionMeta(rawActions, ["landing_page_view"]);
+
+  const outbound_clicks = parseInteiroMeta(extrairNumeroMistoMeta(insight.outbound_clicks, ["outbound_click"]));
+  const cost_per_outbound_click = extrairNumeroMistoMeta(insight.cost_per_outbound_click, ["outbound_click"]);
+  const cost_per_landing_page_view = extrairActionMeta(rawCostPerAction, ["landing_page_view"]);
+  const cost_per_view_content = extrairActionMeta(rawCostPerAction, ["view_content", "offsite_conversion.fb_pixel_view_content"]);
+  const cost_per_add_to_cart = extrairActionMeta(rawCostPerAction, ["add_to_cart", "offsite_conversion.fb_pixel_add_to_cart"]);
+  const cost_per_initiate_checkout = extrairActionMeta(rawCostPerAction, ["initiate_checkout", "offsite_conversion.fb_pixel_initiate_checkout"]);
+  const cost_per_purchase = extrairActionMeta(rawCostPerAction, ["purchase", "offsite_conversion.fb_pixel_purchase"]);
+
+  const video_plays = parseInteiroMeta(extrairNumeroMistoMeta(insight.video_play_actions, ["video_view", "video_play"]));
+  const thruplays = parseInteiroMeta(extrairNumeroMistoMeta(insight.video_thruplay_watched_actions, ["video_view", "thruplay"]));
+  const average_watch_time = extrairNumeroMistoMeta(insight.video_avg_time_watched_actions, ["video_view"]);
+
+  const roas = (gasto != null && gasto > 0 && purchase_value != null && purchase_value > 0)
+    ? arredondarMeta(purchase_value / gasto, 2)
+    : null;
+  const custoPorConversao = (purchase != null && purchase > 0 && gasto != null && gasto > 0)
+    ? arredondarMeta(gasto / purchase, 2)
+    : null;
+
+  return {
+    gasto,
+    impressoes,
+    reach,
+    cliques,
+    link_clicks,
+    ctr,
+    cpc,
+    cpm,
+    frequencia,
+    view_content,
+    purchase,
+    purchase_value,
+    conversoes: purchase,
+    add_to_cart,
+    initiate_checkout,
+    leads,
+    roas,
+    custoPorConversao,
+    cost_per_view_content,
+    cost_per_add_to_cart,
+    cost_per_initiate_checkout,
+    cost_per_purchase: cost_per_purchase ?? custoPorConversao,
+    outbound_clicks,
+    landing_page_views,
+    cost_per_outbound_click,
+    cost_per_landing_page_view,
+    outbound_ctr: dividirMeta(outbound_clicks, impressoes, 100, 2),
+    link_click_rate: dividirMeta(link_clicks, cliques, 100, 2),
+    landing_page_view_rate: dividirMeta(landing_page_views, outbound_clicks ?? link_clicks, 100, 2),
+    checkout_rate: dividirMeta(initiate_checkout, add_to_cart, 100, 2),
+    purchase_rate: dividirMeta(purchase, initiate_checkout, 100, 2),
+    video_plays,
+    thruplays,
+    average_watch_time,
+    _actions: rawActions,
+    _action_values: rawActionValues,
+    _cost_per_action_type: rawCostPerAction,
+  };
+}
+
+function montarCamadasMetricasMeta(metricas) {
+  return {
+    entrega: {
+      gasto: metricas.gasto,
+      impressoes: metricas.impressoes,
+      reach: metricas.reach,
+      cliques: metricas.cliques,
+      link_clicks: metricas.link_clicks,
+      ctr: metricas.ctr,
+      cpc: metricas.cpc,
+      cpm: metricas.cpm,
+      frequencia: metricas.frequencia,
+    },
+    funil: {
+      view_content: metricas.view_content,
+      add_to_cart: metricas.add_to_cart,
+      initiate_checkout: metricas.initiate_checkout,
+      purchase: metricas.purchase,
+      purchase_value: metricas.purchase_value,
+      roas: metricas.roas,
+      cost_per_view_content: metricas.cost_per_view_content,
+      cost_per_add_to_cart: metricas.cost_per_add_to_cart,
+      cost_per_initiate_checkout: metricas.cost_per_initiate_checkout,
+      cost_per_purchase: metricas.cost_per_purchase,
+    },
+    qualidade: {
+      outbound_clicks: metricas.outbound_clicks,
+      landing_page_views: metricas.landing_page_views,
+      cost_per_outbound_click: metricas.cost_per_outbound_click,
+      cost_per_landing_page_view: metricas.cost_per_landing_page_view,
+      outbound_ctr: metricas.outbound_ctr,
+      link_click_rate: metricas.link_click_rate,
+      landing_page_view_rate: metricas.landing_page_view_rate,
+      checkout_rate: metricas.checkout_rate,
+      purchase_rate: metricas.purchase_rate,
+    },
+    video: {
+      video_plays: metricas.video_plays,
+      thruplays: metricas.thruplays,
+      average_watch_time: metricas.average_watch_time,
+    },
+  };
+}
+
+function indexarPorCampo(lista, campo) {
+  const map = new Map();
+  (lista || []).forEach(item => {
+    const chave = item?.[campo];
+    if (chave != null && chave !== "") map.set(String(chave), item);
+  });
+  return map;
+}
+
+function agruparPorCampo(lista, campo) {
+  const map = new Map();
+  (lista || []).forEach(item => {
+    const chave = item?.[campo];
+    if (chave == null || chave === "") return;
+    const key = String(chave);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(item);
+  });
+  return map;
+}
+
+function erroMetaApi(jsonError) {
+  const codigo = jsonError?.code || null;
+  let msg = jsonError?.message || "Erro desconhecido na API Meta.";
+  if (codigo === 190) msg = "Token Meta expirado ou invalido. Gere um novo em developers.facebook.com.";
+  else if (codigo === 100) msg = "Campo, parametro ou ID invalido na API Meta.";
+  else if (codigo === 10 || codigo === 200) msg = "Permissoes insuficientes. O token precisa de ads_read.";
+  const err = new Error(msg);
+  err.tipo = "api";
+  err.codigo = codigo;
+  return err;
+}
+
+async function buscarListaMetaPaginada(urlInicial, { debugMeta, endpointDebug, etapa, maxPaginas = 2 } = {}) {
+  const dados = [];
+  let urlAtual = urlInicial;
+  let pagina = 1;
+  while (urlAtual && pagina <= maxPaginas) {
+    registrarEndpointDebugMeta(debugMeta, { ...(endpointDebug || {}), pagina });
+    let resp;
+    try {
+      resp = await fetch(urlAtual);
+    } catch {
+      const err = new Error("Sem conexao com a API do Meta. Verifique sua internet.");
+      err.tipo = "rede";
+      throw err;
+    }
+    const json = await resp.json();
+    if (json.error) throw erroMetaApi(json.error);
+    if (Array.isArray(json.data)) dados.push(...json.data);
+    urlAtual = json.paging?.next || null;
+    pagina += 1;
+  }
+  return dados;
+}
+
+async function buscarInsightsNivelMeta({ accountId, token, periodo, level, fields, fallbackFields, debugMeta }) {
+  const montarUrl = (listaCampos) => {
+    const params = new URLSearchParams({
+      fields: listaCampos.join(","),
+      level,
+      limit: "500",
+      access_token: token,
+    });
+    Object.entries(periodo.query).forEach(([chave, valor]) => params.set(chave, valor));
+    return `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${accountId}/insights?${params.toString()}`;
+  };
+
+  const endpointBase = {
+    etapa: `insights_${level}`,
+    metodo: "GET",
+    endpoint: `/${META_GRAPH_VERSION}/act_{account}/insights`,
+    level,
+    periodo: periodo.chave,
+  };
+
+  try {
+    const dados = await buscarListaMetaPaginada(montarUrl(fields), {
+      debugMeta,
+      etapa: `insights_${level}`,
+      endpointDebug: { ...endpointBase, fields },
+      maxPaginas: 4,
+    });
+    return { dados, erro: null, fallback: false };
+  } catch (e) {
+    registrarErroDebugMeta(debugMeta, {
+      etapa: `insights_${level}`,
+      codigo: e.codigo || null,
+      mensagem: e.message,
+    });
+
+    if (!fallbackFields || fallbackFields.join(",") === fields.join(",")) {
+      return { dados: [], erro: e.message, fallback: false };
+    }
+
+    try {
+      const dados = await buscarListaMetaPaginada(montarUrl(fallbackFields), {
+        debugMeta,
+        etapa: `insights_${level}_fallback`,
+        endpointDebug: { ...endpointBase, etapa: `insights_${level}_fallback`, fields: fallbackFields, fallback: true },
+        maxPaginas: 4,
+      });
+      return { dados, erro: null, fallback: true };
+    } catch (fallbackErr) {
+      registrarErroDebugMeta(debugMeta, {
+        etapa: `insights_${level}_fallback`,
+        codigo: fallbackErr.codigo || null,
+        mensagem: fallbackErr.message,
+      });
+      return { dados: [], erro: fallbackErr.message, fallback: true };
+    }
+  }
+}
+
+async function buscarEdgeMeta({ accountId, token, edge, fields, debugMeta, etapa }) {
+  const params = new URLSearchParams({
+    fields: fields.join(","),
+    limit: "500",
+    access_token: token,
+  });
+  const url = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${accountId}/${edge}?${params.toString()}`;
+  try {
+    const dados = await buscarListaMetaPaginada(url, {
+      debugMeta,
+      etapa,
+      endpointDebug: {
+        etapa,
+        metodo: "GET",
+        endpoint: `/${META_GRAPH_VERSION}/act_{account}/${edge}`,
+        fields,
+      },
+      maxPaginas: 4,
+    });
+    return { dados, erro: null };
+  } catch (e) {
+    registrarErroDebugMeta(debugMeta, {
+      etapa,
+      codigo: e.codigo || null,
+      mensagem: e.message,
+    });
+    return { dados: [], erro: e.message };
+  }
+}
+
+function montarAdsetDetalhadoMeta(adset = {}, insight = {}) {
+  const metricas = normalizarMetricasInsightMeta(insight);
+  return {
+    adset_id: adset.id || insight.adset_id || null,
+    adset_name: adset.name || insight.adset_name || null,
+    status: adset.status || null,
+    effective_status: adset.effective_status || null,
+    configured_status: adset.configured_status || null,
+    optimization_goal: adset.optimization_goal || null,
+    billing_event: adset.billing_event || null,
+    daily_budget: parseBudgetMeta(adset.daily_budget),
+    lifetime_budget: parseBudgetMeta(adset.lifetime_budget),
+    budget_remaining: parseBudgetMeta(adset.budget_remaining),
+    attribution_setting: normalizarAttributionSpecMeta(adset.attribution_spec),
+    start_time: adset.start_time || null,
+    end_time: adset.end_time || null,
+    ...montarCamadasMetricasMeta(metricas),
+  };
+}
+
+function montarAdDetalhadoMeta(ad = {}, insight = {}, criativo = {}) {
+  const metricas = normalizarMetricasInsightMeta(insight);
+  return {
+    ad_id: ad.id || insight.ad_id || null,
+    ad_name: ad.name || insight.ad_name || null,
+    adset_id: ad.adset_id || insight.adset_id || null,
+    adset_name: insight.adset_name || null,
+    status: ad.status || null,
+    effective_status: ad.effective_status || null,
+    configured_status: ad.configured_status || null,
+    creative_id: criativo.creative_id || ad.creative?.id || null,
+    creative: criativo,
+    ...montarCamadasMetricasMeta(metricas),
+  };
+}
+
+function montarErrosParciaisMeta(partes) {
+  return Object.entries(partes || {})
+    .filter(([, valor]) => !!valor)
+    .map(([etapa, mensagem]) => ({ etapa, mensagem }));
+}
+
+async function buscarInsightsMetaLegacy(accountKey, opcoes = {}) {
   const inicioDebug = Date.now();
   const periodo = normalizarPeriodoMeta(opcoes.period || opcoes.periodo);
   const debugAtivo = !!opcoes.debug;
@@ -4528,6 +4973,273 @@ async function buscarInsightsMeta(accountKey, opcoes = {}) {
 }
 
 // ── GESTOR: PERSISTÊNCIA DE RESTRIÇÕES (memória server-side por conta) ────────
+async function buscarInsightsMeta(accountKey, opcoes = {}) {
+  const inicioDebug = Date.now();
+  const periodo = normalizarPeriodoMeta(opcoes.period || opcoes.periodo);
+  const debugAtivo = !!opcoes.debug;
+  const cfg = (accountKey && ACCOUNT_CONFIG[accountKey]) ? ACCOUNT_CONFIG[accountKey] : null;
+  const token = (accountKey && META_TOKENS[accountKey]) ? META_TOKENS[accountKey] : META_ACCESS_TOKEN;
+  const accountId = cfg?.accountId || META_AD_ACCOUNT_ID;
+  const debugMeta = debugAtivo ? criarDebugMeta({ accountKey, cfg, periodo }) : null;
+
+  if (!token || !accountId) {
+    const err = new Error(
+      accountKey
+        ? `Conta "${accountKey}" nao configurada. Verifique META_ACCESS_TOKEN e META_AD_ACCOUNT_ID no .env.`
+        : "API Meta nao configurada. Adicione META_ACCESS_TOKEN e META_AD_ACCOUNT_ID nas variaveis de ambiente."
+    );
+    err.tipo = "config";
+    registrarErroDebugMeta(debugMeta, { etapa: "config", mensagem: err.message });
+    err.metaDebug = finalizarDebugMeta(debugMeta, inicioDebug);
+    throw err;
+  }
+
+  let campanhas = [];
+  try {
+    const paramsCampanhas = new URLSearchParams({
+      fields: META_CAMPANHA_FIELDS.join(","),
+      limit: "500",
+      access_token: token,
+    });
+    const urlCampanhas = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${accountId}/campaigns?${paramsCampanhas.toString()}`;
+    campanhas = await buscarListaMetaPaginada(urlCampanhas, {
+      debugMeta,
+      etapa: "campanhas",
+      endpointDebug: {
+        etapa: "campanhas",
+        metodo: "GET",
+        endpoint: `/${META_GRAPH_VERSION}/act_{account}/campaigns`,
+        fields: META_CAMPANHA_FIELDS,
+      },
+      maxPaginas: 4,
+    });
+  } catch (err) {
+    registrarErroDebugMeta(debugMeta, {
+      etapa: "campanhas",
+      codigo: err.codigo || null,
+      mensagem: err.message,
+    });
+    err.metaDebug = finalizarDebugMeta(debugMeta, inicioDebug);
+    throw err;
+  }
+
+  if (debugMeta) debugMeta.quantidades.campanhasRetornadas = campanhas.length;
+  if (campanhas.length === 0) {
+    if (debugMeta) return { campanhas: [], metaDebug: finalizarDebugMeta(debugMeta, inicioDebug) };
+    return [];
+  }
+
+  if (debugMeta) debugMeta.quantidades.insightsSolicitados = campanhas.length;
+
+  const [
+    insightsCampanhaRes,
+    insightsAdsetsRes,
+    insightsAdsRes,
+    adsetsRes,
+    adsRes,
+  ] = await Promise.all([
+    buscarInsightsNivelMeta({
+      accountId,
+      token,
+      periodo,
+      level: "campaign",
+      fields: META_INSIGHTS_FIELDS_BY_LEVEL.campaign,
+      fallbackFields: META_INSIGHTS_SAFE_FIELDS_BY_LEVEL.campaign,
+      debugMeta,
+    }),
+    buscarInsightsNivelMeta({
+      accountId,
+      token,
+      periodo,
+      level: "adset",
+      fields: META_INSIGHTS_FIELDS_BY_LEVEL.adset,
+      fallbackFields: META_INSIGHTS_SAFE_FIELDS_BY_LEVEL.adset,
+      debugMeta,
+    }),
+    buscarInsightsNivelMeta({
+      accountId,
+      token,
+      periodo,
+      level: "ad",
+      fields: META_INSIGHTS_FIELDS_BY_LEVEL.ad,
+      fallbackFields: META_INSIGHTS_SAFE_FIELDS_BY_LEVEL.ad,
+      debugMeta,
+    }),
+    buscarEdgeMeta({ accountId, token, edge: "adsets", fields: META_ADSET_FIELDS, debugMeta, etapa: "adsets" }),
+    buscarEdgeMeta({ accountId, token, edge: "ads", fields: META_AD_FIELDS, debugMeta, etapa: "ads" }),
+  ]);
+
+  if (debugMeta) {
+    debugMeta.quantidades.insightsComDados = insightsCampanhaRes.dados.length;
+    debugMeta.quantidades.insightsComErro = insightsCampanhaRes.erro ? campanhas.length : 0;
+    debugMeta.quantidades.adsetsRetornados = adsetsRes.dados.length;
+    debugMeta.quantidades.adsRetornados = adsRes.dados.length;
+    debugMeta.quantidades.insightsAdsetsComDados = insightsAdsetsRes.dados.length;
+    debugMeta.quantidades.insightsAdsComDados = insightsAdsRes.dados.length;
+    debugMeta.quantidades.usouFallbackInsights = {
+      campaign: insightsCampanhaRes.fallback,
+      adset: insightsAdsetsRes.fallback,
+      ad: insightsAdsRes.fallback,
+    };
+  }
+
+  const insightCampanhaPorId = indexarPorCampo(insightsCampanhaRes.dados, "campaign_id");
+  const insightCampanhaPorNome = indexarPorCampo(insightsCampanhaRes.dados, "campaign_name");
+  const adsetsPorCampanha = agruparPorCampo(adsetsRes.dados, "campaign_id");
+  const adsPorCampanha = agruparPorCampo(adsRes.dados, "campaign_id");
+  const insightsAdsetsPorCampanha = agruparPorCampo(insightsAdsetsRes.dados, "campaign_id");
+  const insightsAdsPorCampanha = agruparPorCampo(insightsAdsRes.dados, "campaign_id");
+  const adsetsPorId = indexarPorCampo(adsetsRes.dados, "id");
+  const adsPorId = indexarPorCampo(adsRes.dados, "id");
+  const insightsAdsetsPorId = indexarPorCampo(insightsAdsetsRes.dados, "adset_id");
+  const insightsAdsPorId = indexarPorCampo(insightsAdsRes.dados, "ad_id");
+
+  const campanhasComInsights = campanhas.map((camp) => {
+    try {
+      const insight = insightCampanhaPorId.get(String(camp.id)) || insightCampanhaPorNome.get(String(camp.name || "")) || {};
+      registrarCamposAusentesDebugMeta(debugMeta, insight);
+      const metricas = normalizarMetricasInsightMeta(insight);
+      const camadas = montarCamadasMetricasMeta(metricas);
+
+      const adsetsMeta = adsetsPorCampanha.get(String(camp.id)) || [];
+      const adsetInsights = insightsAdsetsPorCampanha.get(String(camp.id)) || [];
+      const adsetIds = new Set([
+        ...adsetsMeta.map(a => a.id).filter(Boolean).map(String),
+        ...adsetInsights.map(i => i.adset_id).filter(Boolean).map(String),
+      ]);
+      const adsets = Array.from(adsetIds).map((id) => {
+        const adset = adsetsPorId.get(id) || {};
+        const adsetInsight = insightsAdsetsPorId.get(id) || {};
+        return montarAdsetDetalhadoMeta(adset, adsetInsight);
+      });
+
+      const adsMeta = adsPorCampanha.get(String(camp.id)) || [];
+      const adInsights = insightsAdsPorCampanha.get(String(camp.id)) || [];
+      const adIds = new Set([
+        ...adsMeta.map(a => a.id).filter(Boolean).map(String),
+        ...adInsights.map(i => i.ad_id).filter(Boolean).map(String),
+      ]);
+      const criativosPorId = new Map();
+      const ads = Array.from(adIds).map((id) => {
+        const ad = adsPorId.get(id) || {};
+        const adInsight = insightsAdsPorId.get(id) || {};
+        const criativo = normalizarCriativoMeta(ad.creative || {});
+        if (criativo.creative_id) {
+          const existente = criativosPorId.get(criativo.creative_id) || { ...criativo, ad_ids: [], ad_names: [], adset_ids: [] };
+          if (ad.id) existente.ad_ids.push(ad.id);
+          if (ad.name) existente.ad_names.push(ad.name);
+          if (ad.adset_id) existente.adset_ids.push(ad.adset_id);
+          criativosPorId.set(criativo.creative_id, existente);
+        }
+        return montarAdDetalhadoMeta(ad, adInsight, criativo);
+      });
+      const criativos = Array.from(criativosPorId.values()).map(c => ({
+        ...c,
+        ad_ids: Array.from(new Set(c.ad_ids)),
+        ad_names: Array.from(new Set(c.ad_names)),
+        adset_ids: Array.from(new Set(c.adset_ids)),
+      }));
+      const attribution_setting = Array.from(new Set(adsets.map(a => a.attribution_setting).filter(Boolean)))[0] || null;
+      const erros_parciais = montarErrosParciaisMeta({
+        insights_campaign: insightsCampanhaRes.erro,
+        insights_adset: insightsAdsetsRes.erro,
+        insights_ad: insightsAdsRes.erro,
+        adsets: adsetsRes.erro,
+        ads: adsRes.erro,
+      });
+
+      return {
+        campanha: camp.name || insight.campaign_name || "Sem nome",
+        gasto: metricas.gasto,
+        ctr: metricas.ctr,
+        cpc: metricas.cpc,
+        roas: metricas.roas,
+        conversoes: metricas.conversoes,
+        add_to_cart: metricas.add_to_cart,
+        initiate_checkout: metricas.initiate_checkout,
+
+        campaign_id: camp.id || insight.campaign_id || null,
+        status: camp.status || null,
+        effective_status: camp.effective_status || null,
+        configured_status: camp.configured_status || null,
+        objective: camp.objective || null,
+        daily_budget: parseBudgetMeta(camp.daily_budget),
+        lifetime_budget: parseBudgetMeta(camp.lifetime_budget),
+        budget_remaining: parseBudgetMeta(camp.budget_remaining),
+        attribution_setting,
+        start_time: camp.start_time || null,
+        stop_time: camp.stop_time || null,
+
+        impressoes: metricas.impressoes,
+        reach: metricas.reach,
+        cliques: metricas.cliques,
+        link_clicks: metricas.link_clicks,
+        cpm: metricas.cpm,
+        frequencia: metricas.frequencia,
+        view_content: metricas.view_content,
+        purchase: metricas.purchase,
+        purchase_value: metricas.purchase_value,
+        leads: metricas.leads,
+        custoPorConversao: metricas.custoPorConversao,
+        cost_per_view_content: metricas.cost_per_view_content,
+        cost_per_add_to_cart: metricas.cost_per_add_to_cart,
+        cost_per_initiate_checkout: metricas.cost_per_initiate_checkout,
+        cost_per_purchase: metricas.cost_per_purchase,
+        outbound_clicks: metricas.outbound_clicks,
+        landing_page_views: metricas.landing_page_views,
+        cost_per_outbound_click: metricas.cost_per_outbound_click,
+        cost_per_landing_page_view: metricas.cost_per_landing_page_view,
+        outbound_ctr: metricas.outbound_ctr,
+        link_click_rate: metricas.link_click_rate,
+        landing_page_view_rate: metricas.landing_page_view_rate,
+        checkout_rate: metricas.checkout_rate,
+        purchase_rate: metricas.purchase_rate,
+        video_plays: metricas.video_plays,
+        thruplays: metricas.thruplays,
+        average_watch_time: metricas.average_watch_time,
+
+        resumo: {
+          campaign_id: camp.id || insight.campaign_id || null,
+          campanha: camp.name || insight.campaign_name || "Sem nome",
+          status: camp.status || null,
+          objective: camp.objective || null,
+          daily_budget: parseBudgetMeta(camp.daily_budget),
+          lifetime_budget: parseBudgetMeta(camp.lifetime_budget),
+          attribution_setting,
+          ...camadas,
+        },
+        adsets,
+        ads,
+        criativos,
+        erros_parciais,
+        erro: insightsCampanhaRes.erro || undefined,
+        _actions: metricas._actions,
+        _action_values: metricas._action_values,
+        _cost_per_action_type: metricas._cost_per_action_type,
+      };
+    } catch (e) {
+      console.warn(`[Meta] Erro ao processar campanha ${camp.name}:`, e.message);
+      if (debugMeta) debugMeta.quantidades.insightsComErro += 1;
+      registrarErroDebugMeta(debugMeta, {
+        etapa: "processar_campanha",
+        campanha: camp.name || "Sem nome",
+        mensagem: e.message,
+      });
+      return {
+        campanha: camp.name || "Sem nome",
+        campaign_id: camp.id || null,
+        status: camp.status || null,
+        objective: camp.objective || null,
+        erro: e.message,
+      };
+    }
+  });
+
+  const resultado = campanhasComInsights.filter(c => c !== null);
+  if (debugMeta) return { campanhas: resultado, metaDebug: finalizarDebugMeta(debugMeta, inicioDebug) };
+  return resultado;
+}
+
 const _restricoesPorConta = new Map(); // accountId → [{tipo, regra}]
 
 function carregarRestricoesConta(accountId) {
@@ -4605,6 +5317,173 @@ function analisarFunil(campanha) {
 }
 
 // Restrições — padrões semânticos amplos, acumulativo por histórico
+function numeroQualidadeTrafego(valor) {
+  if (valor == null || valor === "") return null;
+  const numero = Number(valor);
+  return Number.isFinite(numero) ? numero : null;
+}
+
+function somaEventosQualidadeTrafego(...valores) {
+  return valores.reduce((total, valor) => {
+    const numero = numeroQualidadeTrafego(valor);
+    return numero == null ? total : total + Math.max(0, numero);
+  }, 0);
+}
+
+function avaliarQualidadeDadosTrafego(snapshot = {}) {
+  const gasto = numeroQualidadeTrafego(snapshot.gasto);
+  const impressoes = numeroQualidadeTrafego(snapshot.impressoes);
+  const cliques = numeroQualidadeTrafego(snapshot.cliques);
+  const outbound = numeroQualidadeTrafego(snapshot.outbound_clicks);
+  const lpv = numeroQualidadeTrafego(snapshot.landing_page_views);
+  const viewContent = numeroQualidadeTrafego(snapshot.view_content);
+  const addToCart = numeroQualidadeTrafego(snapshot.add_to_cart);
+  const checkout = numeroQualidadeTrafego(snapshot.initiate_checkout);
+  const compras = numeroQualidadeTrafego(snapshot.conversoes ?? snapshot.purchase);
+  const leads = numeroQualidadeTrafego(snapshot.leads);
+  const adsetsCount = Array.isArray(snapshot.adsets) ? snapshot.adsets.length : 0;
+  const adsCount = Array.isArray(snapshot.ads) ? snapshot.ads.length : 0;
+  const criativosCount = Array.isArray(snapshot.criativos) ? snapshot.criativos.length : 0;
+
+  let score = 0;
+  const sinais = [];
+  const motivos = [];
+  const eventosPixelPresentes = [viewContent, addToCart, checkout, compras, leads].filter(v => v != null).length;
+  const totalEventosPixel = somaEventosQualidadeTrafego(viewContent, addToCart, checkout, compras, leads);
+
+  if (snapshot.erro) motivos.push(`erro parcial: ${snapshot.erro}`);
+
+  if (gasto == null) motivos.push("gasto ausente");
+  else if (gasto >= 100) { score += 2; sinais.push("gasto relevante"); }
+  else if (gasto >= 30) { score += 1; sinais.push("gasto minimo para leitura inicial"); }
+  else if (gasto > 0) { score += 0.5; motivos.push("gasto baixo"); }
+  else motivos.push("sem gasto");
+
+  if (impressoes == null) motivos.push("impressoes ausentes");
+  else if (impressoes >= 1000) { score += 2; sinais.push("volume de impressoes bom"); }
+  else if (impressoes >= 300) { score += 1; sinais.push("volume de impressoes inicial"); }
+  else if (impressoes > 0) { score += 0.5; motivos.push("poucas impressoes"); }
+  else motivos.push("sem entrega");
+
+  if (cliques == null) motivos.push("cliques ausentes");
+  else if (cliques >= 30) { score += 1; sinais.push("volume de cliques util"); }
+  else if (cliques >= 10) score += 0.5;
+
+  if (outbound != null) { score += 1; sinais.push("outbound clicks visiveis"); }
+  else motivos.push("outbound clicks ausentes");
+
+  if (lpv != null) { score += 1; sinais.push("landing page views visiveis"); }
+  else motivos.push("landing page views ausentes");
+
+  if (eventosPixelPresentes >= 3) { score += 2; sinais.push("funil de pixel visivel"); }
+  else if (eventosPixelPresentes >= 1) { score += 1; sinais.push("algum evento de pixel visivel"); }
+  else motivos.push("sem eventos de pixel visiveis");
+
+  if (compras != null && compras >= 3) { score += 2; sinais.push("volume de compras permite leitura"); }
+  else if (totalEventosPixel >= 10) { score += 1.5; sinais.push("volume de eventos permite leitura parcial"); }
+  else if (totalEventosPixel > 0) score += 0.5;
+  else motivos.push("volume de conversoes/eventos insuficiente");
+
+  if (adsetsCount > 0) score += 0.5;
+  else motivos.push("sem detalhe por conjunto");
+  if (adsCount > 0) score += 0.5;
+  else motivos.push("sem detalhe por anuncio");
+  if (criativosCount > 0) score += 0.5;
+  else motivos.push("sem criativo identificado");
+
+  const baseMuitoFraca =
+    !!snapshot.erro ||
+    gasto == null ||
+    impressoes == null ||
+    impressoes < 100 ||
+    (gasto < 20 && totalEventosPixel < 3);
+
+  let classificacao = "dados_ok";
+  if (baseMuitoFraca || score < 4.5) classificacao = "dados_fracos";
+  else if (score >= 8 && (eventosPixelPresentes >= 2 || compras != null)) classificacao = "dados_bons";
+
+  const confiancaMaxima = classificacao === "dados_bons" ? 90 : classificacao === "dados_ok" ? 70 : 40;
+  const resumo = classificacao === "dados_fracos"
+    ? "Base fraca: use leitura conservadora e evite pausar ou escalar."
+    : classificacao === "dados_bons"
+      ? "Base boa: ja da para recomendar com mais firmeza."
+      : "Base ok: da para orientar, mas sem agressividade.";
+
+  return {
+    classificacao,
+    score: Math.round(score * 10) / 10,
+    confiancaMaxima,
+    resumo,
+    sinais: Array.from(new Set(sinais)),
+    motivos: Array.from(new Set(motivos)).slice(0, 8),
+    bloqueios: classificacao === "dados_fracos"
+      ? ["pausar", "duplicar campanha", "criar novo conjunto", "escalar orcamento", "aumentar orcamento"]
+      : [],
+    base: {
+      gasto,
+      impressoes,
+      cliques,
+      outbound_clicks: outbound,
+      landing_page_views: lpv,
+      eventosPixelPresentes,
+      totalEventosPixel,
+      compras,
+      adsets: adsetsCount,
+      ads: adsCount,
+      criativos: criativosCount,
+    },
+  };
+}
+
+function textoNormalizadoTrafego(texto = "") {
+  return String(texto)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function recomendacaoForteComDadosFracos(parsed = {}) {
+  const acao = textoNormalizadoTrafego(parsed.acao || "");
+  if (["pausar", "duplicar campanha", "criar novo conjunto"].includes(acao)) return true;
+  const texto = textoNormalizadoTrafego([
+    parsed.resposta,
+    parsed.justificativa,
+    parsed.base_dados,
+  ].filter(Boolean).join(" "));
+  const textoSemNegacao = texto.replace(
+    /\b(nao|sem)\s+([^.;\n]{0,40})?(paus\w*|duplicar campanha|criar novo conjunto|escalar|subir orcamento|aumentar orcamento|aumentar verba|subir verba)/g,
+    ""
+  );
+  return /\bpaus|duplicar campanha|criar novo conjunto|escalar|subir orcamento|aumentar orcamento|aumentar verba|subir verba/.test(textoSemNegacao);
+}
+
+function aplicarTravaQualidadeDados(parsed = {}, dataQuality) {
+  if (!dataQuality) return parsed;
+
+  const resultado = { ...parsed, dataQuality };
+  if (resultado.confianca != null) {
+    const confianca = Number(resultado.confianca);
+    resultado.confianca = Number.isFinite(confianca)
+      ? Math.min(confianca, dataQuality.confiancaMaxima)
+      : dataQuality.confiancaMaxima;
+  } else if (dataQuality.classificacao === "dados_fracos" && resultado.acao) {
+    resultado.confianca = dataQuality.confiancaMaxima;
+  }
+
+  if (dataQuality.classificacao !== "dados_fracos") return resultado;
+  if (!recomendacaoForteComDadosFracos(resultado)) return resultado;
+
+  return {
+    ...resultado,
+    resposta: "",
+    acao: "aguardar dados",
+    justificativa: "Base de dados fraca. Nao vou recomendar pausa, escala ou novo conjunto sem volume minimo confiavel.",
+    base_dados: dataQuality.motivos.length ? dataQuality.motivos.join("; ") : dataQuality.resumo,
+    confianca: Math.min(resultado.confianca ?? dataQuality.confiancaMaxima, dataQuality.confiancaMaxima),
+    bloqueado_por_data_quality: true,
+  };
+}
+
 function extrairRestricoes(historico) {
   const regras = {
     sem_verba: {
@@ -4795,10 +5674,14 @@ RETORNE APENAS ESTE JSON — sem texto adicional:
 }
 
 // Fallback determinístico — rule-based, zero IA, sempre conservador
-function fallbackDeterministico(restricoes, campanha, accountConfig) {
+function fallbackDeterministico(restricoes, campanha, accountConfig, dataQuality = null) {
   let acao = "manter", justificativa = "", base_dados = "";
 
-  if (restricoes.some(r => r.tipo === "sem_verba")) {
+  if (dataQuality?.classificacao === "dados_fracos") {
+    acao = "aguardar dados";
+    justificativa = "Dados fracos para decisao agressiva. Vou segurar pausa, escala ou novo conjunto ate ter base melhor.";
+    base_dados = dataQuality.motivos?.length ? dataQuality.motivos.join("; ") : dataQuality.resumo;
+  } else if (restricoes.some(r => r.tipo === "sem_verba")) {
     acao = "manter";
     justificativa = "Restrição de orçamento ativa — ações com custo adicional bloqueadas.";
     base_dados = "Restrição sem_verba detectada no histórico.";
@@ -4820,7 +5703,7 @@ function fallbackDeterministico(restricoes, campanha, accountConfig) {
     base_dados = "Fallback determinístico ativado após falha na análise de IA.";
   }
 
-  return { acao, justificativa, base_dados, confianca: 0, fallback: true };
+  return { acao, justificativa, base_dados, confianca: 0, fallback: true, dataQuality };
 }
 
 // ── PROCESSADOR UNIFICADO DE AGENTES ─────────────────────────────────────────
@@ -4963,6 +5846,9 @@ async function analisarCampanha(campanha, mensagem, historico, accountKey) {
   const n  = (v, pre = "", suf = "", d = 2) => v != null ? `${pre}${parseFloat(v).toFixed(d)}${suf}` : "sem dado";
   const ni = (v) => v != null ? parseInt(v).toLocaleString("pt-BR") : "sem dado";
 
+  const dataQuality = avaliarQualidadeDadosTrafego(campanha);
+  const listaCurta = (itens) => Array.isArray(itens) && itens.length ? itens.join("; ") : "nenhum";
+
   const contextoTrafego = [
     `═ DADOS DA CAMPANHA (últimos 30 dias) ═`,
     `Nome: ${campanha.campanha}`,
@@ -4973,6 +5859,17 @@ async function analisarCampanha(campanha, mensagem, historico, accountKey) {
     `CTR: ${n(campanha.ctr, "", "%")} | CPC: ${n(campanha.cpc, "R$ ")} | CPM: ${n(campanha.cpm, "R$ ")}`,
     `Frequência: ${n(campanha.frequencia, "", "x", 1)} | Compras: ${ni(campanha.conversoes)} | ROAS: ${n(campanha.roas, "", "x")}`,
     `Add to Cart: ${ni(campanha.add_to_cart)} | Checkout: ${ni(campanha.initiate_checkout)} | Leads: ${ni(campanha.leads)}`,
+    `View Content: ${ni(campanha.view_content)} | Outbound: ${ni(campanha.outbound_clicks)} | LPV: ${ni(campanha.landing_page_views)}`,
+    `Detalhe: ${dataQuality.base.adsets} conjunto(s), ${dataQuality.base.ads} anuncio(s), ${dataQuality.base.criativos} criativo(s)`,
+    ``,
+    `DATA QUALITY`,
+    `Classificacao: ${dataQuality.classificacao} | Score: ${dataQuality.score}/10 | Confianca maxima: ${dataQuality.confiancaMaxima}%`,
+    `Leitura: ${dataQuality.resumo}`,
+    `Sinais: ${listaCurta(dataQuality.sinais)}`,
+    `Limites: ${listaCurta(dataQuality.motivos)}`,
+    dataQuality.classificacao === "dados_fracos"
+      ? `REGRA: dados_fracos bloqueia recomendacao forte de pausar, duplicar, criar novo conjunto ou escalar orcamento. Use manter ou aguardar dados.`
+      : "",
     ``,
     `═ CONTEXTO DO NEGÓCIO ═`,
     `Tipo: ${accountConfig.tipo_produto}`,
@@ -4993,7 +5890,7 @@ async function analisarCampanha(campanha, mensagem, historico, accountKey) {
     resultado = await processarAgente("analytics", mensagem, contextoTrafego, historico);
   } catch (e) {
     console.error(`[Gestor] Erro ao chamar @analytics:`, e.message);
-    const fallback = fallbackDeterministico(restricoes, campanha, accountConfig);
+    const fallback = fallbackDeterministico(restricoes, campanha, accountConfig, dataQuality);
     resultado = {
       agente: "analytics",
       resposta: `Análise automática: ${fallback.acao}. ${fallback.justificativa}`,
@@ -5042,6 +5939,8 @@ async function analisarCampanha(campanha, mensagem, historico, accountKey) {
     }
   }
 
+  parsed = aplicarTravaQualidadeDados(parsed, dataQuality);
+
   // Audit trail
   await registrarLog({
     accountId,
@@ -5050,6 +5949,7 @@ async function analisarCampanha(campanha, mensagem, historico, accountKey) {
       gasto: campanha.gasto, ctr: campanha.ctr, cpc: campanha.cpc,
       roas: campanha.roas, conversoes: campanha.conversoes,
     },
+    data_quality: dataQuality,
     contexto_negocio: accountConfig.objetivo,
     restricoes: restricoes.map(r => r.tipo),
     acao_recomendada: parsed?.acao,
@@ -5059,13 +5959,13 @@ async function analisarCampanha(campanha, mensagem, historico, accountKey) {
     mensagem_usuario: mensagem,
   });
 
-  return { parsed, restricoes, accountConfig, accountId };
+  return { parsed, restricoes, accountConfig, accountId, dataQuality };
 }
 
 // Formata resultado para o frontend — mantém texto natural do @analytics
 async function chatGestorTrafego(campanha, mensagem, historico, accountKey) {
   const resultado = await analisarCampanha(campanha, mensagem, historico, accountKey);
-  const { parsed } = resultado;
+  const { parsed, dataQuality } = resultado;
 
   // Se é resposta em texto livre (conversacional), retorna como está
   if (parsed.resposta && typeof parsed.resposta === "string" && parsed.resposta.length > 20 && !parsed.acao) {
@@ -5075,7 +5975,8 @@ async function chatGestorTrafego(campanha, mensagem, historico, accountKey) {
         acao: null,
         justificativa: parsed.resposta,
         base_dados: "",
-        confianca: null,
+        confianca: dataQuality?.classificacao === "dados_fracos" ? dataQuality.confiancaMaxima : null,
+        dataQuality,
         fallback: false,
       },
     };
@@ -5101,6 +6002,8 @@ async function chatGestorTrafego(campanha, mensagem, historico, accountKey) {
       justificativa: parsed.justificativa || "",
       base_dados: parsed.base_dados || "",
       confianca: parsed.confianca ?? null,
+      dataQuality: parsed.dataQuality || dataQuality,
+      bloqueado_por_data_quality: !!parsed.bloqueado_por_data_quality,
       fallback: false,
     },
   };
@@ -5115,6 +6018,7 @@ async function analisarCampanhas(campanhas) {
     if (c.erro) return `Campanha: ${c.campanha}\nSTATUS: ${c.status || "desconhecido"}\nERRO AO CARREGAR: ${c.erro}`;
     const linhas = [
       `Campanha: ${c.campanha} | Status: ${c.status || "desconhecido"}`,
+      c.dataQuality ? `Qualidade dos dados: ${c.dataQuality.classificacao} (${c.dataQuality.score}/10) | ${c.dataQuality.resumo}` : "",
       `Gasto: ${nd(c.gasto, "R$")} | Impressões: ${ni(c.impressoes)} | Cliques: ${ni(c.cliques)}`,
       `CTR: ${nd(c.ctr, "", "%")} | CPC: ${nd(c.cpc, "R$")} | CPM: ${nd(c.cpm, "R$")}`,
       `Frequência: ${nd(c.frequencia, "", "x", 1)}`,
@@ -5122,7 +6026,7 @@ async function analisarCampanhas(campanhas) {
       `Custo/compra: ${nd(c.custoPorConversao, "R$")}`,
       `Add to Cart: ${ni(c.add_to_cart)} | Checkout iniciado: ${ni(c.initiate_checkout)} | Leads: ${ni(c.leads)}`,
     ];
-    return linhas.join("\n");
+    return linhas.filter(Boolean).join("\n");
   }).join("\n\n");
 
   const prompt = `Você é especialista em tráfego pago. Analise as campanhas e retorne diagnóstico direto.
@@ -6003,6 +6907,9 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
       // Lê accountKey da query string — ?account=rivano ou ?account=com_tempero
       const resultadoMeta = await buscarInsightsMeta(accountKey, { debug: debugAtivo, period });
       const campanhas = Array.isArray(resultadoMeta) ? resultadoMeta : (resultadoMeta.campanhas || []);
+      campanhas.forEach(c => {
+        if (c && !c.dataQuality) c.dataQuality = avaliarQualidadeDadosTrafego(c);
+      });
       // Só analisa se houver campanhas
       const analise = campanhas.length > 0 ? await analisarCampanhas(campanhas) : null;
       const nomeConta = accountKey ? (ACCOUNT_CONFIG[accountKey]?.name || accountKey) : "conta padrão";
