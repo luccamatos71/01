@@ -4171,11 +4171,140 @@ async function editarImagemGemini(base64Input, mimeType, promptEdicao) {
   });
 }
 
-async function buscarInsightsMeta(accountKey) {
+const META_GRAPH_VERSION = "v19.0";
+const META_CAMPANHA_FIELDS = ["id", "name", "status", "objective"];
+const META_INSIGHTS_FIELDS = ["spend", "impressions", "clicks", "cpc", "ctr", "cpm", "frequency", "actions", "action_values"];
+const META_METRICAS_IMPORTANTES_FALTANTES = [
+  "campaign_id", "campaign_name", "adset_id", "adset_name", "ad_id", "ad_name",
+  "optimization_goal", "attribution_setting", "daily_budget", "lifetime_budget",
+  "reach", "link_clicks", "outbound_clicks", "landing_page_views",
+  "cost_per_landing_page_view", "cost_per_outbound_click",
+  "view_content", "cost_per_add_to_cart", "cost_per_initiate_checkout",
+  "cost_per_purchase", "creative_id", "thumbnail_url", "primary_text",
+  "headline", "description", "call_to_action", "video_plays", "thruplays",
+  "average_watch_time", "breakdowns_por_posicionamento", "breakdowns_por_idade_genero",
+];
+
+function dataMetaYYYYMMDD(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function normalizarPeriodoMeta(period) {
+  const raw = String(period || "").trim().toLowerCase();
+  if (!raw) {
+    return {
+      chave: "30d",
+      label: "ultimos 30 dias",
+      modo: "date_preset",
+      query: { date_preset: "last_30d" },
+      defaultPreservado: true,
+    };
+  }
+
+  const mapaDias = { hoje: 1, today: 1, "1d": 1, "7d": 7, "14d": 14, "30d": 30 };
+  const dias = mapaDias[raw] || 30;
+  const hoje = new Date();
+  const inicio = new Date(hoje);
+  inicio.setDate(hoje.getDate() - (dias - 1));
+
+  return {
+    chave: dias === 1 ? "hoje" : `${dias}d`,
+    label: dias === 1 ? "hoje" : `ultimos ${dias} dias`,
+    modo: "time_range",
+    since: dataMetaYYYYMMDD(inicio),
+    until: dataMetaYYYYMMDD(hoje),
+    query: {
+      time_range: JSON.stringify({
+        since: dataMetaYYYYMMDD(inicio),
+        until: dataMetaYYYYMMDD(hoje),
+      }),
+    },
+    defaultPreservado: false,
+  };
+}
+
+function criarDebugMeta({ accountKey, cfg, periodo }) {
+  return {
+    conta: {
+      key: accountKey || "default",
+      nome: cfg?.name || "conta padrao",
+      accountIdConfigurado: !!(cfg?.accountId || META_AD_ACCOUNT_ID),
+    },
+    graphVersion: META_GRAPH_VERSION,
+    periodo: {
+      chave: periodo.chave,
+      label: periodo.label,
+      modo: periodo.modo,
+      since: periodo.since || null,
+      until: periodo.until || null,
+      defaultPreservado: periodo.defaultPreservado,
+    },
+    endpointsChamados: [],
+    camposSolicitados: {
+      campanhas: META_CAMPANHA_FIELDS,
+      insights: META_INSIGHTS_FIELDS,
+    },
+    camposAusentes: [],
+    erros: [],
+    quantidades: {
+      campanhasRetornadas: 0,
+      insightsSolicitados: 0,
+      insightsComDados: 0,
+      insightsComErro: 0,
+    },
+    metricasFaltantesPlanejadas: META_METRICAS_IMPORTANTES_FALTANTES,
+    tempoRespostaMs: null,
+  };
+}
+
+function finalizarDebugMeta(debug, inicioMs) {
+  if (!debug) return null;
+  debug.camposAusentes = Array.from(new Set(debug.camposAusentes)).sort();
+  debug.erros = debug.erros.slice(0, 30);
+  debug.endpointsChamados = debug.endpointsChamados.slice(0, 80);
+  debug.tempoRespostaMs = Date.now() - inicioMs;
+  return debug;
+}
+
+function registrarEndpointDebugMeta(debug, endpoint) {
+  if (debug) debug.endpointsChamados.push(endpoint);
+}
+
+function registrarErroDebugMeta(debug, erro) {
+  if (!debug) return;
+  debug.erros.push({
+    etapa: erro.etapa || "desconhecida",
+    campanha: erro.campanha || null,
+    codigo: erro.codigo || null,
+    mensagem: erro.mensagem || erro.message || String(erro),
+  });
+}
+
+function registrarCamposAusentesDebugMeta(debug, insight = {}) {
+  if (!debug) return;
+  META_INSIGHTS_FIELDS.forEach((campo) => {
+    if (insight[campo] == null) debug.camposAusentes.push(campo);
+  });
+  const actions = Array.isArray(insight.actions) ? insight.actions : [];
+  const values = Array.isArray(insight.action_values) ? insight.action_values : [];
+  const temAction = (tipos) => actions.some(a => tipos.includes(a.action_type));
+  const temValue = (tipos) => values.some(a => tipos.includes(a.action_type));
+  if (!temAction(["purchase", "offsite_conversion.fb_pixel_purchase"])) debug.camposAusentes.push("purchase");
+  if (!temValue(["purchase", "offsite_conversion.fb_pixel_purchase"])) debug.camposAusentes.push("purchase_value");
+  if (!temAction(["add_to_cart", "offsite_conversion.fb_pixel_add_to_cart"])) debug.camposAusentes.push("add_to_cart");
+  if (!temAction(["initiate_checkout", "offsite_conversion.fb_pixel_initiate_checkout"])) debug.camposAusentes.push("initiate_checkout");
+  if (!temAction(["lead", "offsite_conversion.fb_pixel_lead"])) debug.camposAusentes.push("lead");
+}
+
+async function buscarInsightsMeta(accountKey, opcoes = {}) {
+  const inicioDebug = Date.now();
+  const periodo = normalizarPeriodoMeta(opcoes.period || opcoes.periodo);
+  const debugAtivo = !!opcoes.debug;
   // Resolve token e accountId para a conta selecionada
   const cfg = (accountKey && ACCOUNT_CONFIG[accountKey]) ? ACCOUNT_CONFIG[accountKey] : null;
   const token     = (accountKey && META_TOKENS[accountKey]) ? META_TOKENS[accountKey] : META_ACCESS_TOKEN;
   const accountId = cfg?.accountId || META_AD_ACCOUNT_ID;
+  const debugMeta = debugAtivo ? criarDebugMeta({ accountKey, cfg, periodo }) : null;
 
   if (!token || !accountId) {
     const err = new Error(
@@ -4184,17 +4313,31 @@ async function buscarInsightsMeta(accountKey) {
         : "API Meta não configurada. Adicione META_ACCESS_TOKEN e META_AD_ACCOUNT_ID nas variáveis de ambiente."
     );
     err.tipo = "config";
+    registrarErroDebugMeta(debugMeta, { etapa: "config", mensagem: err.message });
+    err.metaDebug = finalizarDebugMeta(debugMeta, inicioDebug);
     throw err;
   }
 
   let resp;
   try {
     // Buscar lista de campanhas com objective para distinguir tráfego vs conversão
-    const urlCampanhas = `https://graph.facebook.com/v19.0/act_${accountId}/campaigns?fields=id,name,status,objective&access_token=${token}`;
+    const paramsCampanhas = new URLSearchParams({
+      fields: META_CAMPANHA_FIELDS.join(","),
+      access_token: token,
+    });
+    const urlCampanhas = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${accountId}/campaigns?${paramsCampanhas.toString()}`;
+    registrarEndpointDebugMeta(debugMeta, {
+      etapa: "campanhas",
+      metodo: "GET",
+      endpoint: `/${META_GRAPH_VERSION}/act_{account}/campaigns`,
+      fields: META_CAMPANHA_FIELDS,
+    });
     resp = await fetch(urlCampanhas);
   } catch (e) {
     const err = new Error("Sem conexão com a API do Meta. Verifique sua internet.");
     err.tipo = "rede";
+    registrarErroDebugMeta(debugMeta, { etapa: "campanhas", mensagem: err.message });
+    err.metaDebug = finalizarDebugMeta(debugMeta, inicioDebug);
     throw err;
   }
 
@@ -4209,11 +4352,17 @@ async function buscarInsightsMeta(accountKey) {
     const err = new Error(msg);
     err.tipo = "api";
     err.codigo = codigo;
+    registrarErroDebugMeta(debugMeta, { etapa: "campanhas", codigo, mensagem: msg });
+    err.metaDebug = finalizarDebugMeta(debugMeta, inicioDebug);
     throw err;
   }
 
   const campanhas = jsonCampanhas.data || [];
-  if (campanhas.length === 0) return [];
+  if (debugMeta) debugMeta.quantidades.campanhasRetornadas = campanhas.length;
+  if (campanhas.length === 0) {
+    if (debugMeta) return { campanhas: [], metaDebug: finalizarDebugMeta(debugMeta, inicioDebug) };
+    return [];
+  }
 
   // Extrai valor de action por tipo — retorna null se não existir, nunca inventa
   function extrairAction(arr, tipos) {
@@ -4228,12 +4377,33 @@ async function buscarInsightsMeta(accountKey) {
   const campanhasComInsights = await Promise.all(
     campanhas.map(async (camp) => {
       try {
-        const urlInsights = `https://graph.facebook.com/v19.0/${camp.id}/insights?fields=spend,impressions,clicks,cpc,ctr,cpm,frequency,actions,action_values&date_preset=last_30d&access_token=${token}`;
+        if (debugMeta) debugMeta.quantidades.insightsSolicitados += 1;
+        const paramsInsights = new URLSearchParams({
+          fields: META_INSIGHTS_FIELDS.join(","),
+          access_token: token,
+        });
+        Object.entries(periodo.query).forEach(([chave, valor]) => paramsInsights.set(chave, valor));
+        const urlInsights = `https://graph.facebook.com/${META_GRAPH_VERSION}/${camp.id}/insights?${paramsInsights.toString()}`;
+        registrarEndpointDebugMeta(debugMeta, {
+          etapa: "insights",
+          metodo: "GET",
+          endpoint: `/${META_GRAPH_VERSION}/{campaign-id}/insights`,
+          campanha: camp.name || "Sem nome",
+          fields: META_INSIGHTS_FIELDS,
+          periodo: periodo.chave,
+        });
         const respInsights = await fetch(urlInsights);
         const jsonInsights = await respInsights.json();
 
         if (jsonInsights.error) {
           console.warn(`[Meta] Erro ao buscar insights de ${camp.name}:`, jsonInsights.error.message);
+          if (debugMeta) debugMeta.quantidades.insightsComErro += 1;
+          registrarErroDebugMeta(debugMeta, {
+            etapa: "insights",
+            campanha: camp.name || "Sem nome",
+            codigo: jsonInsights.error.code || null,
+            mensagem: jsonInsights.error.message,
+          });
           // Retorna campanha com flag de erro — não silencia, não inventa dados
           return {
             campanha: camp.name || "Sem nome",
@@ -4243,6 +4413,8 @@ async function buscarInsightsMeta(accountKey) {
         }
 
         const insight = (jsonInsights.data && jsonInsights.data[0]) || {};
+        if (jsonInsights.data && jsonInsights.data.length > 0 && debugMeta) debugMeta.quantidades.insightsComDados += 1;
+        registrarCamposAusentesDebugMeta(debugMeta, insight);
 
         // Métricas de entrega — null se o campo não vier da API, nunca default inventado
         const gasto      = insight.spend       != null ? parseFloat(insight.spend)       : null;
@@ -4299,6 +4471,12 @@ async function buscarInsightsMeta(accountKey) {
         };
       } catch (e) {
         console.warn(`[Meta] Erro ao processar campanha ${camp.name}:`, e.message);
+        if (debugMeta) debugMeta.quantidades.insightsComErro += 1;
+        registrarErroDebugMeta(debugMeta, {
+          etapa: "processar_campanha",
+          campanha: camp.name || "Sem nome",
+          mensagem: e.message,
+        });
         return {
           campanha: camp.name || "Sem nome",
           status:   camp.status || null,
@@ -4308,7 +4486,9 @@ async function buscarInsightsMeta(accountKey) {
     })
   );
 
-  return campanhasComInsights.filter(c => c !== null);
+  const resultado = campanhasComInsights.filter(c => c !== null);
+  if (debugMeta) return { campanhas: resultado, metaDebug: finalizarDebugMeta(debugMeta, inicioDebug) };
+  return resultado;
 }
 
 // ── GESTOR: PERSISTÊNCIA DE RESTRIÇÕES (memória server-side por conta) ────────
@@ -5740,25 +5920,32 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
   // GET /ads/insights?account=rivano
   if (req.method === "GET" && pathname === "/ads/insights") {
     res.setHeader("Access-Control-Allow-Origin", "*");
+    const urlObj = new URL(req.url, `http://localhost`);
+    const accountKey = urlObj.searchParams.get("account") || null;
+    const debugAtivo = ["1", "true", "sim"].includes(String(urlObj.searchParams.get("debug") || "").toLowerCase());
+    const period = urlObj.searchParams.get("period") || urlObj.searchParams.get("periodo") || null;
     try {
       // Lê accountKey da query string — ?account=rivano ou ?account=com_tempero
-      const urlObj = new URL(req.url, `http://localhost`);
-      const accountKey = urlObj.searchParams.get("account") || null;
-      const campanhas = await buscarInsightsMeta(accountKey);
+      const resultadoMeta = await buscarInsightsMeta(accountKey, { debug: debugAtivo, period });
+      const campanhas = Array.isArray(resultadoMeta) ? resultadoMeta : (resultadoMeta.campanhas || []);
       // Só analisa se houver campanhas
       const analise = campanhas.length > 0 ? await analisarCampanhas(campanhas) : null;
       const nomeConta = accountKey ? (ACCOUNT_CONFIG[accountKey]?.name || accountKey) : "conta padrão";
       console.log(`[OK] Insights Meta (${nomeConta}): ${campanhas.length} campanha(s).`);
-      return enviarJson(res, 200, { campanhas, analise });
+      const payload = { campanhas, analise };
+      if (debugAtivo && !Array.isArray(resultadoMeta)) payload.metaDebug = resultadoMeta.metaDebug;
+      return enviarJson(res, 200, payload);
     } catch (err) {
       console.error("ERRO Meta:", err.message);
       // Retorna 200 com erro descritivo — frontend exibe mensagem útil, não crash
-      return enviarJson(res, 200, {
+      const payloadErro = {
         campanhas: [],
         analise: null,
         erro: err.message,
         tipo_erro: err.tipo || "desconhecido",
-      });
+      };
+      if (debugAtivo && err.metaDebug) payloadErro.metaDebug = err.metaDebug;
+      return enviarJson(res, 200, payloadErro);
     }
   }
 
