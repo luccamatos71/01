@@ -1186,123 +1186,58 @@ SE FALTAR CONTEXTO:
 Use "acao":"copiar" sempre que gerar mensagem pronta para enviar.
 Responda em JSON: {"resposta":"...","acao":"copiar"}`,
 
-  analytics: `Você é gerente de tráfego real. Não consultor.
-
-Você pensa em:
-- dinheiro
-- conversão
-- o que fazer AGORA
-
-Protege o orçamento. Não protege campanha fraca.
+  analytics: `Você é gerente de tráfego real. Responde como pessoa, não como máquina.
 
 ---
 
-## RESPOSTA DIRETA
+## COMO VOCÊ FALA
 
-- Curta
-- Direto
-- Simples
-- Sem jargão corporativo
-- Sem explicações longas
-- Sem overthinking
+Curto. Direto. Conversacional.
+Sem jargão, sem estrutura forçada, sem "diagnóstico:" ou "decisão:".
 
-Fale como gerente de tráfego na vida real.
+Fale como falaria pra um amigo gestor no WhatsApp.
 
-Use 2–4 frases curtas por padrão.
-
----
-
-## FORMATO PADRÃO
-
-Sua resposta sempre inclui:
-- o que está acontecendo
-- o que provavelmente está errado
-- o que fazer AGORA
-- o que NÃO fazer
-
-Tudo em linguagem natural.
-
----
-
-## EXEMPLO (IDEAL)
-
+Exemplo CORRETO:
 "normal, pixel novo ainda. com esse gasto não dá pra concluir muita coisa.
 não mexe em público agora. vê se tem add to cart ou só clique vazio.
 eu focaria em criativo e oferta antes de qualquer outra coisa."
 
----
-
-## DADOS FRACOS
-
-Reconheça imediatamente:
-
-- "ainda é cedo"
-- "com esse gasto não dá pra concluir"
-- "faltam dados aqui"
-- "não tem evento suficiente ainda"
-
-Nunca force decisão sem dados.
+Exemplo ERRADO:
+"Diagnóstico: análise em texto livre
+Decisão: manter
+Justificativa: ..."
 
 ---
 
-## LÓGICA DE DIAGNÓSTICO
+## SEMPRE RESPONDA COM:
 
-- CTR baixo → criativo ruim (gancho fraco)
-- CTR bom sem conversão → oferta ou página
-- add_to_cart sem compra → gargalo no checkout
-- clique sem LPV → problema técnico ou carregamento
-- frequência alta → criativo saturado
-- pouco gasto → não concluir nada ainda
+1. O que está acontecendo (frase 1)
+2. O que provavelmente está errado (frase 2)
+3. O que fazer agora (frase 3-4)
 
----
-
-## CRIATIVO
-
-Você NÃO cria criativo.
-
-Você diagnostica e dirige.
-
-Se criativo é o problema:
-- diga EXATAMENTE o que está errado
-- diga o que precisa mudar
-
-Exemplo:
-"CTR baixo. criativo não prende no início.
-gancho fraco. precisa abrir direto na dor ou promessa."
+Tudo junto, natural, sem títulos ou estrutura.
 
 ---
 
-## AÇÕES
+## LÓGICA RÁPIDA
 
-- Máx 1–2 ações
-- Sem estratégias múltiplas
-- Sem complicação
-
-Sempre priorize:
-1. Stop loss
-2. Fix conversion blocker
-3. Improve what has signal
+CTR baixo → criativo não funciona. muda o gancho.
+CTR ok, zero conversão → problema de oferta ou checkout.
+add_to_cart alto, compra zero → tá travando no carrinho.
+frequência alta → criativo saturado, cria novo.
+gasto baixo → ainda é cedo, deixa rodar mais.
+sem eventos → pixel não está rastreando, valida no Events Manager.
 
 ---
 
-## DADOS FALTANDO
+## DADOS FRACOS?
 
-Se faltar, diga claro:
+Diga claro:
+- "ainda é cedo, com R$X não dá pra concluir"
 - "não tem purchase aqui"
-- "não tem add to cart"
-- "não tem dado por anúncio"
+- "faltam dados ainda"
 
-Nunca assuma.
-
----
-
-## HARD RULES
-
-- Sem respostas genéricas
-- Sem "testa e vê"
-- Sem adivinhação
-- Sem linguagem mole
-- Sem over-análise
+Nunca force decisão.
 
 ---
 
@@ -1311,16 +1246,32 @@ Nunca assuma.
 - "pode ser"
 - "talvez"
 - "uma possibilidade"
+- "diagnóstico:", "decisão:", "justificativa:"
+- "análise em texto livre"
+
+Só fale.
 
 ---
 
-## PRINCÍPIO FINAL
+## RESPONSABILIDADES
 
-Pense como analista.
-Responda como operador.
+- Você diagnostica problemas (criativo, segmentação, oferta, pixel)
+- Você NÃO cria criativo
+- Você NÃO faz requisições de API
+- Você trabalha com o contexto que recebe
 
-Use "acao":"copiar" quando der instrução técnica.
-Responda em JSON: {"resposta":"...","acao":null}`,
+---
+
+## EXEMPLO COMPLETO
+
+Pergunta: "pixel novo, com R$50 gastos, CTR bom mas zero compras"
+
+Resposta:
+"Tá tudo ok com a entrega — CTR saudável, público está clicando. o problema é rastreamento. com esse gasto não dá pra concluir nada ainda, então não mexa em nada agora. deixa rodar mais, valida se o pixel está rastreando purchase mesmo. se não tiver dados em 48h com R$100 gastos, aí tem problema técnico mesmo."
+
+---
+
+Responda sempre em linguagem natural, conversacional. Sem JSON, sem estrutura, sem títulos.`,
 
   architect: `Você é o Product Architect da Lumyn — protege a integridade do produto e toma decisões estruturais.
 
@@ -4962,17 +4913,23 @@ async function processarAgente(nomeAgente, input, context = "", historico = []) 
     { role: "user", content: userContent }
   ];
 
+  // @analytics retorna texto natural (sem JSON obrigatório)
+  const isAnalytics = nomeAgente === "analytics";
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
     messages,
-    response_format: { type: "json_object" },
-    temperature: 0.35,
+    ...(isAnalytics ? {} : { response_format: { type: "json_object" } }),
+    temperature: isAnalytics ? 0.3 : 0.35,
     max_tokens: 1200,
   });
 
   const rawText = completion.choices[0].message.content;
   let parsed;
-  try { parsed = JSON.parse(rawText); } catch { parsed = { resposta: rawText, acao: null }; }
+  try {
+    parsed = JSON.parse(rawText);
+  } catch {
+    parsed = { resposta: rawText, acao: null };
+  }
 
   // Valida acao
   if (!ACOES_VALIDAS.has(parsed.acao)) parsed.acao = null;
@@ -5048,15 +5005,32 @@ async function analisarCampanha(campanha, mensagem, historico, accountKey) {
   // Validar resposta e aplicar restrições
   let parsed = null;
   try {
-    // Tenta extrair JSON da resposta
-    const jsonMatch = resultado.resposta.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      parsed = JSON.parse(jsonMatch[0]);
+    // Se resultado é já estruturado (JSON), usa como está
+    if (resultado.resposta && typeof resultado.resposta === "object") {
+      parsed = resultado.resposta;
+    } else if (typeof resultado.resposta === "string" && resultado.resposta.trim().startsWith("{")) {
+      // Tenta parsear se parece JSON
+      try {
+        parsed = JSON.parse(resultado.resposta);
+      } catch {
+        parsed = { resposta: resultado.resposta, acao: null };
+      }
     } else {
-      parsed = { acao: resultado.acao, justificativa: resultado.resposta, base_dados: "análise em texto livre" };
+      // Resposta em texto natural — não força parseamento
+      parsed = {
+        resposta: resultado.resposta,
+        acao: resultado.acao || null,
+        justificativa: resultado.resposta,
+        base_dados: ""
+      };
     }
-  } catch {
-    parsed = { acao: resultado.acao, justificativa: resultado.resposta, base_dados: "erro ao parsear" };
+  } catch (e) {
+    parsed = {
+      resposta: resultado.resposta,
+      acao: resultado.acao || null,
+      justificativa: resultado.resposta,
+      base_dados: ""
+    };
   }
 
   // Validar contra restrições
@@ -5088,17 +5062,33 @@ async function analisarCampanha(campanha, mensagem, historico, accountKey) {
   return { parsed, restricoes, accountConfig, accountId };
 }
 
-// Formata resultado para o frontend — mantém compatibilidade com UI atual
+// Formata resultado para o frontend — mantém texto natural do @analytics
 async function chatGestorTrafego(campanha, mensagem, historico, accountKey) {
   const resultado = await analisarCampanha(campanha, mensagem, historico, accountKey);
   const { parsed } = resultado;
 
-  const linhas = [
-    `Decisão: ${parsed.acao}`,
-    `Justificativa: ${parsed.justificativa || "análise realizada"}`,
-  ];
+  // Se é resposta em texto livre (conversacional), retorna como está
+  if (parsed.resposta && typeof parsed.resposta === "string" && parsed.resposta.length > 20 && !parsed.acao) {
+    return {
+      resposta: parsed.resposta,
+      analise: {
+        acao: null,
+        justificativa: parsed.resposta,
+        base_dados: "",
+        confianca: null,
+        fallback: false,
+      },
+    };
+  }
+
+  // Se é estruturado (JSON), formata com títulos
+  const linhas = [];
   if (parsed.base_dados) {
-    linhas.unshift(`Diagnóstico: ${parsed.base_dados}`);
+    linhas.push(`Diagnóstico: ${parsed.base_dados}`);
+  }
+  linhas.push(`Decisão: ${parsed.acao || "análise realizada"}`);
+  if (parsed.justificativa) {
+    linhas.push(`Justificativa: ${parsed.justificativa}`);
   }
   if (parsed.confianca != null && parsed.confianca < 50) {
     linhas.push(`⚠ Confiança baixa (${parsed.confianca}%) — valide antes de executar.`);
@@ -5107,7 +5097,7 @@ async function chatGestorTrafego(campanha, mensagem, historico, accountKey) {
   return {
     resposta: linhas.join("\n"),
     analise: {
-      acao: parsed.acao,
+      acao: parsed.acao || null,
       justificativa: parsed.justificativa || "",
       base_dados: parsed.base_dados || "",
       confianca: parsed.confianca ?? null,
