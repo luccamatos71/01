@@ -4,6 +4,34 @@
     {
       "src": "api/*.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "index.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "manifest.json",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "sw.js",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "icon-192.png",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "icon-512.png",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "icon-192-maskable.png",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "icon-512-maskable.png",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
