@@ -45,6 +45,7 @@ const openai = new OpenAI({
 
 let historico = [];
 let estadoManual = null; // { cenarioOriginal, analiseAtual, analiseEstruturada }
+let leadSeenIndex = [];
 
 const DEBUG_PROSPECCAO_PREFIX = "[DEBUG_PROSPECCAO]";
 
@@ -6452,6 +6453,31 @@ async function handler(req, res) {
           };
           return { ...lead, ...scoreLeadV2(lead) };
         });
+
+        const classificadosNovos = classificados.filter((lead) => {
+          const chave = String(lead.id || lead.telefone || "").trim();
+          if (!chave) return false;
+          return !leadSeenIndex.includes(chave);
+        });
+
+        if (!classificadosNovos.length) {
+          return enviarJson(res, 200, {
+            modo: "leads",
+            resumo: { total: 0, alta: 0, media: 0, baixa: 0, descartados: 0 },
+            leads: [],
+            descartados: [],
+          });
+        }
+
+        leadSeenIndex.push(
+          ...classificadosNovos
+            .map((lead) => String(lead.id || lead.telefone || "").trim())
+            .filter(Boolean)
+        );
+
+        classificados.length = 0;
+        classificados.push(...classificadosNovos);
+
         debugProspeccao("dados_normalizados", {
           quantidade: classificados.length,
           amostra: classificados.slice(0, 3).map((l) => ({
@@ -6534,7 +6560,7 @@ async function handler(req, res) {
         }
 
         const resumo = {
-          total: lugares.length,
+          total: classificados.length,
           alta: leads.filter((l) => l.prioridade === "ALTA").length,
           media: leads.filter((l) => l.prioridade === "MEDIA").length,
           baixa: leads.filter((l) => l.prioridade === "BAIXA").length,
