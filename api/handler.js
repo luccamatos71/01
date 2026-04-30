@@ -2254,24 +2254,118 @@ async function buscarDetalhes(placeId) {
 async function buscarLugaresLeads(query) {
   console.log("[LEADS BUSCA]:", query);
 
-  const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Goog-Api-Key": GOOGLE_API_KEY,
-      "X-Goog-FieldMask":
-        "places.id,places.displayName,places.rating,places.userRatingCount,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.primaryTypeDisplayName,places.googleMapsUri,places.businessStatus",
-    },
-    body: JSON.stringify({
-      textQuery: query,
-      languageCode: "pt-BR",
-      maxResultCount: 20,
-    }),
-  });
+  const tentativas = [query];
+  if (!query.toLowerCase().includes("brasil") && !query.match(/,\s*[A-Z]{2}$/i)) {
+    tentativas.push(query + ", Brasil");
+  }
 
-  const data = await response.json();
-  if (!data.places) return [];
-  return data.places;
+  for (const tentativa of tentativas) {
+    try {
+      const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": GOOGLE_API_KEY,
+          "X-Goog-FieldMask":
+            "places.id,places.displayName,places.rating,places.userRatingCount,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.primaryTypeDisplayName,places.googleMapsUri,places.businessStatus",
+        },
+        body: JSON.stringify({
+          textQuery: tentativa,
+          languageCode: "pt-BR",
+          maxResultCount: 20,
+          locationBias: {
+            circle: {
+              center: { latitude: -14.235, longitude: -51.925 },
+              radius: 3000000,
+            },
+          },
+        }),
+      });
+      const data = await response.json();
+      if (data.error) {
+        console.warn("[LEADS BUSCA] Google API error:", data.error.message || JSON.stringify(data.error));
+        break;
+      }
+      if (data.places && data.places.length > 0) return data.places;
+    } catch (e) {
+      console.warn("[LEADS BUSCA] erro na tentativa:", e.message);
+    }
+  }
+  return [];
+}
+
+async function geocodificarCidadeOSM(cidade) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cidade)}&format=json&limit=1&countrycodes=br`;
+    const res = await fetch(url, { headers: { "User-Agent": "Lumyn/1.0 (app)" } });
+    const data = await res.json();
+    if (!data.length) return null;
+    const { boundingbox } = data[0];
+    return {
+      south: parseFloat(boundingbox[0]),
+      north: parseFloat(boundingbox[1]),
+      west:  parseFloat(boundingbox[2]),
+      east:  parseFloat(boundingbox[3]),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function buscarLugaresLeadsFallback(busca) {
+  console.log("[LEADS OSM]:", busca);
+
+  const match = busca.match(/^(.+?)\s+em\s+(.+)$/i);
+  const categoria = match ? match[1].trim() : busca;
+  const cidade    = match ? match[2].trim() : "";
+
+  let bbox = null;
+  if (cidade) {
+    bbox = await geocodificarCidadeOSM(cidade);
+    if (!bbox) bbox = await geocodificarCidadeOSM(cidade + ", Brasil");
+  }
+  if (!bbox) {
+    console.warn("[LEADS OSM] Não foi possível geocodificar:", cidade);
+    return [];
+  }
+
+  const { south, north, west, east } = bbox;
+  const overpassQuery = `[out:json][timeout:15];(nwr["name"](${south},${west},${north},${east}););out body 40;`;
+
+  try {
+    const res = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      body: "data=" + encodeURIComponent(overpassQuery),
+    });
+    const data = await res.json();
+    if (!data.elements || !data.elements.length) return [];
+
+    const catNorm = removerAcentos(categoria).toLowerCase();
+    const filtrados = data.elements.filter((el) => {
+      if (!el.tags?.name) return false;
+      const nome = removerAcentos(el.tags.name).toLowerCase();
+      const amenity = removerAcentos(el.tags?.amenity || el.tags?.shop || el.tags?.leisure || "").toLowerCase();
+      return nome.includes(catNorm) || amenity.includes(catNorm);
+    });
+
+    const fonte = filtrados.length > 0 ? filtrados : data.elements.filter((el) => el.tags?.name);
+
+    return fonte.slice(0, 20).map((el) => ({
+      id: String(el.id),
+      displayName: { text: el.tags?.name || "Sem nome" },
+      formattedAddress: [el.tags?.["addr:street"], el.tags?.["addr:city"] || cidade].filter(Boolean).join(", "),
+      nationalPhoneNumber: el.tags?.phone || el.tags?.["contact:phone"] || null,
+      websiteUri: el.tags?.website || el.tags?.["contact:website"] || null,
+      googleMapsUri: null,
+      businessStatus: "OPERATIONAL",
+      rating: null,
+      userRatingCount: null,
+      primaryTypeDisplayName: { text: el.tags?.amenity || el.tags?.shop || categoria },
+    }));
+  } catch (e) {
+    console.warn("[LEADS OSM] Overpass error:", e.message);
+    return [];
+  }
 }
 
 function classificarLead(nota, avaliacoes, temSite) {
@@ -6201,7 +6295,11 @@ async function handler(req, res) {
       // LEADS
       if (modo === "leads") {
         const busca = extrairBusca(input);
-        const lugares = await buscarLugaresLeads(busca);
+        let lugares = await buscarLugaresLeads(busca);
+        if (!lugares.length) {
+          console.log("[LEADS] Google retornou vazio, tentando OSM...");
+          lugares = await buscarLugaresLeadsFallback(busca).catch(() => []);
+        }
 
         if (!lugares.length) {
           return enviarJson(res, 200, { erro: "Nenhum resultado encontrado para essa busca." });
