@@ -46,6 +46,41 @@ const openai = new OpenAI({
 let historico = [];
 let estadoManual = null; // { cenarioOriginal, analiseAtual, analiseEstruturada }
 
+const DEBUG_PROSPECCAO_PREFIX = "[DEBUG_PROSPECCAO]";
+
+function debugProspeccao(evento, dados = {}) {
+  console.log(DEBUG_PROSPECCAO_PREFIX, evento, dados);
+}
+
+function debugProspeccaoErro(evento, erro, dados = {}) {
+  console.error(DEBUG_PROSPECCAO_PREFIX, evento, {
+    ...dados,
+    erro: erro?.message || erro?.erro || String(erro || "erro desconhecido"),
+    detalhes: erro?.detalhes || erro?.stack || "",
+  });
+}
+
+function debugProspeccaoNichoLocal(query) {
+  const texto = String(query || "").trim();
+  const match = texto.match(/^(.+?)\s+em\s+(.+)$/i);
+  return {
+    query: texto,
+    nicho: match ? match[1].trim() : texto,
+    local: match ? match[2].trim() : "",
+  };
+}
+
+function debugContarPrioridades(leads = []) {
+  return leads.reduce((acc, lead) => {
+    const prioridade = String(lead?.prioridade || "BAIXA").toUpperCase();
+    if (prioridade === "ALTA") acc.alta += 1;
+    else if (prioridade === "MEDIA") acc.media += 1;
+    else if (prioridade === "DESCARTE") acc.descartado += 1;
+    else acc.baixa += 1;
+    return acc;
+  }, { alta: 0, media: 0, baixa: 0, descartado: 0 });
+}
+
 // ── GESTOR DE TRÁFEGO — CONFIGURAÇÃO POR CONTA ───────────────────────────────
 // Todos os thresholds vivem aqui. Nunca usar valores fixos no código ou prompt.
 const ACCOUNT_CONFIG = {
@@ -513,6 +548,7 @@ async function escolherPadraoSegundaMensagemOutreach(contexto = {}) {
     .join("\n");
 
   try {
+    debugProspeccao("openai_chamada", { fluxo: "outreach_pattern", lead: contexto.nome || "", modelo: "gpt-4o-mini" });
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -541,9 +577,15 @@ Regras:
     });
     const parsed = JSON.parse(completion.choices[0].message.content || "{}");
     const pattern = obterPadraoSegundaMensagemOutreach(parsed.patternId);
-    if (!pattern) return { pattern: fallback, tom: normalizarTomSegundaMensagem("", contexto), origem: "fallback" };
+    if (!pattern) {
+      debugProspeccao("fallback_ativado", { tipo: "outreach_pattern", motivo: "pattern_invalido", lead: contexto.nome || "" });
+      return { pattern: fallback, tom: normalizarTomSegundaMensagem("", contexto), origem: "fallback" };
+    }
+    debugProspeccao("openai_resposta", { fluxo: "outreach_pattern", lead: contexto.nome || "", patternId: pattern.id });
     return { pattern, tom: normalizarTomSegundaMensagem(parsed.tom, contexto), origem: "ia" };
-  } catch {
+  } catch (err) {
+    debugProspeccaoErro("openai_erro", err, { fluxo: "outreach_pattern", lead: contexto.nome || "" });
+    debugProspeccao("fallback_ativado", { tipo: "outreach_pattern", motivo: "openai_erro", lead: contexto.nome || "" });
     return { pattern: fallback, tom: normalizarTomSegundaMensagem("", contexto), origem: "fallback" };
   }
 }
@@ -990,6 +1032,7 @@ Retorne APENAS JSON: {"mensagem":"..."}`;
   const userMsg = montarUserMsgOutreach(contextoOutreach);
 
   try {
+    debugProspeccao("openai_chamada", { fluxo: "outreach_principal", lead: contextoOutreach.nome || "", modelo: "gpt-4o-mini" });
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -1002,8 +1045,11 @@ Retorne APENAS JSON: {"mensagem":"..."}`;
     });
     const raw = completion.choices[0].message.content || "{}";
     const parsed = JSON.parse(raw);
+    debugProspeccao("openai_resposta", { fluxo: "outreach_principal", lead: contextoOutreach.nome || "" });
     return mensagemSeguraOutreach(parsed.mensagem, contextoOutreach, "direta");
-  } catch {
+  } catch (err) {
+    debugProspeccaoErro("openai_erro", err, { fluxo: "outreach_principal", lead: contextoOutreach.nome || "" });
+    debugProspeccao("fallback_ativado", { tipo: "outreach_principal", motivo: "openai_erro", lead: contextoOutreach.nome || "" });
     return mensagemSeguraOutreach("", contextoOutreach, "direta");
   }
 }
@@ -1019,8 +1065,10 @@ async function gerarMensagemContinuidadeOutreach(lead, respostaLead = "") {
 // Gera 5 variacoes de segunda mensagem guiadas pelo contexto do SDR.
 async function gerarVariacoesOutreach(lead) {
   const contextoOutreach = montarContextoOutreachLead(lead);
+  debugProspeccao("outreach_variacoes_inicio", { id: lead?.id || "", nome: lead?.nome || "" });
   const escolha = await escolherPadraoSegundaMensagemOutreach(contextoOutreach);
   const variacoes = montarVariacoesSemiFixasOutreach(escolha.pattern, contextoOutreach);
+  debugProspeccao("outreach_variacoes_ok", { id: lead?.id || "", nome: lead?.nome || "", origemPattern: escolha.origem || "" });
   return preencherVariacoesFallbackOutreach(validarVariacoesOutreach(variacoes, contextoOutreach).variacoes, contextoOutreach);
 }
 
@@ -2093,42 +2141,69 @@ function calcularRadarSDR(leads = [], opcoes = {}) {
 }
 
 async function lerCRM() {
+  debugProspeccao("crm_leitura_inicio", { fonte: supabase ? "supabase" : "arquivo_local" });
   if (supabase) {
     // Tenta ler com ordem se a coluna existir, senão sem ordem
     let query = supabase.from("leads").select("*");
     const { data, error } = await query;
     if (error) {
+      debugProspeccaoErro("crm_leitura_erro", error, { fonte: "supabase" });
+      debugProspeccao("fallback_ativado", { tipo: "crm_arquivo_local", motivo: "supabase_erro" });
       console.error("[CRM] Erro ao ler Supabase:", error.message, "— usando arquivo local como fallback");
       // fallback para arquivo local se Supabase falhar
       try {
         if (!fs.existsSync(CRM_FILE)) return { leads: [] };
-        return normalizarCRMData(JSON.parse(fs.readFileSync(CRM_FILE, "utf8")));
-      } catch { return { leads: [] }; }
+        const local = normalizarCRMData(JSON.parse(fs.readFileSync(CRM_FILE, "utf8")));
+        debugProspeccao("crm_leitura_ok", { fonte: "arquivo_local_fallback", total: local.leads.length });
+        return local;
+      } catch (err) {
+        debugProspeccaoErro("crm_leitura_erro", err, { fonte: "arquivo_local_fallback" });
+        return { leads: [] };
+      }
     }
     // Ordena no JS se tiver dados
     const leads = (data || []).map(r => r.dados);
-    return normalizarCRMData({ leads });
+    const crm = normalizarCRMData({ leads });
+    debugProspeccao("crm_leitura_ok", { fonte: "supabase", total: crm.leads.length });
+    return crm;
   }
   try {
+    debugProspeccao("fallback_ativado", { tipo: "crm_arquivo_local", motivo: "supabase_indisponivel" });
     if (!fs.existsSync(CRM_FILE)) return { leads: [] };
-    return normalizarCRMData(JSON.parse(fs.readFileSync(CRM_FILE, "utf8")));
-  } catch { return { leads: [] }; }
+    const crm = normalizarCRMData(JSON.parse(fs.readFileSync(CRM_FILE, "utf8")));
+    debugProspeccao("crm_leitura_ok", { fonte: "arquivo_local", total: crm.leads.length });
+    return crm;
+  } catch (err) {
+    debugProspeccaoErro("crm_leitura_erro", err, { fonte: "arquivo_local" });
+    return { leads: [] };
+  }
 }
 
 async function salvarLead(lead) {
   const leadNormalizado = normalizarLeadCRM(lead);
+  debugProspeccao("crm_salvamento_inicio", { id: leadNormalizado.id, nome: leadNormalizado.nome || "", fonte: supabase ? "supabase" : "arquivo_local" });
   if (supabase) {
     const { error } = await supabase.from("leads").upsert({ id: leadNormalizado.id, dados: leadNormalizado });
-    if (error) console.error("[CRM] Erro ao salvar lead:", error.message);
+    if (error) {
+      debugProspeccaoErro("crm_salvamento_erro", error, { id: leadNormalizado.id, fonte: "supabase" });
+      console.error("[CRM] Erro ao salvar lead:", error.message);
+    } else {
+      debugProspeccao("crm_salvamento_ok", { id: leadNormalizado.id, fonte: "supabase" });
+    }
     return;
   }
   // fallback local
   try {
+    debugProspeccao("fallback_ativado", { tipo: "crm_arquivo_local", motivo: "salvar_sem_supabase" });
     const crm = fs.existsSync(CRM_FILE) ? JSON.parse(fs.readFileSync(CRM_FILE, "utf8")) : { leads: [] };
     const idx = crm.leads.findIndex(l => l.id === leadNormalizado.id);
     if (idx >= 0) crm.leads[idx] = leadNormalizado; else crm.leads.unshift(leadNormalizado);
     fs.writeFileSync(CRM_FILE, JSON.stringify(crm, null, 2), "utf8");
-  } catch (e) { console.error("[CRM] Erro fallback local:", e.message); }
+    debugProspeccao("crm_salvamento_ok", { id: leadNormalizado.id, fonte: "arquivo_local", total: crm.leads.length });
+  } catch (e) {
+    debugProspeccaoErro("crm_salvamento_erro", e, { id: leadNormalizado.id, fonte: "arquivo_local" });
+    console.error("[CRM] Erro fallback local:", e.message);
+  }
 }
 
 async function removerLead(id) {
@@ -2212,6 +2287,7 @@ function extrairBusca(input) {
 */
 async function buscarLugares(query) {
   console.log("[BUSCA]:", query);
+  debugProspeccao("google_maps_chamada", { endpoint: "places:searchText", modo: "buscar", ...debugProspeccaoNichoLocal(query) });
 
   const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
     method: "POST",
@@ -2229,6 +2305,8 @@ async function buscarLugares(query) {
   });
 
   const data = await response.json();
+  debugProspeccao("google_maps_resposta", { modo: "buscar", status: response.status, quantidade: Array.isArray(data.places) ? data.places.length : 0 });
+  if (data.error) debugProspeccaoErro("google_maps_erro", data.error, { modo: "buscar", status: response.status });
 
   if (!data.places) return [];
 
@@ -2237,6 +2315,7 @@ async function buscarLugares(query) {
 
 async function buscarDetalhes(placeId) {
   console.log("[DETALHES]:", placeId);
+  debugProspeccao("google_maps_chamada", { endpoint: "places/{placeId}", modo: "detalhes", placeId });
 
   const response = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
     method: "GET",
@@ -2248,11 +2327,15 @@ async function buscarDetalhes(placeId) {
     },
   });
 
-  return await response.json();
+  const data = await response.json();
+  debugProspeccao("google_maps_resposta", { modo: "detalhes", status: response.status, placeId, temNome: !!data?.displayName?.text });
+  if (data.error) debugProspeccaoErro("google_maps_erro", data.error, { modo: "detalhes", status: response.status, placeId });
+  return data;
 }
 
 async function buscarLugaresLeads(query) {
   console.log("[LEADS BUSCA]:", query);
+  debugProspeccao("google_maps_chamada", { endpoint: "places:searchText", modo: "leads_inicio", ...debugProspeccaoNichoLocal(query) });
 
   const tentativas = [query];
   if (!query.toLowerCase().includes("brasil") && !query.match(/,\s*[A-Z]{2}$/i)) {
@@ -2261,6 +2344,7 @@ async function buscarLugaresLeads(query) {
 
   for (const tentativa of tentativas) {
     try {
+      debugProspeccao("google_maps_tentativa", { tentativa, ...debugProspeccaoNichoLocal(tentativa) });
       const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
         method: "POST",
         headers: {
@@ -2273,24 +2357,27 @@ async function buscarLugaresLeads(query) {
           textQuery: tentativa,
           languageCode: "pt-BR",
           maxResultCount: 20,
-          locationBias: {
-            circle: {
-              center: { latitude: -14.235, longitude: -51.925 },
-              radius: 3000000,
-            },
-          },
         }),
       });
       const data = await response.json();
+      debugProspeccao("google_maps_resposta", {
+        modo: "leads",
+        tentativa,
+        status: response.status,
+        quantidade: Array.isArray(data.places) ? data.places.length : 0,
+      });
       if (data.error) {
+        debugProspeccaoErro("google_maps_erro", data.error, { modo: "leads", tentativa, status: response.status });
         console.warn("[LEADS BUSCA] Google API error:", data.error.message || JSON.stringify(data.error));
         break;
       }
       if (data.places && data.places.length > 0) return data.places;
     } catch (e) {
+      debugProspeccaoErro("google_maps_excecao", e, { modo: "leads", tentativa });
       console.warn("[LEADS BUSCA] erro na tentativa:", e.message);
     }
   }
+  debugProspeccao("google_maps_sem_resultado", { modo: "leads", tentativas: tentativas.length });
   return [];
 }
 
@@ -2299,6 +2386,7 @@ async function geocodificarCidadeOSM(cidade) {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cidade)}&format=json&limit=1&countrycodes=br`;
     const res = await fetch(url, { headers: { "User-Agent": "Lumyn/1.0 (app)" } });
     const data = await res.json();
+    debugProspeccao("osm_geocode_resposta", { cidade, status: res.status, quantidade: Array.isArray(data) ? data.length : 0 });
     if (!data.length) return null;
     const { boundingbox } = data[0];
     return {
@@ -2307,13 +2395,15 @@ async function geocodificarCidadeOSM(cidade) {
       west:  parseFloat(boundingbox[2]),
       east:  parseFloat(boundingbox[3]),
     };
-  } catch {
+  } catch (err) {
+    debugProspeccaoErro("osm_geocode_erro", err, { cidade });
     return null;
   }
 }
 
 async function buscarLugaresLeadsFallback(busca) {
   console.log("[LEADS OSM]:", busca);
+  debugProspeccao("fallback_ativado", { tipo: "osm", busca });
 
   const match = busca.match(/^(.+?)\s+em\s+(.+)$/i);
   const categoria = match ? match[1].trim() : busca;
@@ -2325,6 +2415,7 @@ async function buscarLugaresLeadsFallback(busca) {
     if (!bbox) bbox = await geocodificarCidadeOSM(cidade + ", Brasil");
   }
   if (!bbox) {
+    debugProspeccao("fallback_osm_sem_bbox", { cidade });
     console.warn("[LEADS OSM] Não foi possível geocodificar:", cidade);
     return [];
   }
@@ -2333,11 +2424,13 @@ async function buscarLugaresLeadsFallback(busca) {
   const overpassQuery = `[out:json][timeout:15];(nwr["name"](${south},${west},${north},${east}););out body 40;`;
 
   try {
+    debugProspeccao("osm_overpass_chamada", { categoria, cidade });
     const res = await fetch("https://overpass-api.de/api/interpreter", {
       method: "POST",
       body: "data=" + encodeURIComponent(overpassQuery),
     });
     const data = await res.json();
+    debugProspeccao("osm_overpass_resposta", { status: res.status, quantidade: Array.isArray(data.elements) ? data.elements.length : 0 });
     if (!data.elements || !data.elements.length) return [];
 
     const catNorm = removerAcentos(categoria).toLowerCase();
@@ -2350,7 +2443,7 @@ async function buscarLugaresLeadsFallback(busca) {
 
     const fonte = filtrados.length > 0 ? filtrados : data.elements.filter((el) => el.tags?.name);
 
-    return fonte.slice(0, 20).map((el) => ({
+    const normalizados = fonte.slice(0, 20).map((el) => ({
       id: String(el.id),
       displayName: { text: el.tags?.name || "Sem nome" },
       formattedAddress: [el.tags?.["addr:street"], el.tags?.["addr:city"] || cidade].filter(Boolean).join(", "),
@@ -2362,7 +2455,10 @@ async function buscarLugaresLeadsFallback(busca) {
       userRatingCount: null,
       primaryTypeDisplayName: { text: el.tags?.amenity || el.tags?.shop || categoria },
     }));
+    debugProspeccao("osm_dados_normalizados", { quantidade: normalizados.length });
+    return normalizados;
   } catch (e) {
+    debugProspeccaoErro("osm_overpass_erro", e, { categoria, cidade });
     console.warn("[LEADS OSM] Overpass error:", e.message);
     return [];
   }
@@ -3363,6 +3459,7 @@ function aplicarPrioridadeOficial(analiseEstruturada, prioridadeOficial, priorid
 
 async function chamarTextoAnaliseSDR(prompt, origem) {
   console.log(`[IA] Chamando OpenAI (${origem})...`);
+  debugProspeccao("openai_chamada", { fluxo: "sdr", origem, modelo: "gpt-4o-mini" });
 
   const resp = await openai.chat.completions.create({
     model: "gpt-4o-mini",
@@ -3370,6 +3467,7 @@ async function chamarTextoAnaliseSDR(prompt, origem) {
   });
 
   console.log("[IA] Resposta recebida.");
+  debugProspeccao("openai_resposta", { fluxo: "sdr", origem, choices: resp?.choices?.length || 0 });
   return resp.choices[0].message.content;
 }
 
@@ -3688,8 +3786,16 @@ Regras finais:
 }
 
 async function analisarLeadSDR({ origem, mensagem, dadosLead, estado, prioridadeOficial, executarIA = true, contexto = "" }) {
+  debugProspeccao("sdr_chamada", {
+    origem,
+    contexto,
+    executarIA,
+    lead: dadosLead?.nome || "",
+    prioridadeOficial: prioridadeOficial || "",
+  });
   if (origem === "manual") {
     if (!mensagem) {
+      debugProspeccao("fallback_ativado", { tipo: "sdr_manual", motivo: "mensagem_vazia", contexto });
       return {
         resposta: "",
         analiseEstruturada: criarFallbackManualEstruturado(""),
@@ -3698,6 +3804,7 @@ async function analisarLeadSDR({ origem, mensagem, dadosLead, estado, prioridade
     }
 
     if (!executarIA) {
+      debugProspeccao("fallback_ativado", { tipo: "sdr_manual", motivo: "executarIA_false", contexto });
       return {
         resposta: "",
         analiseEstruturada: criarFallbackManualEstruturado(""),
@@ -3714,15 +3821,23 @@ async function analisarLeadSDR({ origem, mensagem, dadosLead, estado, prioridade
         : extrairAnaliseEstruturada(estado.analiseAtual, criarFallbackManualEstruturado(estado.analiseAtual)).analiseEstruturada;
 
       const extraida = extrairAnaliseEstruturada(resposta, analiseAnterior);
+      if (!extraida.extraiuAlgo && !ehNovoCenario) {
+        debugProspeccao("fallback_ativado", { tipo: "sdr_manual", motivo: "mantem_analise_anterior", contexto });
+      }
       const analiseEstruturada = ehNovoCenario
         ? extraida.analiseEstruturada
         : (extraida.extraiuAlgo ? extraida.analiseEstruturada : analiseAnterior);
 
+      debugProspeccao("classificacao_sdr", { origem, contexto, prioridade: analiseEstruturada.prioridade, valeAbordar: analiseEstruturada.valeAbordar });
       return { resposta, analiseEstruturada, ehNovoCenario };
     }
 
     const resposta = await gerarAnaliseManual(mensagem);
     const extraida = extrairAnaliseEstruturada(resposta, criarFallbackManualEstruturado(resposta));
+    if (!extraida.extraiuAlgo) {
+      debugProspeccao("fallback_ativado", { tipo: "sdr_manual", motivo: "analise_nao_estruturada", contexto });
+    }
+    debugProspeccao("classificacao_sdr", { origem, contexto, prioridade: extraida.analiseEstruturada.prioridade, valeAbordar: extraida.analiseEstruturada.valeAbordar });
     return {
       resposta,
       analiseEstruturada: extraida.analiseEstruturada,
@@ -3740,6 +3855,7 @@ async function analisarLeadSDR({ origem, mensagem, dadosLead, estado, prioridade
     const fallback = criarFallbackGoogleEstruturado(prioridadeBase);
 
     if (!executarIA) {
+      debugProspeccao("fallback_ativado", { tipo: "sdr_google", motivo: "executarIA_false", contexto: contexto || "google" });
       return {
         resposta: "",
         analiseEstruturada: aplicarPrioridadeOficial(fallback, prioridadeBase, "", contexto || "google"),
@@ -3748,6 +3864,9 @@ async function analisarLeadSDR({ origem, mensagem, dadosLead, estado, prioridade
 
     const resposta = await gerarAnalise(dadosLead);
     const extraida = extrairAnaliseEstruturada(resposta, fallback);
+    if (!extraida.extraiuAlgo) {
+      debugProspeccao("fallback_ativado", { tipo: "sdr_google", motivo: "analise_nao_estruturada", contexto: contexto || "google" });
+    }
     const analiseEstruturada = aplicarPrioridadeOficial(
       extraida.analiseEstruturada,
       prioridadeBase,
@@ -3755,6 +3874,7 @@ async function analisarLeadSDR({ origem, mensagem, dadosLead, estado, prioridade
       contexto || "google"
     );
 
+    debugProspeccao("classificacao_sdr", { origem, contexto: contexto || "google", prioridade: analiseEstruturada.prioridade, valeAbordar: analiseEstruturada.valeAbordar });
     return { resposta, analiseEstruturada };
   }
 
@@ -6168,6 +6288,7 @@ async function handler(req, res) {
       const modo = body.modo || "buscar";
       const input = body.input || "";
       const placeId = body.placeId;
+      debugProspeccao("rota_recebida", { route: pathname, modo, placeId: placeId || "", ...debugProspeccaoNichoLocal(input) });
 
       console.log(`[REQUEST] modo=${modo} | input="${input.slice(0, 60)}" | placeId=${placeId || "—"}`);
 
@@ -6295,13 +6416,21 @@ async function handler(req, res) {
       // LEADS
       if (modo === "leads") {
         const busca = extrairBusca(input);
+        debugProspeccao("leads_busca_recebida", debugProspeccaoNichoLocal(busca));
         let lugares = await buscarLugaresLeads(busca);
+        debugProspeccao("leads_google_resultados", { quantidade: lugares.length });
         if (!lugares.length) {
+          debugProspeccao("fallback_ativado", { tipo: "osm", motivo: "google_zero_resultados", busca });
           console.log("[LEADS] Google retornou vazio, tentando OSM...");
-          lugares = await buscarLugaresLeadsFallback(busca).catch(() => []);
+          lugares = await buscarLugaresLeadsFallback(busca).catch((err) => {
+            debugProspeccaoErro("fallback_osm_erro", err, { busca });
+            return [];
+          });
+          debugProspeccao("leads_fallback_resultados", { tipo: "osm", quantidade: lugares.length });
         }
 
         if (!lugares.length) {
+          debugProspeccao("leads_sem_resultados", debugProspeccaoNichoLocal(busca));
           return enviarJson(res, 200, { erro: "Nenhum resultado encontrado para essa busca." });
         }
 
@@ -6323,10 +6452,21 @@ async function handler(req, res) {
           };
           return { ...lead, ...scoreLeadV2(lead) };
         });
+        debugProspeccao("dados_normalizados", {
+          quantidade: classificados.length,
+          amostra: classificados.slice(0, 3).map((l) => ({
+            id: l.id,
+            nome: l.nome,
+            prioridade: l.prioridade,
+            score: l.score ?? null,
+          })),
+        });
+        debugProspeccao("classificacao_sdr_pre", debugContarPrioridades(classificados));
 
         classificados.forEach((lead) => {
           lead.analiseEstruturada = criarFallbackGoogleEstruturado(lead.prioridade);
         });
+        debugProspeccao("fallback_ativado", { tipo: "analise_estruturada_pre_sdr", total: classificados.length });
 
         const leads = classificados.filter((l) => l.prioridade !== "DESCARTE");
         const descartados = classificados.filter((l) => l.prioridade === "DESCARTE");
@@ -6347,6 +6487,12 @@ async function handler(req, res) {
         const medias = ordenadosParaAnalise.filter(l => l.prioridade === "MEDIA");
         const slotsRestantes = Math.max(0, CAP_PRECOMPUTE - altas.length);
         const leadsParaAnalisar = [...altas, ...medias.slice(0, slotsRestantes)];
+        debugProspeccao("sdr_lote_preparado", {
+          total: leadsParaAnalisar.length,
+          altas: altas.length,
+          medias: Math.min(medias.length, slotsRestantes),
+          modoTeste: MODO_TESTE,
+        });
 
         if (!MODO_TESTE && leadsParaAnalisar.length > 0) {
           const analises = await Promise.all(
@@ -6364,15 +6510,27 @@ async function handler(req, res) {
                 },
                 prioridadeOficial: l.prioridade,
                 contexto: `leads placeId=${l.id}`,
-              }).catch(() => null)
+              }).catch((err) => {
+                debugProspeccaoErro("sdr_erro", err, { id: l.id, nome: l.nome || "" });
+                return null;
+              })
             )
           );
           leadsParaAnalisar.forEach((l, i) => {
             if (!analises[i]) return;
+            const prioridadeAntes = l.prioridade;
             l.analise = analises[i].resposta;
             l.analiseEstruturada = analises[i].analiseEstruturada;
             l.prioridade = analises[i].analiseEstruturada.prioridade;
+            debugProspeccao("classificacao_sdr_lead", {
+              id: l.id,
+              nome: l.nome || "",
+              antes: prioridadeAntes,
+              depois: l.prioridade,
+            });
           });
+        } else if (MODO_TESTE) {
+          debugProspeccao("fallback_ativado", { tipo: "modo_teste_sem_sdr", total: leadsParaAnalisar.length });
         }
 
         const resumo = {
@@ -6384,10 +6542,12 @@ async function handler(req, res) {
         };
 
         console.log(`[OK] Leads: ${resumo.alta} ALTA, ${resumo.media} MÉDIA, ${resumo.baixa} BAIXA, ${resumo.descartados} descartados.`);
+        debugProspeccao("classificacao_sdr_final", debugContarPrioridades([...leads, ...descartados]));
         return enviarJson(res, 200, { modo: "leads", resumo, leads, descartados });
       }
 
     } catch (err) {
+      debugProspeccaoErro("analisar_rota_erro", err, { route: pathname });
       console.error("ERRO:", err);
       return enviarJson(res, 500, { erro: err.message });
     }
@@ -6400,26 +6560,38 @@ async function handler(req, res) {
     try {
       const body = await lerBody(req);
       const { modo } = body;
+      debugProspeccao("rota_recebida", { route: pathname, modo: modo || "" });
 
       if (modo === "listar") {
-        return enviarJson(res, 200, await lerCRM());
+        const crm = await lerCRM();
+        debugProspeccao("crm_listar_ok", { total: (crm.leads || []).length });
+        return enviarJson(res, 200, crm);
       }
 
       if (modo === "learning") {
+        debugProspeccao("crm_learning_leitura_inicio");
         const crm = await lerCRM();
-        return enviarJson(res, 200, calcularCRMLearning(crm.leads || []));
+        const learning = calcularCRMLearning(crm.leads || []);
+        debugProspeccao("crm_learning_leitura_ok", {
+          totalLeads: (crm.leads || []).length,
+          abordados: learning?.resumo?.abordados || 0,
+        });
+        return enviarJson(res, 200, learning);
       }
 
       if (modo === "radar_sdr") {
         const crm = await lerCRM();
+        debugProspeccao("crm_learning_radar_leitura_ok", { totalLeads: (crm.leads || []).length, janelaDias: body.janelaDias || 7 });
         return enviarJson(res, 200, calcularRadarSDR(crm.leads || [], { janelaDias: body.janelaDias }));
       }
 
       if (modo === "salvar") {
         const crm = await lerCRM();
         const lead = body.lead;
+        debugProspeccao("crm_salvar_rota_inicio", { id: lead?.id || "", nome: lead?.nome || "" });
         const existing = crm.leads.find(l => l.id === lead.id);
         if (existing) {
+          debugProspeccao("crm_salvar_rota_existente", { id: lead.id, nome: existing.nome || "" });
           return enviarJson(res, 200, { ok: true, lead: existing, jaExiste: true });
         }
         const agora = new Date().toISOString();
@@ -6485,6 +6657,7 @@ async function handler(req, res) {
           atualizadoEm: agora,
         };
         await salvarLead(novo);
+        debugProspeccao("crm_salvar_rota_ok", { id: novo.id, nome: novo.nome || "", prioridade: novo.prioridade || "" });
         console.log(`[CRM] Lead salvo: ${novo.nome}`);
         return enviarJson(res, 200, { ok: true, lead: novo });
       }
@@ -6541,6 +6714,7 @@ async function handler(req, res) {
 
       return enviarJson(res, 400, { erro: "Modo CRM inválido" });
     } catch (err) {
+      debugProspeccaoErro("crm_rota_erro", err, { route: pathname });
       console.error("ERRO CRM:", err);
       return enviarJson(res, 500, { erro: err.message });
     }
@@ -6848,24 +7022,29 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
     try {
       const body = await lerBody(req);
       const { lead, modo } = body;
+      debugProspeccao("rota_recebida", { route: pathname, modo: modo || "variacoes", id: lead?.id || "", nome: lead?.nome || "" });
       if (!lead || !lead.nome) return enviarJson(res, 400, { erro: "lead com nome é obrigatório." });
 
       if (modo === "principal") {
+        debugProspeccao("openai_rota_outreach_chamada", { route: pathname, modo: modo || "principal", id: lead.id || "", nome: lead.nome || "" });
         const mensagem = await gerarMensagemPrincipalOutreach(lead);
         console.log(`[CRM] Mensagem principal gerada via Outreach: ${lead.nome}`);
         return enviarJson(res, 200, { mensagem });
       }
 
       if (modo === "continuidade") {
+        debugProspeccao("openai_rota_outreach_chamada", { route: pathname, modo: "continuidade", id: lead.id || "", nome: lead.nome || "" });
         const mensagem = await gerarMensagemContinuidadeOutreach(lead, body.respostaLead || "");
         console.log(`[CRM] Continuidade gerada via Outreach: ${lead.nome}`);
         return enviarJson(res, 200, { mensagem });
       }
 
+      debugProspeccao("openai_rota_outreach_chamada", { route: pathname, modo: "variacoes", id: lead.id || "", nome: lead.nome || "" });
       const variacoes = await gerarVariacoesOutreach(lead);
       console.log(`[CRM] Variações geradas via Outreach: ${lead.nome}`);
       return enviarJson(res, 200, { variacoes });
     } catch (err) {
+      debugProspeccaoErro("outreach_rota_erro", err, { route: pathname });
       console.error("ERRO /api/crm/mensagem:", err.message);
       return enviarJson(res, 500, { erro: err.message });
     }
@@ -6877,18 +7056,22 @@ Responda APENAS neste JSON (sem explicação, sem markdown):
     try {
       const body = await lerBody(req);
       const { lead, modo } = body;
+      debugProspeccao("rota_recebida", { route: pathname, modo: modo || "variacoes", id: lead?.id || "", nome: lead?.nome || "" });
       if (!lead || !lead.nome) return enviarJson(res, 400, { erro: "lead com nome é obrigatório." });
 
       if (modo === "principal") {
+        debugProspeccao("openai_rota_outreach_chamada", { route: pathname, modo: modo || "principal", id: lead.id || "", nome: lead.nome || "" });
         const mensagem = await gerarMensagemPrincipalOutreach(lead);
         console.log(`[OK] Mensagem principal gerada: ${lead.nome}`);
         return enviarJson(res, 200, { mensagem });
       }
 
+      debugProspeccao("openai_rota_outreach_chamada", { route: pathname, modo: "variacoes", id: lead.id || "", nome: lead.nome || "" });
       const variacoes = await gerarVariacoesOutreach(lead);
       console.log(`[OK] Variações geradas: ${lead.nome}`);
       return enviarJson(res, 200, { variacoes });
     } catch (err) {
+      debugProspeccaoErro("outreach_rota_erro", err, { route: pathname });
       console.error("ERRO /api/gerar-variacoes:", err.message);
       return enviarJson(res, 500, { erro: err.message });
     }

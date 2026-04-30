@@ -5582,6 +5582,29 @@
     const agentSelect = document.getElementById("agentSelect");
 
     const API_ROUTE = "/api/analisar";
+    const DEBUG_PROSPECCAO_PREFIX = "[DEBUG_PROSPECCAO]";
+
+    function debugProspeccao(evento, dados = {}) {
+      console.log(DEBUG_PROSPECCAO_PREFIX, evento, dados);
+    }
+
+    function debugProspeccaoErro(evento, erro, dados = {}) {
+      console.error(DEBUG_PROSPECCAO_PREFIX, evento, {
+        ...dados,
+        erro: erro?.message || erro?.erro || String(erro || "erro desconhecido"),
+        detalhes: erro?.detalhes || erro?.stack || "",
+      });
+    }
+
+    function debugProspeccaoNichoLocal(query) {
+      const texto = String(query || "").trim();
+      const match = texto.match(/^(.+?)\s+em\s+(.+)$/i);
+      return {
+        query: texto,
+        nicho: match ? match[1].trim() : texto,
+        local: match ? match[2].trim() : "",
+      };
+    }
 
     let isSending = false;
     let leadsMobileMode = false;
@@ -5976,8 +5999,9 @@
     async function fetchWithFallback(routes, payload) {
       let lastError = null;
 
-      for (const route of routes) {
+      for (const [index, route] of routes.entries()) {
         try {
+          debugProspeccao("endpoint_chamado", { route, modo: payload?.modo || "" });
           const response = await fetch(route, {
             method: "POST",
             headers: {
@@ -5993,15 +6017,24 @@
               erro: data?.erro || `Falha na rota ${route}`,
               detalhes: data?.detalhes || `Status HTTP ${response.status}`
             };
+            debugProspeccaoErro("endpoint_erro", lastError, { route, status: response.status, modo: payload?.modo || "" });
+            if (index < routes.length - 1) {
+              debugProspeccao("fallback_ativado", { tipo: "rota", de: route, para: routes[index + 1] });
+            }
             continue;
           }
 
+          debugProspeccao("endpoint_resposta", { route, modo: payload?.modo || "", status: response.status });
           return data;
         } catch (error) {
           lastError = {
             erro: "Erro ao conectar com servidor.",
             detalhes: `${error.message} (${route})`
           };
+          debugProspeccaoErro("endpoint_excecao", error, { route, modo: payload?.modo || "" });
+          if (index < routes.length - 1) {
+            debugProspeccao("fallback_ativado", { tipo: "rota", de: route, para: routes[index + 1] });
+          }
         }
       }
 
@@ -6356,7 +6389,10 @@
       }, 0);
     }
 
-    if (leadsBtn) leadsBtn.addEventListener("click", openLeadsModal);
+    if (leadsBtn) leadsBtn.addEventListener("click", () => {
+      debugProspeccao("botao_leads_abrir_click");
+      openLeadsModal();
+    });
     if (leadsCloseBtn) leadsCloseBtn.addEventListener("click", closeLeadsModal);
     if (leadsOverlay) leadsOverlay.addEventListener("click", (e) => { if (e.target === leadsOverlay) closeLeadsModal(); });
 
@@ -6380,11 +6416,15 @@
       });
     });
 
-    if (leadsSearchBtn) leadsSearchBtn.addEventListener("click", executarBuscaLeads);
+    if (leadsSearchBtn) leadsSearchBtn.addEventListener("click", () => {
+      debugProspeccao("botao_buscar_leads_click", debugProspeccaoNichoLocal(leadsQueryInput?.value || ""));
+      executarBuscaLeads();
+    });
 
     async function executarBuscaLeads() {
       const query = leadsQueryInput.value.trim();
       if (!query) return;
+      debugProspeccao("busca_leads_inicio", debugProspeccaoNichoLocal(query));
 
       salvarBusca(query);
       salvarCidade(query);
@@ -6408,6 +6448,12 @@
       try {
         const data = await fetchWithFallback([API_ROUTE], { modo: "leads", input: query });
         removeLoadingBubble();
+        debugProspeccao("busca_leads_resposta", {
+          total: data?.resumo?.total || 0,
+          leads: Array.isArray(data?.leads) ? data.leads.length : 0,
+          descartados: Array.isArray(data?.descartados) ? data.descartados.length : 0,
+          erro: data?.erro || "",
+        });
 
         if (data.erro) {
           createAssistantBubble({ role: "LUMYN", origem: "leads", erro: data.erro });
@@ -6415,6 +6461,7 @@
           createLeadsBubble(data);
         }
       } catch (err) {
+        debugProspeccaoErro("busca_leads_erro", err, debugProspeccaoNichoLocal(query));
         removeLoadingBubble();
         createAssistantBubble({
           role: "LUMYN",
@@ -6730,6 +6777,7 @@
       if (cached) return cached;
       if (!force && outreachFastInFlight.has(key)) return outreachFastInFlight.get(key);
 
+      debugProspeccao("openai_rota_outreach_chamada", { route: "/api/gerar-variacoes", modo: "principal", id: lead.id, nome: lead.nome || "" });
       const promise = fetch("/api/gerar-variacoes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -6787,7 +6835,8 @@
       try {
         const mensagem = await buscarMensagemPrincipalLead(lead, force);
         renderMensagemPrincipalHTML(section, mensagem, lead, "Pronta para WhatsApp. As variações ficam como extra.");
-      } catch {
+      } catch (err) {
+        debugProspeccaoErro("outreach_mensagem_erro", err, { id: lead?.id || "", nome: lead?.nome || "" });
         currentMsgText = "";
         section.innerHTML = `
           <div class="mensagem-wrap">
@@ -6817,6 +6866,7 @@
       if (!section) return;
       section.innerHTML = `<div class="mensagem-wrap"><div class="loading"><span class="spinner"></span><span>Gerando mensagens...</span></div></div>`;
       try {
+        debugProspeccao("openai_rota_outreach_chamada", { route: "/api/gerar-variacoes", modo: "variacoes", id: lead?.id || "", nome: lead?.nome || "" });
         const r = await fetch("/api/gerar-variacoes", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -6827,9 +6877,11 @@
           setOutreachCache(lead, data.variacoes);
           renderVariacoesHTML(section, data.variacoes, lead);
         } else {
+          debugProspeccaoErro("outreach_variacoes_erro", data, { id: lead?.id || "", nome: lead?.nome || "" });
           section.innerHTML = `<div class="mensagem-wrap"><div class="error-box">${escapeHtml(data.erro || "Erro ao gerar.")}</div></div>`;
         }
-      } catch {
+      } catch (err) {
+        debugProspeccaoErro("outreach_variacoes_erro", err, { id: lead?.id || "", nome: lead?.nome || "" });
         section.innerHTML = `<div class="mensagem-wrap"><div class="error-box">Erro de conexão.</div></div>`;
       }
     }
@@ -7054,9 +7106,11 @@
           crmBtn.addEventListener("click", async (e) => {
             e.stopPropagation();
             if (crmBtn.classList.contains("saved")) return;
+            debugProspeccao("crm_salvar_click_card", { id: lead.id, nome: lead.nome || "" });
             crmBtn.textContent = "...";
             const data = await crmFetch({ modo: "salvar", lead });
             if (data.ok) {
+              debugProspeccao("crm_salvar_ok_card", { id: lead.id, jaExiste: !!data.jaExiste });
               crmBtn.textContent = data.jaExiste ? "No CRM" : "Salvo!";
               crmBtn.classList.add("saved");
               await carregarCRM();
@@ -7066,6 +7120,7 @@
                 carregarRadarSDRLeads(radarSDRJanelaDias, true).catch(() => {});
               }
             } else {
+              debugProspeccaoErro("crm_salvar_erro_card", data, { id: lead.id });
               crmBtn.textContent = "+CRM";
             }
           });
@@ -7113,6 +7168,14 @@
       currentLeadIndex = -1;
 
       const { resumo, leads, descartados } = data;
+      debugProspeccao("leads_exibidos_tela", {
+        total: resumo?.total || 0,
+        exibidos: Array.isArray(leads) ? leads.length : 0,
+        alta: resumo?.alta || 0,
+        media: resumo?.media || 0,
+        baixa: resumo?.baixa || 0,
+        descartados: Array.isArray(descartados) ? descartados.length : 0,
+      });
       const row = document.createElement("div");
       row.className = "row";
 
@@ -7193,12 +7256,24 @@
     const FOLLOWUP_PRAZO_HORAS = 24;
 
     async function crmFetch(payload) {
+      debugProspeccao("crm_endpoint_chamado", { route: CRM_ROUTE, modo: payload?.modo || "" });
       const r = await fetch(CRM_ROUTE, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      return r.json();
+      const data = await r.json();
+      debugProspeccao("crm_endpoint_resposta", {
+        modo: payload?.modo || "",
+        status: r.status,
+        ok: !!data?.ok,
+        erro: data?.erro || "",
+        total: Array.isArray(data?.leads) ? data.leads.length : undefined,
+      });
+      if (!r.ok || data?.erro) {
+        debugProspeccaoErro("crm_endpoint_erro", data, { modo: payload?.modo || "", status: r.status });
+      }
+      return data;
     }
 
     function calcularHorasEntreCRM(inicio, fim) {
@@ -7273,6 +7348,7 @@
 
     async function salvarAtualizacaoCRMLead(lead, campos = {}, { reload = true } = {}) {
       if (!lead?.id) return null;
+      debugProspeccao("crm_salvar_inicio", { id: lead.id, nome: lead.nome || "", campos: Object.keys(campos || {}) });
       const salvo = await crmFetch({ modo: "salvar", lead });
       const base = salvo.lead || lead;
       const data = await crmFetch({ modo: "atualizar", id: base.id, ...campos });
@@ -7286,6 +7362,7 @@
       } else {
         atualizarContadoresSidebar();
       }
+      debugProspeccao("crm_salvar_fim", { id: base.id, ok: !!data?.ok, status: data?.lead?.status || base.status || "" });
       return data.lead || base;
     }
 
@@ -7366,13 +7443,18 @@
     }
 
     async function carregarCRM() {
+      debugProspeccao("crm_listar_inicio");
       try {
         const data = await crmFetch({ modo: "listar" });
         crmData = data;
-        await sincronizarFollowUpsPendentes();
+        debugProspeccao("crm_listar_ok", { total: Array.isArray(data?.leads) ? data.leads.length : 0 });
+        debugProspeccao("crm_followups_auto_sync_pulado", { motivo: "evitar_escrita_automatica_ao_listar" });
         atualizarContadoresSidebar();
         if (crmLearningAberto) carregarCRMLearning();
-      } catch { /* silencioso */ }
+      } catch (err) {
+        debugProspeccaoErro("crm_listar_erro", err);
+        /* silencioso */
+      }
     }
 
     function atualizarContadoresSidebar() {
@@ -7508,13 +7590,20 @@
 
     async function carregarCRMLearning() {
       if (!crmLearningAberto) return;
+      debugProspeccao("crm_learning_leitura_inicio");
       crmLearningData = null;
       renderizarCRMLearning();
       try {
         const data = await crmFetch({ modo: "learning" });
         crmLearningData = data;
-      } catch {
+        debugProspeccao("crm_learning_leitura_ok", {
+          abordados: data?.resumo?.abordados || 0,
+          recomendacoes: Array.isArray(data?.recomendacoes) ? data.recomendacoes.length : 0,
+        });
+      } catch (err) {
+        debugProspeccaoErro("crm_learning_leitura_erro", err);
         crmLearningData = { resumo: {}, recomendacoes: [], avisos: ["erro ao carregar learning"] };
+        debugProspeccao("fallback_ativado", { tipo: "crm_learning_ui", motivo: "erro_leitura" });
       }
       renderizarCRMLearning();
     }
@@ -8165,11 +8254,15 @@
     // Botão "+ CRM" no drawer
     if (analysisCrmBtn) analysisCrmBtn.addEventListener("click", async () => {
       if (!currentLead) return;
+      debugProspeccao("crm_salvar_click_drawer", { id: currentLead.id, nome: currentLead.nome || "" });
       const data = await crmFetch({ modo: "salvar", lead: currentLead });
       if (data.ok) {
+        debugProspeccao("crm_salvar_ok_drawer", { id: currentLead.id, jaExiste: !!data.jaExiste });
         analysisCrmBtn.textContent = data.jaExiste ? "No CRM" : "Salvo!";
         analysisCrmBtn.classList.add("saved");
         await carregarCRM();
+      } else {
+        debugProspeccaoErro("crm_salvar_erro_drawer", data, { id: currentLead.id });
       }
     });
 
