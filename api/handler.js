@@ -2994,63 +2994,38 @@ async function chamarTextoAnaliseSDR(prompt, origem) {
 /*
   IA
 */
-async function gerarAnalise(dados) {
+async function gerarAnalise(dados, prioridadeOficial) {
+  const prioridadeLabel = prioridadeOficial || "não definida";
+  const angulo = dados.anguloAbordagem
+    ? `\nÂngulo pré-calculado: ${dados.anguloAbordagem}`
+    : "";
+  const sinais = Array.isArray(dados.sinaisFortes) && dados.sinaisFortes.length
+    ? `\nSinais identificados: ${dados.sinaisFortes.join(" | ")}`
+    : "";
+
   const prompt = `
-Você é um SDR. Decida: eu abordaria esse lead hoje?
+Você é um SDR. A prioridade desse lead já foi calculada com base em dados determinísticos.
+
+Prioridade calculada: ${prioridadeLabel}${angulo}${sinais}
 
 Dados do negócio (Google Maps):
 ${JSON.stringify(dados, null, 2)}
 
 ---
 
-REGRA 1 — AVALIAÇÕES (decide a base, sempre):
-
-< 20       → ALTA
-20 a 150   → ALTA ou MÉDIA
-151 a 300  → MÉDIA
-> 300      → BAIXA
-
-Negócio com > 300 avaliações NUNCA pode ser ALTA. Ponto final.
-
----
-
-REGRA 2 — NOTA (ajusta dentro da faixa):
-
-Só ajusta se houver sinal contraditório real com a base das avaliações.
-
-> 300 avaliações + nota > 4.3 + site presente → NÃO (descarte — negócio consolidado)
-> 300 avaliações + nota < 4.0               → SIM, BAIXA (problema visível)
-> 300 avaliações + sem site                 → SIM, MÉDIA (exceção única)
-
-20 a 150 + nota 3.0 a 4.3 → ALTA
-20 a 150 + nota > 4.5     → ALTA (crescimento)
-20 a 150 + nota > 4.5 + site presente → MÉDIA
-
-< 20 + qualquer nota → ALTA (poucas avaliações dominam)
-
----
-
-REGRA 3 — CONSISTÊNCIA OBRIGATÓRIA:
-
-Se todos os bullets apontam para BAIXA → prioridade é BAIXA, não MÉDIA.
-MÉDIA só é válida quando há sinais genuinamente contraditórios entre avaliações e nota.
-Proibido suavizar a prioridade sem sinal que justifique.
-
----
+TAREFA:
+Confirme a prioridade com os números reais dos dados. Use "anguloAbordagem" e "sinaisFortes" dos dados como base para os bullets e para o ângulo de abordagem, se presentes.
 
 PROIBIDO:
 - Inventar dado ausente
 - Usar "pode", "talvez", "potencial", "pode indicar"
-- Assumir "dono ocupado" ou "sem urgência" sem dado que confirme
-- Marcar MÉDIA quando todos os sinais apontam na mesma direção
-
----
+- Contradizer a prioridade sem dado concreto que justifique
+- Gerar mensagem pronta (pertence ao Outreacher)
 
 LINGUAGEM — afirmações diretas com o número real dos dados:
-- "4112 avaliações → negócio consolidado → NÃO"
-- "38 avaliações → baixa tração digital → ALTA"
-- "nota 3.8 → espaço de melhoria → ALTA"
-- "sem site → presença fraca → exceção: MÉDIA"
+- "38 avaliações → baixa tração digital → confirma ${prioridadeLabel}"
+- "nota 3.8 → espaço de melhoria → confirma ${prioridadeLabel}"
+- "sem site → presença digital menos estruturada"
 
 ---
 
@@ -3060,12 +3035,12 @@ Vale abordar? SIM ou NÃO
 Prioridade: ALTA / MÉDIA / BAIXA
 
 Por quê:
-- [razão 1 com número real dos dados]
-- [razão 2 com número real dos dados]
+- [razão com número real dos dados]
+- [razão com número real dos dados]
 - [razão 3 se necessário — senão omita]
 
 Problema mais provável:
-[1 frase. Se for hipótese, escrever: (hipótese)]
+[1 frase. Se for hipótese: (hipótese)]
 
 Como abordar (1 linha):
 [canal + tom + momento ideal]
@@ -3076,14 +3051,14 @@ Próximo passo:
 [1 linha operacional. Não escreva mensagem de contato.]
 
 Ângulo de abordagem:
-[opcional. Apenas tema comercial, nunca mensagem pronta.]
+[tema comercial específico do nicho — nunca mensagem pronta]
 
 ---
 
 Regras finais:
 - Nunca invente dado ausente. Se faltar algo relevante, escreva: "dado ausente".
 - Não gere mensagem pronta. Mensagens pertencem somente ao Outreacher.
-- Sem frases de consultoria. Sem obviedades.
+- Sem frases de consultoria genéricas.
 `;
 
   return chamarTextoAnaliseSDR(prompt, "Google");
@@ -3382,7 +3357,7 @@ async function analisarLeadSDR({ origem, mensagem, dadosLead, estado, prioridade
       };
     }
 
-    const resposta = await gerarAnalise(dadosLead);
+    const resposta = await gerarAnalise(dadosLead, prioridadeBase);
     const extraida = extrairAnaliseEstruturada(resposta, fallback);
     if (!extraida.extraiuAlgo) {
       debugProspeccao("fallback_ativado", { tipo: "sdr_google", motivo: "analise_nao_estruturada", contexto: contexto || "google" });
@@ -6079,6 +6054,9 @@ async function handler(req, res) {
                   site: l.site,
                   endereco: l.endereco,
                   categoria: l.categoria,
+                  anguloAbordagem: l.anguloAbordagem || "",
+                  sinaisFortes: l.sinaisFortes || [],
+                  gatilhoConversacional: l.gatilhoConversacional || "",
                 },
                 prioridadeOficial: l.prioridade,
                 contexto: `leads placeId=${l.id}`,
