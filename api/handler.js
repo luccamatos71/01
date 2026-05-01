@@ -2298,6 +2298,46 @@ async function buscarLugaresLeads(query) {
   return { places: [], nextPageToken: null, queryUsada: query };
 }
 
+function gerarVariantesQuery(query) {
+  const variantes = new Set([query]);
+  const partes = query.split(/\s+em\s+|\s+no?\s+|\s+na\s+/i);
+  const nicho = partes[0]?.trim() || query;
+  const local = partes[1]?.trim() || "";
+  if (local) {
+    variantes.add(`${nicho} em ${local}, Brasil`);
+    variantes.add(`${nicho} ${local}`);
+  } else if (!/,\s*\w/.test(query) && !/brasil/i.test(query)) {
+    variantes.add(query + ", Brasil");
+    variantes.add(query + " centro");
+  }
+  return [...variantes].slice(0, 3);
+}
+
+async function buscarLugaresLeadsParalelo(query) {
+  const variantes = gerarVariantesQuery(query);
+  debugProspeccao("leads_variantes_query", { query, variantes });
+
+  const resultados = await Promise.allSettled(
+    variantes.map(v => buscarLugaresLeadsPagina(v))
+  );
+
+  const idsSeen = new Set();
+  const placesUnicos = [];
+  for (const r of resultados) {
+    if (r.status === "fulfilled") {
+      for (const place of r.value.places) {
+        if (place.id && !idsSeen.has(place.id)) {
+          idsSeen.add(place.id);
+          placesUnicos.push(place);
+        }
+      }
+    }
+  }
+
+  debugProspeccao("leads_variantes_merge", { variantesUsadas: variantes.length, totalUnicos: placesUnicos.length });
+  return { places: placesUnicos, queryUsada: query };
+}
+
 async function geocodificarCidadeOSM(cidade) {
   try {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cidade)}&format=json&limit=1&countrycodes=br`;
@@ -5924,55 +5964,22 @@ async function handler(req, res) {
           ? Math.min(quantidadeAlvoRaw, 60)
           : 20;
 
-        debugProspeccao("leads_busca_recebida", { ...debugProspeccaoNichoLocal(busca), prioridadeAlvo, quantidadeAlvo });
+        const seenIdsRaw = Array.isArray(body?.seenIds) ? body.seenIds : [];
+        const seenIdsSet = new Set(seenIdsRaw.map(id => String(id).trim()).filter(Boolean));
 
-        // Busca paginada: até 3 páginas (60 resultados) quando há prioridade alvo
-        const MAX_PAGINAS = prioridadeAlvo ? 3 : 1;
-        let todasAcumuladas = [];
-        let pageToken = null;
-        let queryUsada = null;
-        let usouFallback = false;
+        debugProspeccao("leads_busca_recebida", { ...debugProspeccaoNichoLocal(busca), prioridadeAlvo, quantidadeAlvo, seenIdsCount: seenIdsSet.size });
 
-        for (let pagina = 0; pagina < MAX_PAGINAS; pagina++) {
-          let lugaresGoogle;
-          if (pagina === 0) {
-            const resultado = await buscarLugaresLeads(busca);
-            lugaresGoogle = resultado.places;
-            pageToken = resultado.nextPageToken;
-            queryUsada = resultado.queryUsada;
-          } else {
-            if (!pageToken) break;
-            const resultado = await buscarLugaresLeadsPagina(queryUsada, pageToken);
-            lugaresGoogle = resultado.places;
-            pageToken = resultado.nextPageToken;
-          }
+        const resultado = await buscarLugaresLeadsParalelo(busca);
+        let todasAcumuladas = resultado.places;
 
-          debugProspeccao("leads_google_resultados", { pagina: pagina + 1, quantidade: lugaresGoogle.length });
-
-          if (!lugaresGoogle.length && pagina === 0) {
-            debugProspeccao("fallback_ativado", { tipo: "osm", motivo: "google_zero_resultados", busca });
-            console.log("[LEADS] Google retornou vazio, tentando OSM...");
-            const lugaresOSM = await buscarLugaresLeadsFallback(busca).catch((err) => {
-              debugProspeccaoErro("fallback_osm_erro", err, { busca });
-              return [];
-            });
-            debugProspeccao("leads_fallback_resultados", { tipo: "osm", quantidade: lugaresOSM.length });
-            todasAcumuladas.push(...lugaresOSM);
-            usouFallback = true;
-            break;
-          }
-
-          todasAcumuladas.push(...lugaresGoogle);
-
-          // Verifica se já temos o suficiente da prioridade alvo para parar antes
-          if (prioridadeAlvo && !usouFallback) {
-            const jaClassificados = todasAcumuladas
-              .filter(l => !l.businessStatus || l.businessStatus === "OPERATIONAL")
-              .filter(l => classificarLead(l.rating, l.userRatingCount, !!l.websiteUri) === prioridadeAlvo);
-            if (jaClassificados.length >= quantidadeAlvo || !pageToken) break;
-          } else {
-            break;
-          }
+        if (!todasAcumuladas.length) {
+          debugProspeccao("fallback_ativado", { tipo: "osm", motivo: "google_zero_resultados", busca });
+          console.log("[LEADS] Google retornou vazio, tentando OSM...");
+          todasAcumuladas = await buscarLugaresLeadsFallback(busca).catch((err) => {
+            debugProspeccaoErro("fallback_osm_erro", err, { busca });
+            return [];
+          });
+          debugProspeccao("leads_fallback_resultados", { tipo: "osm", quantidade: todasAcumuladas.length });
         }
 
         if (!todasAcumuladas.length) {
@@ -6033,6 +6040,7 @@ async function handler(req, res) {
         const classificadosNovos = classificadosFiltrados.filter((lead) => {
           const chave = String(lead.id || lead.telefone || "").trim();
           if (!chave) return false;
+          if (seenIdsSet.has(chave)) return false;
           return !leadSeenIndex.includes(chave);
         });
 

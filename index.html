@@ -899,7 +899,18 @@
     }
     .leads-historico-item:hover { background: var(--primary-dim); border-color: var(--primary-border); color: #a5b4fc; }
 
-    .leads-modal-footer { display: flex; justify-content: flex-end; }
+    .leads-modal-footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+    #leadsLimparSeenBtn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-3);
+      font-size: 11px;
+      padding: 6px 12px;
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      transition: color 120ms, border-color 120ms;
+    }
+    #leadsLimparSeenBtn:hover { color: var(--text-2); border-color: rgba(255,255,255,0.15); }
 
     .leads-search-btn {
       padding: 10px 22px;
@@ -5371,6 +5382,7 @@
       <div id="leadsToolResults" class="leads-tool-results" aria-live="polite"></div>
 
       <div class="leads-modal-footer">
+        <button id="leadsLimparSeenBtn" type="button" style="display:none">Limpar histórico</button>
         <button id="leadsSearchBtn" class="leads-search-btn" type="button">Buscar leads</button>
       </div>
     </div>
@@ -6213,8 +6225,9 @@
     const leadsReviewsMaxInput = document.getElementById("leadsReviewsMaxInput");
     const leadsPrioridadeAlvoSelect = document.getElementById("leadsPrioridadeAlvoSelect");
     const leadsQuantidadeAlvoInput = document.getElementById("leadsQuantidadeAlvoInput");
-    const leadsSearchBtn   = document.getElementById("leadsSearchBtn");
-    const leadsRadarSDR    = document.getElementById("leadsRadarSDR");
+    const leadsSearchBtn      = document.getElementById("leadsSearchBtn");
+    const leadsLimparSeenBtn  = document.getElementById("leadsLimparSeenBtn");
+    const leadsRadarSDR       = document.getElementById("leadsRadarSDR");
     const leadsHistorico   = document.getElementById("leadsHistorico");
     const cidadeChipsWrap  = document.getElementById("cidadeChipsWrap");
     const cidadeChips      = document.getElementById("cidadeChips");
@@ -6231,6 +6244,13 @@
 
     // ---- Persistência de buscas ----
     function carregarHistorico() { try { return JSON.parse(localStorage.getItem("lumyn_buscas") || "[]"); } catch { return []; } }
+
+    // ---- Dedup de leads já vistos por query ----
+    function seenIdsKey(query) { return "lumyn_seen_" + query.toLowerCase().trim(); }
+    function carregarSeenIds(query) { try { return JSON.parse(localStorage.getItem(seenIdsKey(query)) || "[]"); } catch { return []; } }
+    function salvarSeenIds(query, ids) { try { localStorage.setItem(seenIdsKey(query), JSON.stringify([...new Set(ids)].slice(-200))); } catch {} }
+    function limparSeenIds(query) { try { localStorage.removeItem(seenIdsKey(query)); } catch {} }
+
     function salvarBusca(query) {
       const hist = carregarHistorico().filter(h => h !== query);
       hist.unshift(query);
@@ -6451,6 +6471,17 @@
       if (e.key === "Enter") { e.preventDefault(); executarBuscaLeads(); }
     });
 
+    if (leadsQueryInput) leadsQueryInput.addEventListener("input", () => {
+      const q = leadsQueryInput.value.trim();
+      if (leadsLimparSeenBtn) leadsLimparSeenBtn.style.display = q && carregarSeenIds(q).length > 0 ? "block" : "none";
+    });
+
+    if (leadsLimparSeenBtn) leadsLimparSeenBtn.addEventListener("click", () => {
+      const q = leadsQueryInput?.value.trim() || "";
+      limparSeenIds(q);
+      leadsLimparSeenBtn.style.display = "none";
+    });
+
     document.querySelectorAll(".leads-chip").forEach((chip) => {
       chip.addEventListener("click", () => {
         const current = leadsQueryInput.value.trim();
@@ -6517,10 +6548,12 @@
         if (temMax) filtros.avaliacoesMax = avaliacoesMax;
         if (prioridadeAlvo) filtros.prioridadeAlvo = prioridadeAlvo;
         if (quantidadeAlvo) filtros.quantidadeAlvo = quantidadeAlvo;
+        const seenIds = carregarSeenIds(query);
         const data = await fetchWithFallback([API_ROUTE], {
           modo: "leads",
           input: query,
           filtros,
+          seenIds,
         });
         removeLoadingBubble();
         debugProspeccao("busca_leads_resposta", {
@@ -6531,8 +6564,15 @@
         });
 
         if (data.erro) {
-          createAssistantBubble({ role: "LUMYN", origem: "leads", erro: data.erro });
+          if (seenIds.length > 0 && (data?.resumo?.total === 0 || !data?.leads?.length)) {
+            createAssistantBubble({ role: "LUMYN", origem: "leads", erro: "Todos os leads desta busca já foram exibidos. Clique em \"Limpar histórico\" para recomeçar." });
+          } else {
+            createAssistantBubble({ role: "LUMYN", origem: "leads", erro: data.erro });
+          }
         } else {
+          const idsRetornados = (data.leads || []).map(l => l.id).filter(Boolean);
+          if (idsRetornados.length) salvarSeenIds(query, [...seenIds, ...idsRetornados]);
+          if (leadsLimparSeenBtn) leadsLimparSeenBtn.style.display = carregarSeenIds(query).length > 0 ? "block" : "none";
           createLeadsBubble(data);
         }
       } catch (err) {
