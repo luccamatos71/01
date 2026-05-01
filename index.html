@@ -699,6 +699,16 @@
       border-color: rgba(99,102,241,0.5);
       box-shadow: 0 0 0 3px rgba(99,102,241,0.08);
     }
+    .leads-reviews-row {
+      display: flex;
+      gap: 8px;
+      margin: -4px 0 16px;
+    }
+    .leads-reviews-row .leads-query-input {
+      margin-bottom: 0;
+      flex: 1;
+      min-width: 0;
+    }
 
     .leads-radar {
       margin-bottom: 16px;
@@ -5291,6 +5301,24 @@
         placeholder="Ex: barbearias em Curitiba"
         autocomplete="off"
       />
+      <div class="leads-reviews-row">
+        <input
+          type="number"
+          id="leadsReviewsMinInput"
+          class="leads-query-input"
+          placeholder="Avaliações mín."
+          min="0"
+          step="1"
+        />
+        <input
+          type="number"
+          id="leadsReviewsMaxInput"
+          class="leads-query-input"
+          placeholder="Avaliações máx."
+          min="0"
+          step="1"
+        />
+      </div>
 
       <div id="leadsRadarSDR" class="leads-radar" aria-live="polite"></div>
 
@@ -6152,6 +6180,8 @@
     const leadsOverlay     = document.getElementById("leadsOverlay");
     const leadsCloseBtn    = document.getElementById("leadsCloseBtn");
     const leadsQueryInput  = document.getElementById("leadsQueryInput");
+    const leadsReviewsMinInput = document.getElementById("leadsReviewsMinInput");
+    const leadsReviewsMaxInput = document.getElementById("leadsReviewsMaxInput");
     const leadsSearchBtn   = document.getElementById("leadsSearchBtn");
     const leadsRadarSDR    = document.getElementById("leadsRadarSDR");
     const leadsHistorico   = document.getElementById("leadsHistorico");
@@ -6424,6 +6454,18 @@
     async function executarBuscaLeads() {
       const query = leadsQueryInput.value.trim();
       if (!query) return;
+      const avaliacoesMin = Number.parseInt(leadsReviewsMinInput?.value || "", 10);
+      const avaliacoesMax = Number.parseInt(leadsReviewsMaxInput?.value || "", 10);
+      const temMin = Number.isFinite(avaliacoesMin) && avaliacoesMin >= 0;
+      const temMax = Number.isFinite(avaliacoesMax) && avaliacoesMax >= 0;
+      if (temMin && temMax && avaliacoesMin > avaliacoesMax) {
+        createAssistantBubble({
+          role: "LUMYN",
+          origem: "leads",
+          erro: "Filtro inválido: avaliações mín. não pode ser maior que avaliações máx."
+        });
+        return;
+      }
       debugProspeccao("busca_leads_inicio", debugProspeccaoNichoLocal(query));
 
       salvarBusca(query);
@@ -6446,7 +6488,14 @@
       createLoadingBubble();
 
       try {
-        const data = await fetchWithFallback([API_ROUTE], { modo: "leads", input: query });
+        const filtros = {};
+        if (temMin) filtros.avaliacoesMin = avaliacoesMin;
+        if (temMax) filtros.avaliacoesMax = avaliacoesMax;
+        const data = await fetchWithFallback([API_ROUTE], {
+          modo: "leads",
+          input: query,
+          filtros,
+        });
         removeLoadingBubble();
         debugProspeccao("busca_leads_resposta", {
           total: data?.resumo?.total || 0,

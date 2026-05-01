@@ -5912,6 +5912,12 @@ async function handler(req, res) {
       if (modo === "leads") {
         leadSeenIndex = [];
         const busca = extrairBusca(input);
+        const filtrosInput = body?.filtros && typeof body.filtros === "object" ? body.filtros : {};
+        const avaliacoesMinRaw = Number.parseInt(filtrosInput.avaliacoesMin, 10);
+        const avaliacoesMaxRaw = Number.parseInt(filtrosInput.avaliacoesMax, 10);
+        const avaliacoesMin = Number.isFinite(avaliacoesMinRaw) && avaliacoesMinRaw >= 0 ? avaliacoesMinRaw : null;
+        const avaliacoesMax = Number.isFinite(avaliacoesMaxRaw) && avaliacoesMaxRaw >= 0 ? avaliacoesMaxRaw : null;
+        const filtroAvaliacoesAtivo = avaliacoesMin !== null || avaliacoesMax !== null;
         debugProspeccao("leads_busca_recebida", debugProspeccaoNichoLocal(busca));
         let lugares = await buscarLugaresLeads(busca);
         debugProspeccao("leads_google_resultados", { quantidade: lugares.length });
@@ -5951,7 +5957,24 @@ async function handler(req, res) {
           return { ...lead, ...scoreLeadV2(lead) };
         });
 
-        const classificadosNovos = classificados.filter((lead) => {
+        const classificadosFiltrados = filtroAvaliacoesAtivo
+          ? classificados.filter((lead) => {
+              const totalAvaliacoes = Number(lead.avaliacoes);
+              if (!Number.isFinite(totalAvaliacoes)) return false;
+              if (avaliacoesMin !== null && totalAvaliacoes < avaliacoesMin) return false;
+              if (avaliacoesMax !== null && totalAvaliacoes > avaliacoesMax) return false;
+              return true;
+            })
+          : classificados;
+        debugProspeccao("leads_filtro_avaliacoes", {
+          ativo: filtroAvaliacoesAtivo,
+          avaliacoesMin,
+          avaliacoesMax,
+          totalAntes: classificados.length,
+          totalDepois: classificadosFiltrados.length,
+        });
+
+        const classificadosNovos = classificadosFiltrados.filter((lead) => {
           const chave = String(lead.id || lead.telefone || "").trim();
           if (!chave) return false;
           return !leadSeenIndex.includes(chave);
