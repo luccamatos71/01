@@ -2314,28 +2314,41 @@ function gerarVariantesQuery(query) {
 }
 
 async function buscarLugaresLeadsParalelo(query) {
-  const variantes = gerarVariantesQuery(query);
-  debugProspeccao("leads_variantes_query", { query, variantes });
-
-  const resultados = await Promise.allSettled(
-    variantes.map(v => buscarLugaresLeadsPagina(v))
-  );
-
+  // Chamada principal com retry e logging completo (caminho confiável)
+  const primario = await buscarLugaresLeads(query);
   const idsSeen = new Set();
   const placesUnicos = [];
-  for (const r of resultados) {
-    if (r.status === "fulfilled") {
-      for (const place of r.value.places) {
-        if (place.id && !idsSeen.has(place.id)) {
-          idsSeen.add(place.id);
-          placesUnicos.push(place);
+
+  for (const place of primario.places) {
+    if (place.id && !idsSeen.has(place.id)) {
+      idsSeen.add(place.id);
+      placesUnicos.push(place);
+    }
+  }
+
+  // Variantes adicionais em paralelo só se a chamada principal funcionou
+  if (primario.places.length > 0) {
+    const todasVariantes = gerarVariantesQuery(query);
+    const variantesExtras = todasVariantes.filter(v => v !== primario.queryUsada);
+    debugProspeccao("leads_variantes_query", { query, queryUsada: primario.queryUsada, variantesExtras });
+
+    if (variantesExtras.length > 0) {
+      const extras = await Promise.allSettled(variantesExtras.map(v => buscarLugaresLeadsPagina(v)));
+      for (const r of extras) {
+        if (r.status === "fulfilled") {
+          for (const place of r.value.places) {
+            if (place.id && !idsSeen.has(place.id)) {
+              idsSeen.add(place.id);
+              placesUnicos.push(place);
+            }
+          }
         }
       }
     }
   }
 
-  debugProspeccao("leads_variantes_merge", { variantesUsadas: variantes.length, totalUnicos: placesUnicos.length });
-  return { places: placesUnicos, queryUsada: query };
+  debugProspeccao("leads_variantes_merge", { totalPrimario: primario.places.length, totalUnicos: placesUnicos.length });
+  return { places: placesUnicos, queryUsada: primario.queryUsada || query };
 }
 
 async function geocodificarCidadeOSM(cidade) {
