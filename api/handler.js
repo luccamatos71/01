@@ -2286,16 +2286,40 @@ async function buscarLugaresLeads(query) {
   for (const tentativa of tentativas) {
     try {
       debugProspeccao("google_maps_tentativa", { tentativa, ...debugProspeccaoNichoLocal(tentativa) });
-      const { places, nextPageToken } = await buscarLugaresLeadsPagina(tentativa);
-      debugProspeccao("google_maps_resposta", { modo: "leads", tentativa, quantidade: places.length });
-      if (places.length > 0) return { places, nextPageToken, queryUsada: tentativa };
+      const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": GOOGLE_API_KEY,
+          "X-Goog-FieldMask":
+            "places.id,places.displayName,places.rating,places.userRatingCount,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.primaryTypeDisplayName,places.googleMapsUri,places.businessStatus",
+        },
+        body: JSON.stringify({
+          textQuery: tentativa,
+          languageCode: "pt-BR",
+          maxResultCount: 20,
+        }),
+      });
+      const data = await response.json();
+      debugProspeccao("google_maps_resposta", {
+        modo: "leads",
+        tentativa,
+        status: response.status,
+        quantidade: Array.isArray(data.places) ? data.places.length : 0,
+      });
+      if (data.error) {
+        debugProspeccaoErro("google_maps_erro", data.error, { modo: "leads", tentativa, status: response.status });
+        console.warn("[LEADS BUSCA] Google API error:", data.error.message || JSON.stringify(data.error));
+        break;
+      }
+      if (data.places && data.places.length > 0) return data.places;
     } catch (e) {
       debugProspeccaoErro("google_maps_excecao", e, { modo: "leads", tentativa });
       console.warn("[LEADS BUSCA] erro na tentativa:", e.message);
     }
   }
   debugProspeccao("google_maps_sem_resultado", { modo: "leads", tentativas: tentativas.length });
-  return { places: [], nextPageToken: null, queryUsada: query };
+  return [];
 }
 
 function gerarVariantesQuery(query) {
@@ -2314,25 +2338,23 @@ function gerarVariantesQuery(query) {
 }
 
 async function buscarLugaresLeadsParalelo(query) {
-  // Chamada principal com retry e logging completo (caminho confiável)
-  const primario = await buscarLugaresLeads(query);
+  // Chamada principal — função original intacta, retorna array
+  const placesPrimario = await buscarLugaresLeads(query);
   const idsSeen = new Set();
   const placesUnicos = [];
 
-  for (const place of primario.places) {
+  for (const place of placesPrimario) {
     if (place.id && !idsSeen.has(place.id)) {
       idsSeen.add(place.id);
       placesUnicos.push(place);
     }
   }
 
-  // Variantes adicionais em paralelo só se a chamada principal funcionou
-  if (primario.places.length > 0) {
-    const todasVariantes = gerarVariantesQuery(query);
-    const variantesExtras = todasVariantes.filter(v => v !== primario.queryUsada);
-    debugProspeccao("leads_variantes_query", { query, queryUsada: primario.queryUsada, variantesExtras });
-
+  // Variantes extras só se a principal funcionou
+  if (placesPrimario.length > 0) {
+    const variantesExtras = gerarVariantesQuery(query).slice(1);
     if (variantesExtras.length > 0) {
+      debugProspeccao("leads_variantes_query", { query, variantesExtras });
       const extras = await Promise.allSettled(variantesExtras.map(v => buscarLugaresLeadsPagina(v)));
       for (const r of extras) {
         if (r.status === "fulfilled") {
@@ -2347,8 +2369,8 @@ async function buscarLugaresLeadsParalelo(query) {
     }
   }
 
-  debugProspeccao("leads_variantes_merge", { totalPrimario: primario.places.length, totalUnicos: placesUnicos.length });
-  return { places: placesUnicos, queryUsada: primario.queryUsada || query };
+  debugProspeccao("leads_variantes_merge", { totalPrimario: placesPrimario.length, totalUnicos: placesUnicos.length });
+  return placesUnicos;
 }
 
 async function geocodificarCidadeOSM(cidade) {
@@ -5982,25 +6004,25 @@ async function handler(req, res) {
 
         debugProspeccao("leads_busca_recebida", { ...debugProspeccaoNichoLocal(busca), prioridadeAlvo, quantidadeAlvo, seenIdsCount: seenIdsSet.size });
 
-        const resultado = await buscarLugaresLeadsParalelo(busca);
-        let todasAcumuladas = resultado.places;
+        let lugares = await buscarLugaresLeadsParalelo(busca);
+        debugProspeccao("leads_google_resultados", { quantidade: lugares.length });
 
-        if (!todasAcumuladas.length) {
+        if (!lugares.length) {
           debugProspeccao("fallback_ativado", { tipo: "osm", motivo: "google_zero_resultados", busca });
           console.log("[LEADS] Google retornou vazio, tentando OSM...");
-          todasAcumuladas = await buscarLugaresLeadsFallback(busca).catch((err) => {
+          lugares = await buscarLugaresLeadsFallback(busca).catch((err) => {
             debugProspeccaoErro("fallback_osm_erro", err, { busca });
             return [];
           });
-          debugProspeccao("leads_fallback_resultados", { tipo: "osm", quantidade: todasAcumuladas.length });
+          debugProspeccao("leads_fallback_resultados", { tipo: "osm", quantidade: lugares.length });
         }
 
-        if (!todasAcumuladas.length) {
+        if (!lugares.length) {
           debugProspeccao("leads_sem_resultados", debugProspeccaoNichoLocal(busca));
           return enviarJson(res, 200, { erro: "Nenhum resultado encontrado para essa busca." });
         }
 
-        let lugares = todasAcumuladas.filter(l => !l.businessStatus || l.businessStatus === "OPERATIONAL");
+        lugares = lugares.filter(l => !l.businessStatus || l.businessStatus === "OPERATIONAL");
 
         const classificados = lugares.map((l) => {
           const prioridade = classificarLead(l.rating, l.userRatingCount, !!l.websiteUri);
@@ -6053,7 +6075,7 @@ async function handler(req, res) {
         const classificadosNovos = classificadosFiltrados.filter((lead) => {
           const chave = String(lead.id || lead.telefone || "").trim();
           if (!chave) return false;
-          if (seenIdsSet.has(chave)) return false;
+          if (seenIdsSet.size > 0 && seenIdsSet.has(chave)) return false;
           return !leadSeenIndex.includes(chave);
         });
 
