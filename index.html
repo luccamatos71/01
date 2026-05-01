@@ -634,6 +634,8 @@
 
     .leads-modal {
       width: min(480px, 94vw);
+      max-height: calc(100dvh - 32px);
+      overflow-y: auto;
       background: var(--surface-2);
       border: 1px solid var(--border);
       border-radius: var(--r-xl);
@@ -709,6 +711,15 @@
       flex: 1;
       min-width: 0;
     }
+    .leads-select {
+      appearance: none;
+      cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 28px;
+    }
+    .leads-select option { background: #0c0e1a; }
 
     .leads-radar {
       margin-bottom: 16px;
@@ -5319,6 +5330,24 @@
           step="1"
         />
       </div>
+      <div class="leads-reviews-row">
+        <select id="leadsPrioridadeAlvoSelect" class="leads-query-input leads-select">
+          <option value="">Todas as prioridades</option>
+          <option value="ALTA">Somente ALTA</option>
+          <option value="MEDIA">Somente MÉDIA</option>
+          <option value="BAIXA">Somente BAIXA</option>
+          <option value="DESCARTE">Somente DESCARTE</option>
+        </select>
+        <input
+          type="number"
+          id="leadsQuantidadeAlvoInput"
+          class="leads-query-input"
+          placeholder="Qtd. alvo (máx 60)"
+          min="1"
+          max="60"
+          step="1"
+        />
+      </div>
 
       <div id="leadsRadarSDR" class="leads-radar" aria-live="polite"></div>
 
@@ -6182,6 +6211,8 @@
     const leadsQueryInput  = document.getElementById("leadsQueryInput");
     const leadsReviewsMinInput = document.getElementById("leadsReviewsMinInput");
     const leadsReviewsMaxInput = document.getElementById("leadsReviewsMaxInput");
+    const leadsPrioridadeAlvoSelect = document.getElementById("leadsPrioridadeAlvoSelect");
+    const leadsQuantidadeAlvoInput = document.getElementById("leadsQuantidadeAlvoInput");
     const leadsSearchBtn   = document.getElementById("leadsSearchBtn");
     const leadsRadarSDR    = document.getElementById("leadsRadarSDR");
     const leadsHistorico   = document.getElementById("leadsHistorico");
@@ -6290,19 +6321,9 @@
       bindRadarSDR();
     }
 
-    function renderRadarSDRErro(janelaDias) {
+    function renderRadarSDRErro() {
       if (!leadsRadarSDR) return;
-      leadsRadarSDR.innerHTML = `
-        <div class="leads-radar-head">
-          <div>
-            <div class="leads-radar-title">Radar SDR</div>
-            <div class="leads-radar-subtitle">Tendencias do CRM para prospectar melhor.</div>
-          </div>
-          <div class="leads-radar-tabs">${renderTabsRadarSDR(janelaDias)}</div>
-        </div>
-        <div class="leads-radar-alert">Nao consegui carregar o radar agora. A busca continua normal.</div>
-      `;
-      bindRadarSDR();
+      leadsRadarSDR.innerHTML = "";
     }
 
     function renderRadarSDR(data, janelaDias) {
@@ -6458,6 +6479,9 @@
       const avaliacoesMax = Number.parseInt(leadsReviewsMaxInput?.value || "", 10);
       const temMin = Number.isFinite(avaliacoesMin) && avaliacoesMin >= 0;
       const temMax = Number.isFinite(avaliacoesMax) && avaliacoesMax >= 0;
+      const prioridadeAlvo = leadsPrioridadeAlvoSelect?.value || "";
+      const quantidadeAlvoRaw = Number.parseInt(leadsQuantidadeAlvoInput?.value || "", 10);
+      const quantidadeAlvo = Number.isFinite(quantidadeAlvoRaw) && quantidadeAlvoRaw > 0 ? Math.min(quantidadeAlvoRaw, 60) : null;
       if (temMin && temMax && avaliacoesMin > avaliacoesMax) {
         createAssistantBubble({
           role: "LUMYN",
@@ -6491,6 +6515,8 @@
         const filtros = {};
         if (temMin) filtros.avaliacoesMin = avaliacoesMin;
         if (temMax) filtros.avaliacoesMax = avaliacoesMax;
+        if (prioridadeAlvo) filtros.prioridadeAlvo = prioridadeAlvo;
+        if (quantidadeAlvo) filtros.quantidadeAlvo = quantidadeAlvo;
         const data = await fetchWithFallback([API_ROUTE], {
           modo: "leads",
           input: query,

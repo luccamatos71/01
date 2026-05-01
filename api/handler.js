@@ -2253,6 +2253,27 @@ async function buscarDetalhes(placeId) {
   return data;
 }
 
+async function buscarLugaresLeadsPagina(query, pageToken = null) {
+  const body = { textQuery: query, languageCode: "pt-BR", maxResultCount: 20 };
+  if (pageToken) body.pageToken = pageToken;
+  const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": GOOGLE_API_KEY,
+      "X-Goog-FieldMask":
+        "places.id,places.displayName,places.rating,places.userRatingCount,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.primaryTypeDisplayName,places.googleMapsUri,places.businessStatus,nextPageToken",
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json();
+  if (data.error) {
+    console.warn("[LEADS BUSCA] Google API error:", data.error.message || JSON.stringify(data.error));
+    return { places: [], nextPageToken: null };
+  }
+  return { places: data.places || [], nextPageToken: data.nextPageToken || null };
+}
+
 async function buscarLugaresLeads(query) {
   console.log("[LEADS BUSCA]:", query);
   debugProspeccao("google_maps_chamada", { endpoint: "places:searchText", modo: "leads_inicio", ...debugProspeccaoNichoLocal(query) });
@@ -2265,40 +2286,16 @@ async function buscarLugaresLeads(query) {
   for (const tentativa of tentativas) {
     try {
       debugProspeccao("google_maps_tentativa", { tentativa, ...debugProspeccaoNichoLocal(tentativa) });
-      const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Goog-Api-Key": GOOGLE_API_KEY,
-          "X-Goog-FieldMask":
-            "places.id,places.displayName,places.rating,places.userRatingCount,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.primaryTypeDisplayName,places.googleMapsUri,places.businessStatus",
-        },
-        body: JSON.stringify({
-          textQuery: tentativa,
-          languageCode: "pt-BR",
-          maxResultCount: 20,
-        }),
-      });
-      const data = await response.json();
-      debugProspeccao("google_maps_resposta", {
-        modo: "leads",
-        tentativa,
-        status: response.status,
-        quantidade: Array.isArray(data.places) ? data.places.length : 0,
-      });
-      if (data.error) {
-        debugProspeccaoErro("google_maps_erro", data.error, { modo: "leads", tentativa, status: response.status });
-        console.warn("[LEADS BUSCA] Google API error:", data.error.message || JSON.stringify(data.error));
-        break;
-      }
-      if (data.places && data.places.length > 0) return data.places;
+      const { places, nextPageToken } = await buscarLugaresLeadsPagina(tentativa);
+      debugProspeccao("google_maps_resposta", { modo: "leads", tentativa, quantidade: places.length });
+      if (places.length > 0) return { places, nextPageToken, queryUsada: tentativa };
     } catch (e) {
       debugProspeccaoErro("google_maps_excecao", e, { modo: "leads", tentativa });
       console.warn("[LEADS BUSCA] erro na tentativa:", e.message);
     }
   }
   debugProspeccao("google_maps_sem_resultado", { modo: "leads", tentativas: tentativas.length });
-  return [];
+  return { places: [], nextPageToken: null, queryUsada: query };
 }
 
 async function geocodificarCidadeOSM(cidade) {
@@ -5918,25 +5915,72 @@ async function handler(req, res) {
         const avaliacoesMin = Number.isFinite(avaliacoesMinRaw) && avaliacoesMinRaw >= 0 ? avaliacoesMinRaw : null;
         const avaliacoesMax = Number.isFinite(avaliacoesMaxRaw) && avaliacoesMaxRaw >= 0 ? avaliacoesMaxRaw : null;
         const filtroAvaliacoesAtivo = avaliacoesMin !== null || avaliacoesMax !== null;
-        debugProspeccao("leads_busca_recebida", debugProspeccaoNichoLocal(busca));
-        let lugares = await buscarLugaresLeads(busca);
-        debugProspeccao("leads_google_resultados", { quantidade: lugares.length });
-        if (!lugares.length) {
-          debugProspeccao("fallback_ativado", { tipo: "osm", motivo: "google_zero_resultados", busca });
-          console.log("[LEADS] Google retornou vazio, tentando OSM...");
-          lugares = await buscarLugaresLeadsFallback(busca).catch((err) => {
-            debugProspeccaoErro("fallback_osm_erro", err, { busca });
-            return [];
-          });
-          debugProspeccao("leads_fallback_resultados", { tipo: "osm", quantidade: lugares.length });
+
+        const PRIORIDADES_VALIDAS = ["ALTA", "MEDIA", "BAIXA", "DESCARTE"];
+        const prioridadeAlvoRaw = String(filtrosInput.prioridadeAlvo || "").toUpperCase().trim();
+        const prioridadeAlvo = PRIORIDADES_VALIDAS.includes(prioridadeAlvoRaw) ? prioridadeAlvoRaw : null;
+        const quantidadeAlvoRaw = Number.parseInt(filtrosInput.quantidadeAlvo, 10);
+        const quantidadeAlvo = Number.isFinite(quantidadeAlvoRaw) && quantidadeAlvoRaw > 0
+          ? Math.min(quantidadeAlvoRaw, 60)
+          : 20;
+
+        debugProspeccao("leads_busca_recebida", { ...debugProspeccaoNichoLocal(busca), prioridadeAlvo, quantidadeAlvo });
+
+        // Busca paginada: até 3 páginas (60 resultados) quando há prioridade alvo
+        const MAX_PAGINAS = prioridadeAlvo ? 3 : 1;
+        let todasAcumuladas = [];
+        let pageToken = null;
+        let queryUsada = null;
+        let usouFallback = false;
+
+        for (let pagina = 0; pagina < MAX_PAGINAS; pagina++) {
+          let lugaresGoogle;
+          if (pagina === 0) {
+            const resultado = await buscarLugaresLeads(busca);
+            lugaresGoogle = resultado.places;
+            pageToken = resultado.nextPageToken;
+            queryUsada = resultado.queryUsada;
+          } else {
+            if (!pageToken) break;
+            const resultado = await buscarLugaresLeadsPagina(queryUsada, pageToken);
+            lugaresGoogle = resultado.places;
+            pageToken = resultado.nextPageToken;
+          }
+
+          debugProspeccao("leads_google_resultados", { pagina: pagina + 1, quantidade: lugaresGoogle.length });
+
+          if (!lugaresGoogle.length && pagina === 0) {
+            debugProspeccao("fallback_ativado", { tipo: "osm", motivo: "google_zero_resultados", busca });
+            console.log("[LEADS] Google retornou vazio, tentando OSM...");
+            const lugaresOSM = await buscarLugaresLeadsFallback(busca).catch((err) => {
+              debugProspeccaoErro("fallback_osm_erro", err, { busca });
+              return [];
+            });
+            debugProspeccao("leads_fallback_resultados", { tipo: "osm", quantidade: lugaresOSM.length });
+            todasAcumuladas.push(...lugaresOSM);
+            usouFallback = true;
+            break;
+          }
+
+          todasAcumuladas.push(...lugaresGoogle);
+
+          // Verifica se já temos o suficiente da prioridade alvo para parar antes
+          if (prioridadeAlvo && !usouFallback) {
+            const jaClassificados = todasAcumuladas
+              .filter(l => !l.businessStatus || l.businessStatus === "OPERATIONAL")
+              .filter(l => classificarLead(l.rating, l.userRatingCount, !!l.websiteUri) === prioridadeAlvo);
+            if (jaClassificados.length >= quantidadeAlvo || !pageToken) break;
+          } else {
+            break;
+          }
         }
 
-        if (!lugares.length) {
+        if (!todasAcumuladas.length) {
           debugProspeccao("leads_sem_resultados", debugProspeccaoNichoLocal(busca));
           return enviarJson(res, 200, { erro: "Nenhum resultado encontrado para essa busca." });
         }
 
-        lugares = lugares.filter(l => !l.businessStatus || l.businessStatus === "OPERATIONAL");
+        let lugares = todasAcumuladas.filter(l => !l.businessStatus || l.businessStatus === "OPERATIONAL");
 
         const classificados = lugares.map((l) => {
           const prioridade = classificarLead(l.rating, l.userRatingCount, !!l.websiteUri);
@@ -5957,7 +6001,8 @@ async function handler(req, res) {
           return { ...lead, ...scoreLeadV2(lead) };
         });
 
-        const classificadosFiltrados = filtroAvaliacoesAtivo
+        // Aplica filtro de avaliações
+        let classificadosFiltrados = filtroAvaliacoesAtivo
           ? classificados.filter((lead) => {
               const totalAvaliacoes = Number(lead.avaliacoes);
               if (!Number.isFinite(totalAvaliacoes)) return false;
@@ -5973,6 +6018,17 @@ async function handler(req, res) {
           totalAntes: classificados.length,
           totalDepois: classificadosFiltrados.length,
         });
+
+        // Aplica filtro de prioridade alvo e limita à quantidade alvo
+        if (prioridadeAlvo) {
+          classificadosFiltrados = classificadosFiltrados.filter(l => l.prioridade === prioridadeAlvo);
+          classificadosFiltrados = classificadosFiltrados.slice(0, quantidadeAlvo);
+          debugProspeccao("leads_filtro_prioridade_alvo", {
+            prioridadeAlvo,
+            quantidadeAlvo,
+            totalDepois: classificadosFiltrados.length,
+          });
+        }
 
         const classificadosNovos = classificadosFiltrados.filter((lead) => {
           const chave = String(lead.id || lead.telefone || "").trim();
