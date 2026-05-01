@@ -5999,6 +5999,45 @@ async function handler(req, res) {
         classificados.length = 0;
         classificados.push(...semCRM);
 
+        const leadsCRMNormalizados = (crmData.leads || []).map(normalizarLeadCRM);
+        const statsNicho = new Map();
+        leadsCRMNormalizados.forEach((lead) => {
+          const chave = String(lead.nichoCanonico || lead.nichoLabel || lead.nicho || lead.categoria || "generico").trim() || "generico";
+          if (!statsNicho.has(chave)) {
+            statsNicho.set(chave, { abordados: 0, reunioes: 0 });
+          }
+          const stats = statsNicho.get(chave);
+          if (leadCRMAbordado(lead)) stats.abordados += 1;
+          if (lead.virouReuniao || ["reuniao", "proposta", "fechado"].includes(lead.status)) stats.reunioes += 1;
+        });
+
+        const nichosValidos = Array.from(statsNicho.entries())
+          .map(([chave, stats]) => ({
+            chave,
+            abordados: stats.abordados,
+            taxaReuniao: taxaCRM(stats.reunioes, stats.abordados),
+          }))
+          .filter((item) => item.abordados >= CRM_LEARNING_MIN_AMOSTRA);
+        const mediaTaxaReuniao = nichosValidos.length
+          ? nichosValidos.reduce((acc, item) => acc + item.taxaReuniao, 0) / nichosValidos.length
+          : 0;
+        const boostPorNicho = new Map(
+          nichosValidos.map((item) => {
+            const delta = item.taxaReuniao - mediaTaxaReuniao;
+            const boost = Math.max(0, Math.min(8, Math.round(delta / 2)));
+            return [item.chave, boost];
+          })
+        );
+        classificados.forEach((lead) => {
+          const chave = String(lead.nichoCanonico || lead.nichoLabel || lead.nicho || lead.categoria || "generico").trim() || "generico";
+          lead.boostRankingNicho = boostPorNicho.get(chave) || 0;
+        });
+        debugProspeccao("ranking_nicho_learning", {
+          nichosValidos: nichosValidos.length,
+          mediaTaxaReuniao: Math.round(mediaTaxaReuniao * 10) / 10,
+          boostsAtivos: Array.from(boostPorNicho.entries()).filter(([, boost]) => boost > 0).length,
+        });
+
         debugProspeccao("dados_normalizados", {
           quantidade: classificados.length,
           amostra: classificados.slice(0, 3).map((l) => ({
@@ -6022,7 +6061,9 @@ async function handler(req, res) {
         leads.sort((a, b) => {
           const diff = ordemPrioridade[a.prioridade] - ordemPrioridade[b.prioridade];
           if (diff !== 0) return diff;
-          const scoreDiff = (b.score || 0) - (a.score || 0);
+          const scoreAjustadoA = (a.score || 0) + (a.boostRankingNicho || 0);
+          const scoreAjustadoB = (b.score || 0) + (b.boostRankingNicho || 0);
+          const scoreDiff = scoreAjustadoB - scoreAjustadoA;
           if (scoreDiff !== 0) return scoreDiff;
           return (a.telefone ? 0 : 1) - (b.telefone ? 0 : 1);
         });
@@ -6213,6 +6254,30 @@ async function handler(req, res) {
       }
 
       if (modo === "atualizar") {
+        if (supabase) {
+          const { data, error } = await supabase.from("leads").select("*").eq("id", body.id).limit(1).maybeSingle();
+          if (error) throw error;
+          if (!data) return enviarJson(res, 404, { erro: "Lead não encontrado" });
+          const leadAtual = normalizarLeadCRM(data.dados || data);
+          const CAMPOS_PERMITIDOS = [
+            "status", "ultimoMovimento", "statusConversa", "ultimaInteracaoEm",
+            "needsFollowUp", "mensagemInicial", "tipoMensagemInicial", "mensagemFollowUp", "followUp", "notas",
+            "respondeu", "usouFollowUp", "virouReuniao", "estagioFinal", "nicho",
+            "primeiraMensagemEnviadaEm", "followUpEnviadoEm", "respondeuEm", "reuniaoEm", "perdidoEm",
+            "learningTags", "motivoPerda", "mensagensUsadas", "outreachPatternId", "outreachVariationUsada",
+            "ultimaMensagemTipo", "tempoAteRespostaHoras", "tempoAteReuniaoHoras", "resultadoComercial", "sinalScoreResultado",
+            "site", "mapsUrl", "businessStatus", "categoriaGoogle", "nichoCanonico", "nichoLabel",
+            "scoreVersion", "score", "scoreConfianca", "scoreBreakdown", "sinaisFortes", "sinaisFracos",
+            "proximoPasso", "anguloAbordagem", "contextoAbordagem", "gatilhoConversacional", "riscoTom", "origemBusca",
+          ];
+          CAMPOS_PERMITIDOS.forEach(c => {
+            if (body[c] !== undefined) leadAtual[c] = body[c];
+          });
+          leadAtual.atualizadoEm = new Date().toISOString();
+          await salvarLead(leadAtual);
+          return enviarJson(res, 200, { ok: true, lead: normalizarLeadCRM(leadAtual) });
+        }
+
         const crm = await lerCRM();
         const idx = crm.leads.findIndex(l => l.id === body.id);
         if (idx < 0) return enviarJson(res, 404, { erro: "Lead não encontrado" });
@@ -6238,6 +6303,17 @@ async function handler(req, res) {
       }
 
       if (modo === "status") {
+        if (supabase) {
+          const { data, error } = await supabase.from("leads").select("*").eq("id", body.id).limit(1).maybeSingle();
+          if (error) throw error;
+          if (!data) return enviarJson(res, 404, { erro: "Lead não encontrado" });
+          const leadAtual = normalizarLeadCRM(data.dados || data);
+          leadAtual.status = body.status;
+          leadAtual.atualizadoEm = new Date().toISOString();
+          await salvarLead(leadAtual);
+          return enviarJson(res, 200, { ok: true });
+        }
+
         const crm = await lerCRM();
         const idx = crm.leads.findIndex(l => l.id === body.id);
         if (idx < 0) return enviarJson(res, 404, { erro: "Lead não encontrado" });
@@ -6248,6 +6324,17 @@ async function handler(req, res) {
       }
 
       if (modo === "notas") {
+        if (supabase) {
+          const { data, error } = await supabase.from("leads").select("*").eq("id", body.id).limit(1).maybeSingle();
+          if (error) throw error;
+          if (!data) return enviarJson(res, 404, { erro: "Lead não encontrado" });
+          const leadAtual = normalizarLeadCRM(data.dados || data);
+          leadAtual.notas = body.notas;
+          leadAtual.atualizadoEm = new Date().toISOString();
+          await salvarLead(leadAtual);
+          return enviarJson(res, 200, { ok: true });
+        }
+
         const crm = await lerCRM();
         const idx = crm.leads.findIndex(l => l.id === body.id);
         if (idx < 0) return enviarJson(res, 404, { erro: "Lead não encontrado" });

@@ -6476,6 +6476,8 @@
     }
 
     function extrairMensagemPronta(analise) {
+      // Hierarquia canônica: Outreacher é a fonte oficial de mensagens.
+      // "Mensagem pronta:" no bloco SDR é suporte legado de retrocompatibilidade.
       // Retrocompat: retorna a primeira mensagem encontrada (Direta > Leve > Agressiva > legado)
       const msgs = extrairMensagens(analise);
       return msgs.direta || msgs.leve || msgs.agressiva || msgs.legado || "";
