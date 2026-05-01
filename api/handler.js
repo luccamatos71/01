@@ -2262,7 +2262,7 @@ async function buscarLugaresLeadsPagina(query, pageToken = null) {
       "Content-Type": "application/json",
       "X-Goog-Api-Key": GOOGLE_API_KEY,
       "X-Goog-FieldMask":
-        "places.id,places.displayName,places.rating,places.userRatingCount,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.primaryTypeDisplayName,places.googleMapsUri,places.businessStatus,nextPageToken",
+        "places.id,places.displayName,places.rating,places.userRatingCount,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.primaryTypeDisplayName,places.googleMapsUri,places.businessStatus",
     },
     body: JSON.stringify(body),
   });
