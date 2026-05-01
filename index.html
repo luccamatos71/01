@@ -6984,6 +6984,7 @@
 
       const metaParts = [];
       if (lead.nota) metaParts.push(`⭐ ${lead.nota} · ${lead.avaliacoes} avaliações`);
+      else if (!lead.mapsUrl) metaParts.push("OpenStreetMap — sem dados de avaliação");
       if (lead.telefone) metaParts.push(lead.telefone);
       if (lead.endereco) metaParts.push(lead.endereco);
       analysisDrawerMeta.textContent = metaParts.join(" · ");
@@ -7004,6 +7005,38 @@
 
       if (lead.analise) {
         renderAnaliseNoDrawer(lead.analise);
+      } else if (lead.prioridade === "BAIXA") {
+        // Render imediato com dados do score — sem espera de IA
+        renderAnaliseNoDrawer("");
+        const varSec = analysisDrawerBody.querySelector("#variacoesSection");
+        if (varSec) {
+          const btn = document.createElement("button");
+          btn.className = "outreach-regenerar-btn";
+          btn.textContent = "Gerar análise completa";
+          btn.addEventListener("click", async () => {
+            btn.textContent = "Analisando...";
+            btn.disabled = true;
+            try {
+              const resp = await fetch(API_ROUTE, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ modo: "analisar", placeId: lead.id })
+              });
+              const data = await resp.json();
+              if (data.resposta) {
+                lead.analise = data.resposta;
+                renderAnaliseNoDrawer(data.resposta);
+              } else {
+                btn.textContent = "Gerar análise completa";
+                btn.disabled = false;
+              }
+            } catch {
+              btn.textContent = "Gerar análise completa";
+              btn.disabled = false;
+            }
+          });
+          varSec.insertAdjacentElement("beforebegin", btn);
+        }
       } else {
         analysisDrawerBody.innerHTML = `<div class="loading"><span class="spinner"></span><span>Analisando...</span></div>`;
         try {
@@ -7030,9 +7063,12 @@
       const badgeClass = p === "MEDIA" ? "media" : p === "ALTA" ? "alta" : p === "DESCARTE" ? "descarte" : "baixa";
       const badgeLabel = p === "MEDIA" ? "MÉDIA" : p;
 
+      const isOSM = !lead.mapsUrl;
       const ratingHtml = lead.nota
         ? `&#11088; ${lead.nota} &nbsp;&middot;&nbsp; ${lead.avaliacoes} aval.`
-        : `${lead.avaliacoes || 0} aval.`;
+        : isOSM
+          ? `<span style="color:rgba(136,146,176,0.55);font-size:11px;">OpenStreetMap</span>`
+          : `${lead.avaliacoes || 0} aval.`;
 
       const phoneHtml = lead.telefone
         ? `&nbsp;&middot;&nbsp; <span style="color:#a5b4fc;">${escapeHtml(lead.telefone)}</span>`
